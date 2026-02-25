@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import type { ReactNode } from 'react'
+import type { ComponentType, ReactNode } from 'react'
 import { cn } from '@/lib/utils'
 import { Variant } from '@/content/Variant'
 
@@ -388,20 +388,58 @@ export function Footer({ children, className }: FooterProps) {
 }
 
 /**
+ * Wraps an MDX component to inject data-flow-target attribute on its root element.
+ * The target format is "ComponentName:text" where text is derived from:
+ * - `label` prop (for ListItem)
+ * - `initials` prop (for Avatar)
+ * - `title` prop (for ScreenHeader)
+ * - string children (for Button, RadioCard, Badge, etc.)
+ */
+function extractTargetText(componentName: string, props: Record<string, unknown>): string | null {
+  void componentName
+  if ('label' in props && typeof props.label === 'string') return props.label
+  if ('initials' in props && typeof props.initials === 'string') return props.initials
+  if ('title' in props && typeof props.title === 'string') return props.title
+  if ('children' in props) {
+    const children = props.children
+    if (typeof children === 'string') return children.trim()
+  }
+  return null
+}
+
+function withFlowTarget<P extends object>(
+  componentName: string,
+  Component: ComponentType<P>
+): ComponentType<P> {
+  function Wrapped(props: P) {
+    const text = extractTargetText(componentName, props as Record<string, unknown>)
+    const target = text ? `${componentName}:${text}` : null
+
+    return (
+      <div data-flow-target={target ?? undefined} style={{ display: 'contents' }}>
+        <Component {...props} />
+      </div>
+    )
+  }
+  Wrapped.displayName = `FlowTarget(${componentName})`
+  return Wrapped
+}
+
+/**
  * Component map provided to MDX runtime.
  * These are available in MDX files without importing.
  */
 export const mdxComponents = {
   Variant,
-  Button,
+  Button: withFlowTarget('Button', Button),
   Card,
   Input,
   Badge,
   Note,
-  ScreenHeader,
-  ListItem,
-  RadioCard,
-  Avatar,
+  ScreenHeader: withFlowTarget('ScreenHeader', ScreenHeader),
+  ListItem: withFlowTarget('ListItem', ListItem),
+  RadioCard: withFlowTarget('RadioCard', RadioCard),
+  Avatar: withFlowTarget('Avatar', Avatar),
   Divider,
   Stack,
   Textarea,
