@@ -1,0 +1,90 @@
+name: Booking Appointment
+startRoute: /booking/search
+startState: empty
+
+actions:
+  # Search screen — hub that links to sub-screens
+  /booking/search:
+    - trigger: "ListItem:Booking type"
+      navigate: /booking/type
+      navigateState: acute
+    - trigger: "ListItem:Book appointment for"
+      navigate: /booking/patient
+      navigateState: self
+    - trigger: "ListItem:Time slots"
+      navigate: /booking/time-slots
+      navigateState: all-selected
+    - trigger: "ListItem:Location"
+      navigate: /booking/location
+      navigateState: initial
+    - trigger: "Button:Search"
+      navigate: /booking/confirmation
+      navigateState: searching
+
+  # Type selection screen
+  /booking/type:
+    - trigger: "RadioCard:Acute"
+      setState: acute
+    - trigger: "RadioCard:Prevention"
+      setState: prevention
+    - trigger: "RadioCard:Follow-up"
+      setState: follow-up
+    - trigger: "Button:Save"
+      navigate: /booking/search
+      navigateState: partial
+    - trigger: "ScreenHeader:Booking type"
+      navigate: /booking/search
+      navigateState: empty
+
+  # Doctor selection screen
+  /booking/doctor:
+    - trigger: "Avatar:AS"
+      setState: selected
+    - trigger: "Avatar:TW"
+      setState: selected
+    - trigger: "ListItem:Specialty"
+      setState: specialty-drawer
+    - trigger: "ScreenHeader:Specialty & Doctor"
+      navigate: /booking/type
+      navigateState: prevention
+
+  # Patient selection screen
+  /booking/patient:
+    - trigger: "ScreenHeader:Book appointment for"
+      navigate: /booking/search
+      navigateState: partial
+    - trigger: "Avatar:MM"
+      setState: family
+    - trigger: "Avatar:SM"
+      setState: self
+
+  # Location screen
+  /booking/location:
+    - trigger: "ScreenHeader:Choose location"
+      navigate: /booking/search
+      navigateState: partial
+    - trigger: "Button:Use current location"
+      setState: selected
+
+  # Time slots screen
+  /booking/time-slots:
+    - trigger: "ScreenHeader:Time slots"
+      navigate: /booking/search
+      navigateState: partial
+
+  # Confirmation screen
+  /booking/confirmation:
+    - trigger: "Button:Confirm Appointment"
+      navigate: /booking/appointments
+      navigateState: loaded
+    - trigger: "Button:Back to Home"
+      navigate: /booking/search
+      navigateState: empty
+    - trigger: "Button:Allow Notifications"
+      setState: found
+
+  # Appointments list screen
+  /booking/appointments:
+    - trigger: "Button:Book New Appointment"
+      navigate: /booking/search
+      navigateState: empty
