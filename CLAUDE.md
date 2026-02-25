@@ -6,6 +6,39 @@
 - Mock data is allowed: use `useState` with hardcoded values and simulated loading delays
 - Do NOT install or add any npm package without explicit user approval
 
+## Architecture
+
+Dependencies flow one direction: **tokens → ui → blocks → screens**. Never upward.
+
+### Layers & File Boundaries
+
+| Layer | Path | Permission | Status | Contains |
+|-------|------|-----------|--------|----------|
+| L1 Tokens | `src/tokens/` | Read-only | Planned | Design values (colors, spacing, radii) as TS constants and Tailwind preset |
+| L2 UI | `src/components/ui/` | Read-only | Exists | Generic React primitives (Button, Input, Card) — domain-free, no business logic |
+| L3 Blocks | `src/blocks/` | Read-only | Planned | Composed, data-driven patterns from L2 — domain-aware, opinionated layout |
+| App | `src/screens/<ScreenName>/` | **Writable** | Active | One-off screen layouts importing L2 + L3 |
+| App | `src/App.tsx` | **Writable** | Exists | Edit only to add imports/routing for new screens |
+
+### Scaffolding (read-only)
+
+| Path | Notes |
+|------|-------|
+| `src/components/dev/` | Dev tools (ScenarioSwitcher) — do not modify |
+| `src/hooks/` | Shared hooks — do not modify |
+| `src/lib/` | Utilities (cn, etc.) — do not modify |
+| `src/main.tsx` | App entry point — do not modify |
+| `src/index.css` | Tailwind imports + CSS variables — do not modify |
+
+### Rules
+
+- Each screen lives in its own folder: `src/screens/<ScreenName>/index.tsx`
+- Screen folders may contain sub-components, mock data, and types specific to that screen
+- L2 components accept standard React props — no domain logic, all strings via props
+- L3 blocks use data-driven API (accept structured data, not children assembly)
+- Blocks cannot import other blocks — extract shared logic to L2
+- If a scaffolding or read-only file needs changes, ask the user first
+
 ## Tech Stack (strict — do not deviate)
 
 - **React 19** + **TypeScript** (strict mode)
