@@ -47,6 +47,12 @@ Dependencies flow one direction: **tokens → ui → blocks → screens**. Never
 - **react-i18next** — all client-facing strings must use `t()` from `useTranslation()`
 - **pnpm** — package manager (not npm, not yarn)
 
+## Brand
+
+Design tokens (colors, typography, spacing, radii) are defined in [docs/design-tokens.md](docs/design-tokens.md).
+
+> This file will be provided later. Do not create it.
+
 ## UI Rules
 
 Follow all rules in [docs/ui-rules.md](docs/ui-rules.md):
