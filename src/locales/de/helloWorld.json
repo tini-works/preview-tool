@@ -1,0 +1,8 @@
+{
+  "title": "Hallo Welt",
+  "description": "Dies ist ein Demo-Bildschirm zur Validierung der Projektarchitektur.",
+  "getStarted": "Loslegen",
+  "itemsTitle": "Einträge",
+  "emptyMessage": "Noch keine Einträge. Fügen Sie Ihren ersten Eintrag hinzu.",
+  "loadingMessage": "Einträge werden geladen..."
+}

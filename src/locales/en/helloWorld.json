@@ -1,0 +1,8 @@
+{
+  "title": "Hello World",
+  "description": "This is a demo screen to validate the project architecture.",
+  "getStarted": "Get Started",
+  "itemsTitle": "Items",
+  "emptyMessage": "No items yet. Add your first item to get started.",
+  "loadingMessage": "Loading items..."
+}
