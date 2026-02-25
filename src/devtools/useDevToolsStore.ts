@@ -30,6 +30,7 @@ interface DevToolsActions {
   togglePlayMode: () => void
   pushFlowHistory: (route: string, state: string | null) => void
   resetFlowHistory: () => void
+  navigateFlow: (route: string, state: string | null) => void
 }
 
 export type DevToolsStore = DevToolsState & DevToolsActions
@@ -92,11 +93,14 @@ export const useDevToolsStore = create<DevToolsStore>()(
 
       pushFlowHistory: (route, state) =>
         set((prev) => ({
-          flowHistory: [...prev.flowHistory, { route, state }],
+          flowHistory: [...prev.flowHistory.slice(-49), { route, state }],
         })),
 
       resetFlowHistory: () =>
         set({ flowHistory: [] }),
+
+      navigateFlow: (route, state) =>
+        set({ selectedRoute: route, selectedState: state }),
     }),
     {
       name: 'preview-tool-devtools',

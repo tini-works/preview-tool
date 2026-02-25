@@ -13,9 +13,9 @@ export function FlowProvider({ children }: FlowProviderProps) {
 
   const playMode = useDevToolsStore((s) => s.playMode)
   const selectedRoute = useDevToolsStore((s) => s.selectedRoute)
-  const setSelectedRoute = useDevToolsStore((s) => s.setSelectedRoute)
   const setSelectedState = useDevToolsStore((s) => s.setSelectedState)
   const pushFlowHistory = useDevToolsStore((s) => s.pushFlowHistory)
+  const navigateFlow = useDevToolsStore((s) => s.navigateFlow)
 
   const flowConfig = useFlowConfig(selectedRoute)
 
@@ -43,16 +43,10 @@ export function FlowProvider({ children }: FlowProviderProps) {
 
       if (action.navigate) {
         pushFlowHistory(selectedRoute, currentState)
-        setSelectedRoute(action.navigate)
-        if (action.navigateState) {
-          // Small delay to let route change propagate before setting state
-          queueMicrotask(() => {
-            setSelectedState(action.navigateState!)
-          })
-        }
+        navigateFlow(action.navigate, action.navigateState ?? null)
       }
     },
-    [playMode, flowConfig, selectedRoute, setSelectedRoute, setSelectedState, pushFlowHistory]
+    [playMode, flowConfig, selectedRoute, setSelectedState, pushFlowHistory, navigateFlow]
   )
 
   return (
