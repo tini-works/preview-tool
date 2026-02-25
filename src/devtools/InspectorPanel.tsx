@@ -1,4 +1,4 @@
-import { Moon, Sun, Monitor, PanelRightClose, PanelRight } from 'lucide-react'
+import { Moon, Sun, Monitor, PanelRightClose, PanelRight, Play, Square, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -25,6 +25,10 @@ export function InspectorPanel() {
   const toggleInspectorCollapsed = useDevToolsStore(
     (s) => s.toggleInspectorCollapsed
   )
+  const playMode = useDevToolsStore((s) => s.playMode)
+  const togglePlayMode = useDevToolsStore((s) => s.togglePlayMode)
+  const flowHistory = useDevToolsStore((s) => s.flowHistory)
+  const resetFlowHistory = useDevToolsStore((s) => s.resetFlowHistory)
 
   const modules = useContentModules()
   const currentModule = modules.find((m) => m.route === selectedRoute)
@@ -67,8 +71,64 @@ export function InspectorPanel() {
         </button>
       </div>
 
+      {/* Play mode toggle */}
+      <div className="flex items-center justify-between border-b border-neutral-100 px-3 py-2">
+        <div className="flex items-center gap-2">
+          <Button
+            variant={playMode ? 'default' : 'outline'}
+            size="icon-sm"
+            onClick={togglePlayMode}
+            title={playMode ? 'Stop play mode' : 'Start play mode'}
+          >
+            {playMode ? <Square className="size-3" /> : <Play className="size-3" />}
+          </Button>
+          <span className="text-xs font-medium text-neutral-500">
+            {playMode ? 'Playing' : 'Play'}
+          </span>
+        </div>
+        {playMode && flowHistory.length > 0 && (
+          <button
+            onClick={resetFlowHistory}
+            className="text-neutral-400 hover:text-neutral-600"
+            title="Reset flow"
+          >
+            <RotateCcw className="size-3.5" />
+          </button>
+        )}
+      </div>
+
       {/* Controls */}
       <div className="flex-1 overflow-y-auto">
+        {/* Flow breadcrumb (only in play mode with history) */}
+        {playMode && flowHistory.length > 0 && (
+          <Section title="Flow History">
+            <div className="flex flex-col gap-1">
+              {flowHistory.map((entry, i) => (
+                <div key={i} className="flex items-center gap-1.5 text-xs text-neutral-400">
+                  <span className="truncate">{entry.route.split('/').pop()}</span>
+                  {entry.state && (
+                    <>
+                      <span>·</span>
+                      <span className="truncate text-neutral-300">{entry.state}</span>
+                    </>
+                  )}
+                </div>
+              ))}
+              {selectedRoute && (
+                <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-700">
+                  <span className="truncate">{selectedRoute.split('/').pop()}</span>
+                  {selectedState && (
+                    <>
+                      <span>·</span>
+                      <span className="truncate text-teal-600">{selectedState}</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </Section>
+        )}
+
         {/* Device section */}
         <Section title="Device">
           <Select
