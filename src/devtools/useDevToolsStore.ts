@@ -13,6 +13,8 @@ interface DevToolsState {
   selectedState: string | null
   catalogCollapsed: boolean
   inspectorCollapsed: boolean
+  playMode: boolean
+  flowHistory: Array<{ route: string; state: string | null }>
 }
 
 interface DevToolsActions {
@@ -24,6 +26,10 @@ interface DevToolsActions {
   setResponsiveSize: (width: number, height: number) => void
   toggleCatalogCollapsed: () => void
   toggleInspectorCollapsed: () => void
+  setPlayMode: (enabled: boolean) => void
+  togglePlayMode: () => void
+  pushFlowHistory: (route: string, state: string | null) => void
+  resetFlowHistory: () => void
 }
 
 export type DevToolsStore = DevToolsState & DevToolsActions
@@ -37,6 +43,8 @@ const DEFAULT_STATE: DevToolsState = {
   selectedState: null,
   catalogCollapsed: false,
   inspectorCollapsed: false,
+  playMode: false,
+  flowHistory: [],
 }
 
 export const useDevToolsStore = create<DevToolsStore>()(
@@ -72,6 +80,23 @@ export const useDevToolsStore = create<DevToolsStore>()(
 
       toggleInspectorCollapsed: () =>
         set((state) => ({ inspectorCollapsed: !state.inspectorCollapsed })),
+
+      setPlayMode: (enabled) =>
+        set({ playMode: enabled }),
+
+      togglePlayMode: () =>
+        set((state) => ({
+          playMode: !state.playMode,
+          flowHistory: !state.playMode ? [] : state.flowHistory,
+        })),
+
+      pushFlowHistory: (route, state) =>
+        set((prev) => ({
+          flowHistory: [...prev.flowHistory, { route, state }],
+        })),
+
+      resetFlowHistory: () =>
+        set({ flowHistory: [] }),
     }),
     {
       name: 'preview-tool-devtools',
