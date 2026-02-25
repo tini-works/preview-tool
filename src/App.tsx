@@ -1,5 +1,6 @@
 import { useDevToolsStore } from '@/devtools/useDevToolsStore'
-import { DevToolsBar } from '@/devtools/DevToolsBar'
+import { CatalogPanel } from '@/devtools/CatalogPanel'
+import { InspectorPanel } from '@/devtools/InspectorPanel'
 import { DeviceFrame } from '@/preview/DeviceFrame'
 import { ContentRenderer } from '@/content/ContentRenderer'
 import { getDevice } from '@/preview/device-frames'
@@ -16,21 +17,28 @@ function App() {
   const device = getDevice(activeDevice)
 
   return (
-    <div className="flex h-svh flex-col bg-neutral-50">
-      <DevToolsBar />
+    <div className="flex h-svh bg-neutral-100">
+      {/* Left: Catalog */}
+      <CatalogPanel />
 
-      <DeviceFrame
-        device={device}
-        osMode={osMode}
-        responsiveWidth={responsiveWidth}
-        responsiveHeight={responsiveHeight}
-        onResponsiveResize={setResponsiveSize}
-      >
-        <ContentRenderer
-          route={selectedRoute}
-          activeState={selectedState}
-        />
-      </DeviceFrame>
+      {/* Center: Device preview */}
+      <div className="flex flex-1 flex-col overflow-hidden">
+        <DeviceFrame
+          device={device}
+          osMode={osMode}
+          responsiveWidth={responsiveWidth}
+          responsiveHeight={responsiveHeight}
+          onResponsiveResize={setResponsiveSize}
+        >
+          <ContentRenderer
+            route={selectedRoute}
+            activeState={selectedState}
+          />
+        </DeviceFrame>
+      </div>
+
+      {/* Right: Inspector */}
+      <InspectorPanel />
     </div>
   )
 }

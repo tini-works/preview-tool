@@ -11,6 +11,8 @@ interface DevToolsState {
   osMode: OsMode
   selectedRoute: string | null
   selectedState: string | null
+  catalogCollapsed: boolean
+  inspectorCollapsed: boolean
 }
 
 interface DevToolsActions {
@@ -20,6 +22,8 @@ interface DevToolsActions {
   setSelectedRoute: (route: string | null) => void
   setSelectedState: (state: string | null) => void
   setResponsiveSize: (width: number, height: number) => void
+  toggleCatalogCollapsed: () => void
+  toggleInspectorCollapsed: () => void
 }
 
 export type DevToolsStore = DevToolsState & DevToolsActions
@@ -31,6 +35,8 @@ const DEFAULT_STATE: DevToolsState = {
   osMode: 'light',
   selectedRoute: null,
   selectedState: null,
+  catalogCollapsed: false,
+  inspectorCollapsed: false,
 }
 
 export const useDevToolsStore = create<DevToolsStore>()(
@@ -57,6 +63,12 @@ export const useDevToolsStore = create<DevToolsStore>()(
 
       setResponsiveSize: (width, height) =>
         set({ responsiveWidth: width, responsiveHeight: height }),
+
+      toggleCatalogCollapsed: () =>
+        set((state) => ({ catalogCollapsed: !state.catalogCollapsed })),
+
+      toggleInspectorCollapsed: () =>
+        set((state) => ({ inspectorCollapsed: !state.inspectorCollapsed })),
     }),
     {
       name: 'preview-tool-devtools',
