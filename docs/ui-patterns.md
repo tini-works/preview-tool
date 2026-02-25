@@ -34,18 +34,57 @@
 
 ## Mock Data Convention
 
-- Use `useState` with hardcoded initial data
-- Simulate loading with `useEffect` + `setTimeout` (1-2 second delay)
-- Include at least one example of empty state in comments or toggle
-- Example:
-  ```tsx
-  const [items, setItems] = useState<Item[]>([])
-  const [isLoading, setIsLoading] = useState(true)
+Each screen defines a set of **scenarios** — named states with corresponding mock data — and uses the `useScenarios` hook + `<ScenarioSwitcher>` component to switch between them in dev mode.
 
-  useEffect(() => {
-    setTimeout(() => {
-      setItems(MOCK_DATA)
-      setIsLoading(false)
-    }, 1500)
-  }, [])
-  ```
+### Required base scenarios
+
+Every screen must define at least these three scenarios:
+
+| Key          | Label       | Data shape                                |
+|--------------|-------------|-------------------------------------------|
+| `loading`    | Loading     | `{ isLoading: true, items: [] }`          |
+| `empty`      | Empty       | `{ isLoading: false, items: [] }`         |
+| `populated`  | Populated   | `{ isLoading: false, items: [...data] }`  |
+
+Custom extras are encouraged: `single-item`, `error`, `many-items`, etc.
+
+### Hook: `useScenarios<T>`
+
+```tsx
+import { useScenarios } from "@/hooks/use-scenarios"
+
+const scenarios = {
+  loading:    { label: "Loading",    data: { isLoading: true,  items: [] } },
+  empty:      { label: "Empty",      data: { isLoading: false, items: [] } },
+  populated:  { label: "Populated",  data: { isLoading: false, items: MOCK_DATA } },
+  singleItem: { label: "Single Item", data: { isLoading: false, items: [MOCK_DATA[0]] } },
+}
+
+const { active, activeKey, setActiveKey, scenarios: allScenarios } = useScenarios(scenarios)
+```
+
+### Component: `<ScenarioSwitcher>`
+
+- Dev-only (`import.meta.env.DEV`) — hidden in production builds
+- Floating bottom-right panel, collapsible via beaker icon toggle
+- Clicking a scenario instantly swaps the active state — no transition delay
+
+```tsx
+import { ScenarioSwitcher } from "@/components/dev/scenario-switcher"
+
+function MyScreen() {
+  const { active, activeKey, setActiveKey, scenarios } = useScenarios(myScenarios)
+  const { isLoading, items } = active.data
+
+  return (
+    <>
+      {/* screen content using isLoading and items */}
+      <ScenarioSwitcher
+        scenarios={scenarios}
+        activeKey={activeKey}
+        onChange={setActiveKey}
+      />
+    </>
+  )
+}
+```
