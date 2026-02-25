@@ -2,6 +2,7 @@ import { useEffect, useState, type ComponentType } from 'react'
 import { VariantProvider } from '@/content/Variant'
 import { mdxComponents } from '@/content/mdx-components'
 import { useContentModules } from '@/content/useContentModules'
+import { FlowProvider } from '@/flow/FlowProvider'
 import { MDXProvider } from '@mdx-js/react'
 
 interface ContentRendererProps {
@@ -66,9 +67,11 @@ export function ContentRenderer({ route, activeState }: ContentRendererProps) {
   return (
     <MDXProvider components={mdxComponents}>
       <VariantProvider activeState={activeState}>
-        <div className="p-4">
-          <Component />
-        </div>
+        <FlowProvider>
+          <div className="p-4">
+            <Component />
+          </div>
+        </FlowProvider>
       </VariantProvider>
     </MDXProvider>
   )
