@@ -150,6 +150,239 @@ export function Note({
   )
 }
 
+interface ScreenHeaderProps {
+  title: string
+  subtitle?: string
+  className?: string
+}
+
+export function ScreenHeader({ title, subtitle, className }: ScreenHeaderProps) {
+  return (
+    <div
+      className={cn(
+        'sticky top-0 z-10 flex items-center gap-3 border-b border-neutral-200 bg-white px-4 py-3',
+        className
+      )}
+    >
+      <div className="flex size-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+      </div>
+      <div className="flex flex-col">
+        <span className="text-base font-semibold text-neutral-900">{title}</span>
+        {subtitle && (
+          <span className="text-xs text-neutral-500">{subtitle}</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface ListItemProps {
+  icon?: string
+  label: string
+  description?: string
+  required?: boolean
+  selected?: boolean
+  className?: string
+}
+
+export function ListItem({
+  icon,
+  label,
+  description,
+  required,
+  selected,
+  className,
+}: ListItemProps) {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-3 border-b border-neutral-100 px-4 py-3 last:border-b-0',
+        selected && 'bg-neutral-50',
+        className
+      )}
+    >
+      {icon && (
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-sm">
+          {icon}
+        </span>
+      )}
+      <div className="flex flex-1 flex-col">
+        <span className="text-sm font-medium text-neutral-900">
+          {label}
+          {required && <span className="ml-1 text-red-500">*</span>}
+        </span>
+        {description && (
+          <span className="text-xs text-neutral-500">{description}</span>
+        )}
+      </div>
+      <svg className="size-4 shrink-0 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+  )
+}
+
+interface RadioCardProps {
+  children: ReactNode
+  selected?: boolean
+  className?: string
+}
+
+export function RadioCard({ children, selected, className }: RadioCardProps) {
+  return (
+    <div
+      className={cn(
+        'flex items-center gap-3 rounded-lg border-2 px-4 py-3',
+        selected
+          ? 'border-teal-500 bg-teal-50'
+          : 'border-neutral-200 bg-white',
+        className
+      )}
+    >
+      <span
+        className={cn(
+          'flex size-5 shrink-0 items-center justify-center rounded-full border-2',
+          selected ? 'border-teal-500' : 'border-neutral-400'
+        )}
+      >
+        {selected && (
+          <span className="size-2.5 rounded-full bg-teal-500" />
+        )}
+      </span>
+      <span className="text-sm font-medium text-neutral-900">{children}</span>
+    </div>
+  )
+}
+
+interface AvatarProps {
+  initials: string
+  variant?: 'primary' | 'secondary'
+  size?: 'sm' | 'md' | 'lg'
+  className?: string
+}
+
+export function Avatar({
+  initials,
+  variant = 'primary',
+  size = 'md',
+  className,
+}: AvatarProps) {
+  return (
+    <div
+      className={cn(
+        'flex shrink-0 items-center justify-center rounded-full font-semibold',
+        {
+          'bg-teal-100 text-teal-700': variant === 'primary',
+          'bg-orange-100 text-orange-600': variant === 'secondary',
+        },
+        {
+          'size-8 text-xs': size === 'sm',
+          'size-10 text-sm': size === 'md',
+          'size-12 text-base': size === 'lg',
+        },
+        className
+      )}
+    >
+      {initials}
+    </div>
+  )
+}
+
+interface DividerProps {
+  label?: string
+  className?: string
+}
+
+export function Divider({ label, className }: DividerProps) {
+  if (label) {
+    return (
+      <div className={cn('flex items-center gap-3 py-2', className)}>
+        <div className="h-px flex-1 bg-neutral-200" />
+        <span className="text-xs text-neutral-400">{label}</span>
+        <div className="h-px flex-1 bg-neutral-200" />
+      </div>
+    )
+  }
+  return <div className={cn('h-px bg-neutral-200', className)} />
+}
+
+interface StackProps {
+  children: ReactNode
+  gap?: 'sm' | 'md' | 'lg'
+  className?: string
+}
+
+export function Stack({ children, gap = 'md', className }: StackProps) {
+  return (
+    <div
+      className={cn(
+        'flex flex-col',
+        {
+          'gap-2': gap === 'sm',
+          'gap-4': gap === 'md',
+          'gap-6': gap === 'lg',
+        },
+        className
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
+interface TextareaProps {
+  label?: string
+  placeholder?: string
+  value?: string
+  maxLength?: number
+  className?: string
+}
+
+export function Textarea({
+  label,
+  placeholder,
+  value,
+  maxLength,
+  className,
+}: TextareaProps) {
+  return (
+    <div className={cn('flex flex-col gap-1.5', className)}>
+      {label && (
+        <label className="text-sm font-medium text-neutral-700">{label}</label>
+      )}
+      <textarea
+        placeholder={placeholder}
+        defaultValue={value}
+        maxLength={maxLength}
+        rows={3}
+        className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+      />
+      {maxLength && (
+        <span className="self-end text-xs text-neutral-400">
+          {value?.length ?? 0}/{maxLength}
+        </span>
+      )}
+    </div>
+  )
+}
+
+interface FooterProps {
+  children: ReactNode
+  className?: string
+}
+
+export function Footer({ children, className }: FooterProps) {
+  return (
+    <div
+      className={cn(
+        'sticky bottom-0 border-t border-neutral-200 bg-white px-4 py-3',
+        className
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
 /**
  * Component map provided to MDX runtime.
  * These are available in MDX files without importing.
@@ -161,4 +394,12 @@ export const mdxComponents = {
   Input,
   Badge,
   Note,
+  ScreenHeader,
+  ListItem,
+  RadioCard,
+  Avatar,
+  Divider,
+  Stack,
+  Textarea,
+  Footer,
 }

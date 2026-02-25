@@ -1,0 +1,100 @@
+---
+type: screen
+states:
+  empty:
+    description: No selections made yet
+  partial:
+    description: Some fields filled, location missing
+  ready:
+    description: All required fields filled
+  loading:
+    description: Submitting search request
+---
+
+<ScreenHeader title="Search for Appointment" />
+
+<Variant state="empty">
+  <Stack gap="md" className="p-4">
+    <Card className="p-0 overflow-hidden">
+      <ListItem icon="📋" label="Booking type" description="Select type..." />
+      <ListItem icon="👤" label="Book appointment for" description="Select patient..." />
+      <ListItem icon="📅" label="Time slots" description="Select preferred times..." />
+      <ListItem icon="📍" label="Location" description="Select location..." required />
+    </Card>
+
+    <Textarea
+      label="Reason for visit"
+      placeholder="Describe your symptoms or reason for visit..."
+      maxLength={200}
+    />
+
+    <Footer>
+      <Button variant="secondary" size="lg" className="w-full opacity-50">Search</Button>
+    </Footer>
+  </Stack>
+</Variant>
+
+<Variant state="partial">
+  <Stack gap="md" className="p-4">
+    <Card className="p-0 overflow-hidden">
+      <ListItem icon="📋" label="Booking type" description="Acute" selected />
+      <ListItem icon="👤" label="Book appointment for" description="Sarah M." selected />
+      <ListItem icon="📅" label="Time slots" description="15 slots selected" selected />
+      <ListItem icon="📍" label="Location" description="Select location..." required />
+    </Card>
+
+    <Textarea
+      label="Reason for visit"
+      placeholder="Describe your symptoms or reason for visit..."
+      value="Persistent headache for 3 days"
+      maxLength={200}
+    />
+
+    <Footer>
+      <Button variant="secondary" size="lg" className="w-full opacity-50">Search</Button>
+    </Footer>
+  </Stack>
+</Variant>
+
+<Variant state="ready">
+  <Stack gap="md" className="p-4">
+    <Card className="p-0 overflow-hidden">
+      <ListItem icon="📋" label="Booking type" description="Acute" selected />
+      <ListItem icon="👤" label="Book appointment for" description="Sarah M." selected />
+      <ListItem icon="📅" label="Time slots" description="15 slots selected" selected />
+      <ListItem icon="📍" label="Location" description="Friedrichstr. 123, Berlin" selected />
+    </Card>
+
+    <Textarea
+      label="Reason for visit"
+      placeholder="Describe your symptoms or reason for visit..."
+      value="Persistent headache for 3 days"
+      maxLength={200}
+    />
+
+    <Footer>
+      <Button size="lg" className="w-full">Search</Button>
+    </Footer>
+  </Stack>
+</Variant>
+
+<Variant state="loading">
+  <Stack gap="md" className="p-4">
+    <Card className="p-0 overflow-hidden">
+      <ListItem icon="📋" label="Booking type" description="Acute" selected />
+      <ListItem icon="👤" label="Book appointment for" description="Sarah M." selected />
+      <ListItem icon="📅" label="Time slots" description="15 slots selected" selected />
+      <ListItem icon="📍" label="Location" description="Friedrichstr. 123, Berlin" selected />
+    </Card>
+
+    <Textarea
+      label="Reason for visit"
+      value="Persistent headache for 3 days"
+      maxLength={200}
+    />
+
+    <Footer>
+      <Button size="lg" className="w-full opacity-70">Searching...</Button>
+    </Footer>
+  </Stack>
+</Variant>

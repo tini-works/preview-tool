@@ -1,0 +1,87 @@
+---
+type: screen
+states:
+  initial:
+    description: No location selected
+  search-results:
+    description: Showing address search results
+  selected:
+    description: Location selected
+---
+
+<ScreenHeader title="Choose location" />
+
+<Variant state="initial">
+  <Stack gap="md" className="p-4">
+    <Button size="lg" className="w-full flex items-center justify-center gap-2">
+      <span>📍</span> Use current location
+    </Button>
+
+    <Divider label="or enter an address" />
+
+    <Input placeholder="Search address..." />
+
+    <div>
+      <p className="mb-2 text-xs font-semibold tracking-wider text-neutral-400">RECENT LOCATIONS</p>
+      <Card className="p-0 overflow-hidden">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-neutral-100">
+          <span className="text-neutral-400">📍</span>
+          <span className="text-sm text-neutral-900">Friedrichstr. 123, 10117 Berlin</span>
+        </div>
+        <div className="flex items-center gap-3 px-4 py-3">
+          <span className="text-neutral-400">📍</span>
+          <span className="text-sm text-neutral-900">Kurfürstendamm 45, 10719 Berlin</span>
+        </div>
+      </Card>
+    </div>
+  </Stack>
+</Variant>
+
+<Variant state="search-results">
+  <Stack gap="md" className="p-4">
+    <Button size="lg" className="w-full flex items-center justify-center gap-2">
+      <span>📍</span> Use current location
+    </Button>
+
+    <Divider label="or enter an address" />
+
+    <Input placeholder="Search address..." />
+
+    <Card className="p-0 overflow-hidden">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-neutral-100 hover:bg-neutral-50">
+        <span className="text-neutral-400">📍</span>
+        <span className="text-sm text-neutral-900">Friedrichstr. 123, 10117 Berlin</span>
+      </div>
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-neutral-100 hover:bg-neutral-50">
+        <span className="text-neutral-400">📍</span>
+        <span className="text-sm text-neutral-900">Schönhauser Allee 78, 10439 Berlin</span>
+      </div>
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-neutral-100 hover:bg-neutral-50">
+        <span className="text-neutral-400">📍</span>
+        <span className="text-sm text-neutral-900">Torstr. 220, 10115 Berlin</span>
+      </div>
+      <div className="flex items-center gap-3 px-4 py-3 hover:bg-neutral-50">
+        <span className="text-neutral-400">📍</span>
+        <span className="text-sm text-neutral-900">Kantstr. 58, 10627 Berlin</span>
+      </div>
+    </Card>
+  </Stack>
+</Variant>
+
+<Variant state="selected">
+  <Stack gap="md" className="p-4">
+    <Note type="success">Location selected</Note>
+
+    <Card className="border-2 border-teal-500 bg-teal-50">
+      <div className="flex items-center gap-3">
+        <span className="text-teal-500">📍</span>
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-neutral-900">Friedrichstr. 123</span>
+          <span className="text-xs text-neutral-500">10117 Berlin</span>
+        </div>
+      </div>
+    </Card>
+
+    <Button variant="outline" size="lg" className="w-full">Change location</Button>
+  </Stack>
+</Variant>
