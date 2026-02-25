@@ -1,8 +1,10 @@
+import { useEffect, useRef } from 'react'
 import { useDevToolsStore } from '@/devtools/useDevToolsStore'
 import { CatalogPanel } from '@/devtools/CatalogPanel'
 import { InspectorPanel } from '@/devtools/InspectorPanel'
 import { DeviceFrame } from '@/preview/DeviceFrame'
 import { ContentRenderer } from '@/content/ContentRenderer'
+import { useContentModules } from '@/content/useContentModules'
 import { getDevice } from '@/preview/device-frames'
 
 function App() {
@@ -10,9 +12,26 @@ function App() {
   const osMode = useDevToolsStore((s) => s.osMode)
   const selectedRoute = useDevToolsStore((s) => s.selectedRoute)
   const selectedState = useDevToolsStore((s) => s.selectedState)
+  const setSelectedState = useDevToolsStore((s) => s.setSelectedState)
   const responsiveWidth = useDevToolsStore((s) => s.responsiveWidth)
   const responsiveHeight = useDevToolsStore((s) => s.responsiveHeight)
   const setResponsiveSize = useDevToolsStore((s) => s.setResponsiveSize)
+
+  const modules = useContentModules()
+  const prevRouteRef = useRef<string | null>(null)
+
+  // Auto-select the first state when navigating to a new route
+  useEffect(() => {
+    if (selectedRoute === prevRouteRef.current) return
+    prevRouteRef.current = selectedRoute
+
+    if (!selectedRoute) return
+
+    const mod = modules.find((m) => m.route === selectedRoute)
+    const states = mod?.frontmatter?.states
+    const firstState = states ? Object.keys(states)[0] ?? null : null
+    setSelectedState(firstState)
+  }, [selectedRoute, modules, setSelectedState])
 
   const device = getDevice(activeDevice)
 

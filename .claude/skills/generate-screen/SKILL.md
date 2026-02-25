@@ -7,6 +7,8 @@ Generate consistent MDX screen files by matching the user's description to prove
 ```dot
 digraph generate {
   "User describes screen" [shape=box];
+  "Description detailed enough?" [shape=diamond];
+  "Ask clarifying questions" [shape=box];
   "Read component library" [shape=box];
   "Read 2-3 existing MDX files" [shape=box];
   "Match to screen pattern" [shape=diamond];
@@ -14,7 +16,10 @@ digraph generate {
   "Generate MDX" [shape=box];
   "Write file, verify build" [shape=box];
 
-  "User describes screen" -> "Read component library";
+  "User describes screen" -> "Description detailed enough?";
+  "Description detailed enough?" -> "Read component library" [label="yes"];
+  "Description detailed enough?" -> "Ask clarifying questions" [label="no"];
+  "Ask clarifying questions" -> "Read component library";
   "Read component library" -> "Read 2-3 existing MDX files";
   "Read 2-3 existing MDX files" -> "Match to screen pattern";
   "Match to screen pattern" -> "Confirm pattern + states with user";
@@ -23,6 +28,30 @@ digraph generate {
   "Generate MDX" -> "Write file, verify build";
 }
 ```
+
+## Step 0: Gather requirements (if description is vague)
+
+Before doing anything, check whether the user's description covers these three things:
+
+1. **Content & components** — what data/items appear on screen (e.g., "list of appointments with doctor name, date, and status badge")
+2. **States** — what variants to handle (e.g., "loading, empty, and loaded states")
+3. **Flow context** — where this screen fits (e.g., "after booking confirmation, user lands here")
+
+**A description is detailed enough if** it answers at least (1) and (2). Flow context is nice-to-have.
+
+**A description is vague if** it only names the screen (e.g., "appointment list", "profile page", "settings screen") without specifying content or states.
+
+When the description is vague, use `AskUserQuestion` to ask up to 3 questions. Tailor questions to what's missing — don't ask about things already provided.
+
+Example questions:
+
+```
+- "What information should each appointment row show?" (content)
+- "What states should this screen handle?" (states)
+- "Where does this screen appear in the flow?" (flow)
+```
+
+Do NOT guess and generate. Ask first, then proceed to Step 1.
 
 ## Step 1: Learn the project
 

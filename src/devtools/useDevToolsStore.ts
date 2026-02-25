@@ -56,7 +56,10 @@ export const useDevToolsStore = create<DevToolsStore>()(
         })),
 
       setSelectedRoute: (route) =>
-        set({ selectedRoute: route, selectedState: null }),
+        set((prev) => {
+          if (route === prev.selectedRoute) return {}
+          return { selectedRoute: route, selectedState: null }
+        }),
 
       setSelectedState: (state) =>
         set({ selectedState: state }),

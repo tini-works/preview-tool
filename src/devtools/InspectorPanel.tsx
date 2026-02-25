@@ -114,9 +114,7 @@ export function InspectorPanel() {
               {stateKeys.map((key) => (
                 <button
                   key={key}
-                  onClick={() =>
-                    setSelectedState(selectedState === key ? null : key)
-                  }
+                  onClick={() => setSelectedState(key)}
                   className={
                     selectedState === key
                       ? 'rounded-md bg-neutral-900/5 px-2 py-1 text-left text-sm font-medium text-neutral-900'
