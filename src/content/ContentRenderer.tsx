@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo } from 'react'
+import { useEffect, useState, type ComponentType } from 'react'
 import { VariantProvider } from '@/content/Variant'
 import { mdxComponents } from '@/content/mdx-components'
 import { useContentModules } from '@/content/useContentModules'
@@ -9,17 +9,31 @@ interface ContentRendererProps {
   activeState: string | null
 }
 
+interface LoadedState {
+  route: string
+  Component: ComponentType
+}
+
 export function ContentRenderer({ route, activeState }: ContentRendererProps) {
   const modules = useContentModules()
+  const [loaded, setLoaded] = useState<LoadedState | null>(null)
 
-  const MdxComponent = useMemo(() => {
-    if (!route) return null
+  useEffect(() => {
+    if (!route) return
+
     const entry = modules.find((m) => m.route === route)
-    if (!entry) return null
-    return lazy(async () => {
-      const mod = await entry.module()
-      return { default: mod.default }
+    if (!entry) return
+
+    let cancelled = false
+    entry.module().then((mod) => {
+      if (!cancelled) {
+        setLoaded({ route, Component: mod.default })
+      }
     })
+
+    return () => {
+      cancelled = true
+    }
   }, [route, modules])
 
   if (!route) {
@@ -30,7 +44,8 @@ export function ContentRenderer({ route, activeState }: ContentRendererProps) {
     )
   }
 
-  if (!MdxComponent) {
+  const entry = modules.find((m) => m.route === route)
+  if (!entry) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-center text-neutral-400">
         <p>Content not found: {route}</p>
@@ -38,21 +53,23 @@ export function ContentRenderer({ route, activeState }: ContentRendererProps) {
     )
   }
 
+  if (!loaded || loaded.route !== route) {
+    return (
+      <div className="flex h-full items-center justify-center p-8 text-neutral-400">
+        Loading...
+      </div>
+    )
+  }
+
+  const { Component } = loaded
+
   return (
-    <Suspense
-      fallback={
-        <div className="flex h-full items-center justify-center p-8 text-neutral-400">
-          Loading...
+    <MDXProvider components={mdxComponents}>
+      <VariantProvider activeState={activeState}>
+        <div className="p-4">
+          <Component />
         </div>
-      }
-    >
-      <MDXProvider components={mdxComponents}>
-        <VariantProvider activeState={activeState}>
-          <div className="p-4">
-            <MdxComponent />
-          </div>
-        </VariantProvider>
-      </MDXProvider>
-    </Suspense>
+      </VariantProvider>
+    </MDXProvider>
   )
 }
