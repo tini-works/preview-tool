@@ -41,8 +41,6 @@ export function InspectorPanel() {
   const setFontScale = useDevToolsStore((s) => s.setFontScale)
   const language = useDevToolsStore((s) => s.language)
   const setLanguage = useDevToolsStore((s) => s.setLanguage)
-  const listItemCount = useDevToolsStore((s) => s.listItemCount)
-  const setListItemCount = useDevToolsStore((s) => s.setListItemCount)
   const featureFlags = useDevToolsStore((s) => s.featureFlags)
   const setFeatureFlag = useDevToolsStore((s) => s.setFeatureFlag)
   const regionStates = useDevToolsStore((s) => s.regionStates)
@@ -55,7 +53,6 @@ export function InspectorPanel() {
   const scenarios = currentModule?.scenarios
   const stateKeys = scenarios ? Object.keys(scenarios) : []
   const currentFlags = currentModule?.flags
-  const hasListData = currentModule?.hasListData
   const regions = currentModule?.regions
   const hasRegions = regions && Object.keys(regions).length > 0
 
@@ -280,39 +277,6 @@ export function InspectorPanel() {
                   />
                 </div>
               ))}
-            </div>
-          </Section>
-        )}
-
-        {/* Legacy list items (only when no regions and screen has list data) */}
-        {!hasRegions && hasListData && (
-          <Section title="List Items">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setListItemCount(listItemCount - 1)}
-                disabled={listItemCount <= 0}
-                className="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-40"
-              >
-                &minus;
-              </button>
-              <input
-                type="number"
-                value={listItemCount}
-                onChange={(e) => {
-                  const val = Number(e.target.value)
-                  if (!Number.isNaN(val)) setListItemCount(val)
-                }}
-                min={0}
-                max={99}
-                className="h-7 w-14 rounded-md border border-neutral-200 bg-white px-2 text-center text-sm text-neutral-900 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              />
-              <button
-                onClick={() => setListItemCount(listItemCount + 1)}
-                disabled={listItemCount >= 99}
-                className="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-40"
-              >
-                +
-              </button>
             </div>
           </Section>
         )}

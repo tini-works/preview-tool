@@ -37,6 +37,5 @@ export interface ScreenEntry {
   module: () => Promise<ScreenModule>
   scenarios: Record<string, Scenario>
   flags?: Record<string, FlagDefinition>
-  hasListData?: boolean
   regions?: RegionsMap
 }

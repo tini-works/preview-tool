@@ -19,7 +19,6 @@ interface DevToolsState {
   networkMode: NetworkMode
   fontScale: number
   language: string
-  listItemCount: number
   featureFlags: Record<string, boolean>
   regionStates: Record<string, string>
   regionListCounts: Record<string, number>
@@ -42,7 +41,6 @@ interface DevToolsActions {
   setNetworkMode: (mode: NetworkMode) => void
   setFontScale: (scale: number) => void
   setLanguage: (lang: string) => void
-  setListItemCount: (count: number) => void
   setFeatureFlag: (key: string, value: boolean) => void
   resetFeatureFlags: () => void
   setRegionState: (regionKey: string, state: string) => void
@@ -66,7 +64,6 @@ const DEFAULT_STATE: DevToolsState = {
   networkMode: 'online' as NetworkMode,
   fontScale: 1,
   language: 'en',
-  listItemCount: 5,
   featureFlags: {},
   regionStates: {},
   regionListCounts: {},
@@ -139,9 +136,6 @@ export const useDevToolsStore = create<DevToolsStore>()(
 
       setLanguage: (lang) =>
         set({ language: lang }),
-
-      setListItemCount: (count) =>
-        set({ listItemCount: Math.max(0, Math.min(99, Math.round(count))) }),
 
       setFeatureFlag: (key, value) =>
         set((prev) => ({
