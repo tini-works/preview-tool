@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware'
 import type { DeviceType } from '@/preview/device-frames'
 
 export type OsMode = 'light' | 'dark'
+export type NetworkMode = 'online' | 'slow-3g' | 'offline'
 
 interface DevToolsState {
   activeDevice: DeviceType
@@ -15,6 +16,11 @@ interface DevToolsState {
   inspectorCollapsed: boolean
   playMode: boolean
   flowHistory: Array<{ route: string; state: string | null }>
+  networkMode: NetworkMode
+  fontScale: number
+  language: string
+  listItemCount: number
+  featureFlags: Record<string, boolean>
 }
 
 interface DevToolsActions {
@@ -31,6 +37,12 @@ interface DevToolsActions {
   pushFlowHistory: (route: string, state: string | null) => void
   resetFlowHistory: () => void
   navigateFlow: (route: string, state: string | null) => void
+  setNetworkMode: (mode: NetworkMode) => void
+  setFontScale: (scale: number) => void
+  setLanguage: (lang: string) => void
+  setListItemCount: (count: number) => void
+  setFeatureFlag: (key: string, value: boolean) => void
+  resetFeatureFlags: () => void
 }
 
 export type DevToolsStore = DevToolsState & DevToolsActions
@@ -46,6 +58,11 @@ const DEFAULT_STATE: DevToolsState = {
   inspectorCollapsed: false,
   playMode: false,
   flowHistory: [],
+  networkMode: 'online' as NetworkMode,
+  fontScale: 1,
+  language: 'en',
+  listItemCount: 5,
+  featureFlags: {},
 }
 
 export const useDevToolsStore = create<DevToolsStore>()(
@@ -101,6 +118,26 @@ export const useDevToolsStore = create<DevToolsStore>()(
 
       navigateFlow: (route, state) =>
         set({ selectedRoute: route, selectedState: state }),
+
+      setNetworkMode: (mode) =>
+        set({ networkMode: mode }),
+
+      setFontScale: (scale) =>
+        set({ fontScale: Math.round(Math.max(0.75, Math.min(2, scale)) * 100) / 100 }),
+
+      setLanguage: (lang) =>
+        set({ language: lang }),
+
+      setListItemCount: (count) =>
+        set({ listItemCount: Math.max(0, Math.min(99, Math.round(count))) }),
+
+      setFeatureFlag: (key, value) =>
+        set((prev) => ({
+          featureFlags: { ...prev.featureFlags, [key]: value },
+        })),
+
+      resetFeatureFlags: () =>
+        set({ featureFlags: {} }),
     }),
     {
       name: 'preview-tool-devtools',
@@ -109,6 +146,9 @@ export const useDevToolsStore = create<DevToolsStore>()(
         responsiveWidth: state.responsiveWidth,
         responsiveHeight: state.responsiveHeight,
         osMode: state.osMode,
+        fontScale: state.fontScale,
+        language: state.language,
+        networkMode: state.networkMode,
       }),
     }
   )
