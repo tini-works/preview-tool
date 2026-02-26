@@ -13,7 +13,13 @@ import {
 import { Stepper } from '../_shared/Stepper'
 import type { PrescriptionLocationData } from './scenarios'
 
-export default function PrescriptionLocationScreen({ data }: { data: PrescriptionLocationData }) {
+export default function PrescriptionLocationScreen({
+  data,
+  flags,
+}: {
+  data: PrescriptionLocationData
+  flags?: Record<string, boolean>
+}) {
   const { method, savedAddress, pickupView, apotheken, selectedApothekeId } = data
   const { t } = useTranslation('prescription-location')
 
@@ -100,12 +106,14 @@ export default function PrescriptionLocationScreen({ data }: { data: Prescriptio
       {!isDelivery && (
         <>
           {/* Map placeholder */}
-          <div className="flex h-40 items-center justify-center bg-cream-200">
-            <div className="flex flex-col items-center gap-1 text-slate-400">
-              <span className="text-2xl">🗺️</span>
-              <span className="text-xs">📍 📍 📍</span>
+          {flags?.showMap !== false && (
+            <div className="flex h-40 items-center justify-center bg-cream-200">
+              <div className="flex flex-col items-center gap-1 text-slate-400">
+                <span className="text-2xl">🗺️</span>
+                <span className="text-xs">📍 📍 📍</span>
+              </div>
             </div>
-          </div>
+          )}
 
           {pickupView === 'loading' && (
             <div className="flex items-center justify-center py-12">

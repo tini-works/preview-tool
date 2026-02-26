@@ -9,7 +9,13 @@ import {
 } from '@/components/screen'
 import type { BookingDoctorData } from './scenarios'
 
-export default function BookingDoctorScreen({ data }: { data: BookingDoctorData }) {
+export default function BookingDoctorScreen({
+  data,
+  flags,
+}: {
+  data: BookingDoctorData
+  flags?: Record<string, boolean>
+}) {
   const { view } = data
 
   return (
@@ -31,27 +37,29 @@ export default function BookingDoctorScreen({ data }: { data: BookingDoctorData 
             />
           </Card>
 
-          <div>
-            <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">FAVORITED</p>
-            <Card className="overflow-hidden p-0">
-              <div className="flex items-center gap-3 border-b border-cream-300 px-4 py-3">
-                <Avatar initials="AS" data-flow-target="Avatar:AS" />
-                <div className="flex flex-1 flex-col">
-                  <span className="text-sm font-medium text-charcoal-500">Dr. Anna Schmidt</span>
-                  <span className="text-xs text-slate-500">General Practice</span>
+          {flags?.showFavorites !== false && (
+            <div>
+              <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">FAVORITED</p>
+              <Card className="overflow-hidden p-0">
+                <div className="flex items-center gap-3 border-b border-cream-300 px-4 py-3">
+                  <Avatar initials="AS" data-flow-target="Avatar:AS" />
+                  <div className="flex flex-1 flex-col">
+                    <span className="text-sm font-medium text-charcoal-500">Dr. Anna Schmidt</span>
+                    <span className="text-xs text-slate-500">General Practice</span>
+                  </div>
+                  <span className="text-coral-500">♥</span>
                 </div>
-                <span className="text-coral-500">♥</span>
-              </div>
-              <div className="flex items-center gap-3 px-4 py-3">
-                <Avatar initials="TW" data-flow-target="Avatar:TW" />
-                <div className="flex flex-1 flex-col">
-                  <span className="text-sm font-medium text-charcoal-500">Dr. Thomas Weber</span>
-                  <span className="text-xs text-slate-500">Cardiology</span>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <Avatar initials="TW" data-flow-target="Avatar:TW" />
+                  <div className="flex flex-1 flex-col">
+                    <span className="text-sm font-medium text-charcoal-500">Dr. Thomas Weber</span>
+                    <span className="text-xs text-slate-500">Cardiology</span>
+                  </div>
+                  <span className="text-coral-500">♥</span>
                 </div>
-                <span className="text-coral-500">♥</span>
-              </div>
-            </Card>
-          </div>
+              </Card>
+            </div>
+          )}
 
           <div>
             <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">ALL DOCTORS</p>
@@ -95,19 +103,21 @@ export default function BookingDoctorScreen({ data }: { data: BookingDoctorData 
             />
           </Card>
 
-          <div>
-            <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">FAVORITED</p>
-            <Card className="overflow-hidden p-0">
-              <div className="flex items-center gap-3 rounded-lg border-2 border-teal-500 bg-teal-50 px-4 py-3">
-                <Avatar initials="AS" data-flow-target="Avatar:AS" />
-                <div className="flex flex-1 flex-col">
-                  <span className="text-sm font-medium text-charcoal-500">Dr. Anna Schmidt</span>
-                  <span className="text-xs text-slate-500">General Practice</span>
+          {flags?.showFavorites !== false && (
+            <div>
+              <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">FAVORITED</p>
+              <Card className="overflow-hidden p-0">
+                <div className="flex items-center gap-3 rounded-lg border-2 border-teal-500 bg-teal-50 px-4 py-3">
+                  <Avatar initials="AS" data-flow-target="Avatar:AS" />
+                  <div className="flex flex-1 flex-col">
+                    <span className="text-sm font-medium text-charcoal-500">Dr. Anna Schmidt</span>
+                    <span className="text-xs text-slate-500">General Practice</span>
+                  </div>
+                  <span className="text-coral-500">♥</span>
                 </div>
-                <span className="text-coral-500">♥</span>
-              </div>
-            </Card>
-          </div>
+              </Card>
+            </div>
+          )}
 
           <Note type="success">Dr. Anna Schmidt selected for your appointment.</Note>
         </Stack>

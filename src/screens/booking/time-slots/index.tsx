@@ -15,7 +15,13 @@ function SlotCell({ selected }: { selected: boolean }) {
   return <div className="aspect-square rounded-md bg-cream-200" />
 }
 
-export default function BookingTimeSlotsScreen({ data }: { data: BookingTimeSlotsData }) {
+export default function BookingTimeSlotsScreen({
+  data,
+  flags,
+}: {
+  data: BookingTimeSlotsData
+  flags?: Record<string, boolean>
+}) {
   const { slots, showWarning } = data
 
   return (
@@ -44,10 +50,12 @@ export default function BookingTimeSlotsScreen({ data }: { data: BookingTimeSlot
           ))}
         </div>
 
-        <div className="flex items-center gap-4 text-xs text-slate-500">
-          <span className="flex items-center gap-1.5"><span className="size-3 rounded-sm bg-teal-500" /> Selected</span>
-          <span className="flex items-center gap-1.5"><span className="size-3 rounded-sm bg-cream-200" /> Available</span>
-        </div>
+        {flags?.showLegend !== false && (
+          <div className="flex items-center gap-4 text-xs text-slate-500">
+            <span className="flex items-center gap-1.5"><span className="size-3 rounded-sm bg-teal-500" /> Selected</span>
+            <span className="flex items-center gap-1.5"><span className="size-3 rounded-sm bg-cream-200" /> Available</span>
+          </div>
+        )}
 
         {showWarning && (
           <Note type="warning">

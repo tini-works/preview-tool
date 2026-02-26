@@ -13,7 +13,13 @@ import {
 } from '@/components/screen'
 import type { ProfileData } from './scenarios'
 
-export default function ProfileScreen({ data }: { data: ProfileData }) {
+export default function ProfileScreen({
+  data,
+  flags,
+}: {
+  data: ProfileData
+  flags?: Record<string, boolean>
+}) {
   const { isLoading, user, insurances, insurancesLoading, familyMembers, familyMembersLoading, settings } = data
   const { t } = useTranslation('profile')
 
@@ -85,81 +91,85 @@ export default function ProfileScreen({ data }: { data: ProfileData }) {
         </div>
 
         {/* Insurance */}
-        <div>
-          <p className="mb-2 text-xs font-semibold tracking-wider text-neutral-400">
-            {t('insurance').toUpperCase()}
-          </p>
-          {insurancesLoading ? (
-            <Card className="flex items-center justify-center py-8">
-              <div className="flex items-center gap-2 text-neutral-500">
-                <Loader2 className="size-4 animate-spin" />
-                <span className="text-sm">{t('loading')}</span>
-              </div>
-            </Card>
-          ) : insurances.length === 0 ? (
-            <Note type="info">{t('noInsurance')}</Note>
-          ) : (
-            <Card className="overflow-hidden p-0">
-              {insurances.map((ins) => (
-                <div
-                  key={ins.memberId}
-                  className="flex items-start gap-3 border-b border-neutral-100 px-4 py-3 last:border-b-0"
-                >
-                  <Badge>{ins.type}</Badge>
-                  <div className="flex flex-col gap-0.5">
-                    <p className="text-sm font-medium text-neutral-900">{ins.insurer}</p>
-                    <p className="text-xs text-neutral-500">{ins.memberId}</p>
-                  </div>
+        {flags?.showInsurance !== false && (
+          <div>
+            <p className="mb-2 text-xs font-semibold tracking-wider text-neutral-400">
+              {t('insurance').toUpperCase()}
+            </p>
+            {insurancesLoading ? (
+              <Card className="flex items-center justify-center py-8">
+                <div className="flex items-center gap-2 text-neutral-500">
+                  <Loader2 className="size-4 animate-spin" />
+                  <span className="text-sm">{t('loading')}</span>
                 </div>
-              ))}
-            </Card>
-          )}
-        </div>
+              </Card>
+            ) : insurances.length === 0 ? (
+              <Note type="info">{t('noInsurance')}</Note>
+            ) : (
+              <Card className="overflow-hidden p-0">
+                {insurances.map((ins) => (
+                  <div
+                    key={ins.memberId}
+                    className="flex items-start gap-3 border-b border-neutral-100 px-4 py-3 last:border-b-0"
+                  >
+                    <Badge>{ins.type}</Badge>
+                    <div className="flex flex-col gap-0.5">
+                      <p className="text-sm font-medium text-neutral-900">{ins.insurer}</p>
+                      <p className="text-xs text-neutral-500">{ins.memberId}</p>
+                    </div>
+                  </div>
+                ))}
+              </Card>
+            )}
+          </div>
+        )}
 
         {/* Family Members */}
-        <div>
-          <p className="mb-2 text-xs font-semibold tracking-wider text-neutral-400">
-            {t('familyMembers').toUpperCase()}
-          </p>
-          {familyMembersLoading ? (
-            <Card className="flex items-center justify-center py-8">
-              <div className="flex items-center gap-2 text-neutral-500">
-                <Loader2 className="size-4 animate-spin" />
-                <span className="text-sm">{t('loading')}</span>
-              </div>
-            </Card>
-          ) : familyMembers.length === 0 ? (
-            <Stack gap="sm">
-              <Note type="info">{t('noFamily')}</Note>
+        {flags?.showFamilyMembers !== false && (
+          <div>
+            <p className="mb-2 text-xs font-semibold tracking-wider text-neutral-400">
+              {t('familyMembers').toUpperCase()}
+            </p>
+            {familyMembersLoading ? (
+              <Card className="flex items-center justify-center py-8">
+                <div className="flex items-center gap-2 text-neutral-500">
+                  <Loader2 className="size-4 animate-spin" />
+                  <span className="text-sm">{t('loading')}</span>
+                </div>
+              </Card>
+            ) : familyMembers.length === 0 ? (
+              <Stack gap="sm">
+                <Note type="info">{t('noFamily')}</Note>
+                <Card className="overflow-hidden p-0">
+                  <ListItem
+                    icon="+"
+                    label={t('addFamilyMember')}
+                  />
+                </Card>
+              </Stack>
+            ) : (
               <Card className="overflow-hidden p-0">
+                {familyMembers.map((member) => (
+                  <div
+                    key={member.name}
+                    className="flex items-center gap-3 border-b border-neutral-100 px-4 py-3 last:border-b-0"
+                  >
+                    <Avatar initials={member.initials} size="sm" variant="secondary" />
+                    <div className="flex flex-1 flex-col">
+                      <span className="text-sm font-medium text-neutral-900">{member.name}</span>
+                      <span className="text-xs text-neutral-500">{member.relationship}</span>
+                    </div>
+                    <svg className="size-4 shrink-0 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+                  </div>
+                ))}
                 <ListItem
                   icon="+"
                   label={t('addFamilyMember')}
                 />
               </Card>
-            </Stack>
-          ) : (
-            <Card className="overflow-hidden p-0">
-              {familyMembers.map((member) => (
-                <div
-                  key={member.name}
-                  className="flex items-center gap-3 border-b border-neutral-100 px-4 py-3 last:border-b-0"
-                >
-                  <Avatar initials={member.initials} size="sm" variant="secondary" />
-                  <div className="flex flex-1 flex-col">
-                    <span className="text-sm font-medium text-neutral-900">{member.name}</span>
-                    <span className="text-xs text-neutral-500">{member.relationship}</span>
-                  </div>
-                  <svg className="size-4 shrink-0 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
-                </div>
-              ))}
-              <ListItem
-                icon="+"
-                label={t('addFamilyMember')}
-              />
-            </Card>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Settings */}
         <div>

@@ -18,7 +18,13 @@ const statusVariant = {
   expired: 'error',
 } as const
 
-export default function PrescriptionListScreen({ data }: { data: PrescriptionListData }) {
+export default function PrescriptionListScreen({
+  data,
+  flags,
+}: {
+  data: PrescriptionListData
+  flags?: Record<string, boolean>
+}) {
   const { view, insurer, memberId, prescriptions, selectedIds } = data
   const { t } = useTranslation('prescription-list')
 

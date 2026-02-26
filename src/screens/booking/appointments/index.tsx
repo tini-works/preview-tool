@@ -10,7 +10,13 @@ import {
 } from '@/components/screen'
 import type { BookingAppointmentsData } from './scenarios'
 
-export default function BookingAppointmentsScreen({ data }: { data: BookingAppointmentsData }) {
+export default function BookingAppointmentsScreen({
+  data,
+  flags,
+}: {
+  data: BookingAppointmentsData
+  flags?: Record<string, boolean>
+}) {
   const { view } = data
 
   return (
@@ -38,23 +44,25 @@ export default function BookingAppointmentsScreen({ data }: { data: BookingAppoi
               </Card>
             </div>
 
-            <div>
-              <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">PAST</p>
-              <Card className="overflow-hidden p-0">
-                <ListItem
-                  icon="📅"
-                  label="Dr. Lisa Bauer"
-                  description="Dermatology · Jan 15, 2026"
-                  trailing={<Badge>Completed</Badge>}
-                />
-                <ListItem
-                  icon="📅"
-                  label="Dr. Emily Klein"
-                  description="General Practice · Dec 8, 2025"
-                  trailing={<Badge>Completed</Badge>}
-                />
-              </Card>
-            </div>
+            {flags?.showPastAppointments !== false && (
+              <div>
+                <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">PAST</p>
+                <Card className="overflow-hidden p-0">
+                  <ListItem
+                    icon="📅"
+                    label="Dr. Lisa Bauer"
+                    description="Dermatology · Jan 15, 2026"
+                    trailing={<Badge>Completed</Badge>}
+                  />
+                  <ListItem
+                    icon="📅"
+                    label="Dr. Emily Klein"
+                    description="General Practice · Dec 8, 2025"
+                    trailing={<Badge>Completed</Badge>}
+                  />
+                </Card>
+              </div>
+            )}
           </Stack>
 
           <Footer>

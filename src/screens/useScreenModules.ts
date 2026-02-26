@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import type { ScreenEntry, ScreenModule, ScenarioModule, RegionsMap } from '@/screens/types'
+import { featureFlagConfig } from '@/config/feature-flags'
 
 const screenModules = import.meta.glob<ScreenModule>(
   '/src/screens/**/index.tsx'

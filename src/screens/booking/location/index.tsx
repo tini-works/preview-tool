@@ -9,7 +9,13 @@ import {
 } from '@/components/screen'
 import type { BookingLocationData } from './scenarios'
 
-export default function BookingLocationScreen({ data }: { data: BookingLocationData }) {
+export default function BookingLocationScreen({
+  data,
+  flags,
+}: {
+  data: BookingLocationData
+  flags?: Record<string, boolean>
+}) {
   const { view } = data
 
   return (
@@ -21,42 +27,48 @@ export default function BookingLocationScreen({ data }: { data: BookingLocationD
 
       {view === 'initial' && (
         <Stack gap="md" className="p-4">
-          <Button
-            size="lg"
-            className="flex w-full items-center justify-center gap-2"
-            data-flow-target="Button:Use current location"
-          >
-            <span>📍</span> Use current location
-          </Button>
+          {flags?.showCurrentLocation !== false && (
+            <Button
+              size="lg"
+              className="flex w-full items-center justify-center gap-2"
+              data-flow-target="Button:Use current location"
+            >
+              <span>📍</span> Use current location
+            </Button>
+          )}
 
           <Divider label="or enter an address" />
           <Input placeholder="Search address..." />
 
-          <div>
-            <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">RECENT LOCATIONS</p>
-            <Card className="overflow-hidden p-0">
-              <div className="flex items-center gap-3 border-b border-cream-300 px-4 py-3">
-                <span className="text-slate-400">📍</span>
-                <span className="text-sm text-charcoal-500">Friedrichstr. 123, 10117 Berlin</span>
-              </div>
-              <div className="flex items-center gap-3 px-4 py-3">
-                <span className="text-slate-400">📍</span>
-                <span className="text-sm text-charcoal-500">Kurfürstendamm 45, 10719 Berlin</span>
-              </div>
-            </Card>
-          </div>
+          {flags?.showRecentLocations !== false && (
+            <div>
+              <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">RECENT LOCATIONS</p>
+              <Card className="overflow-hidden p-0">
+                <div className="flex items-center gap-3 border-b border-cream-300 px-4 py-3">
+                  <span className="text-slate-400">📍</span>
+                  <span className="text-sm text-charcoal-500">Friedrichstr. 123, 10117 Berlin</span>
+                </div>
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <span className="text-slate-400">📍</span>
+                  <span className="text-sm text-charcoal-500">Kurfürstendamm 45, 10719 Berlin</span>
+                </div>
+              </Card>
+            </div>
+          )}
         </Stack>
       )}
 
       {view === 'search-results' && (
         <Stack gap="md" className="p-4">
-          <Button
-            size="lg"
-            className="flex w-full items-center justify-center gap-2"
-            data-flow-target="Button:Use current location"
-          >
-            <span>📍</span> Use current location
-          </Button>
+          {flags?.showCurrentLocation !== false && (
+            <Button
+              size="lg"
+              className="flex w-full items-center justify-center gap-2"
+              data-flow-target="Button:Use current location"
+            >
+              <span>📍</span> Use current location
+            </Button>
+          )}
 
           <Divider label="or enter an address" />
           <Input placeholder="Search address..." />

@@ -11,7 +11,13 @@ import {
 import { Stepper } from '../_shared/Stepper'
 import type { PrescriptionConfirmationData } from './scenarios'
 
-export default function PrescriptionConfirmationScreen({ data }: { data: PrescriptionConfirmationData }) {
+export default function PrescriptionConfirmationScreen({
+  data,
+  flags,
+}: {
+  data: PrescriptionConfirmationData
+  flags?: Record<string, boolean>
+}) {
   const {
     state,
     deliveryMethod,
