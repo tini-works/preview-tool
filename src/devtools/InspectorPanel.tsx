@@ -1,5 +1,9 @@
+import { useEffect } from 'react'
 import { Moon, Sun, Monitor, PanelRightClose, PanelRight, Play, Square, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Label } from '@/components/ui/label'
+import { Slider } from '@/components/ui/slider'
+import { Switch } from '@/components/ui/switch'
 import {
   Select,
   SelectContent,
@@ -7,9 +11,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useDevToolsStore } from '@/devtools/useDevToolsStore'
+import { useDevToolsStore, type NetworkMode } from '@/devtools/useDevToolsStore'
 import { getAllDevices, getDevice, type DeviceType } from '@/preview/device-frames'
 import { useScreenModules } from '@/screens/useScreenModules'
+import i18n from '@/lib/i18n'
 
 export function InspectorPanel() {
   const activeDevice = useDevToolsStore((s) => s.activeDevice)
@@ -30,10 +35,29 @@ export function InspectorPanel() {
   const flowHistory = useDevToolsStore((s) => s.flowHistory)
   const resetFlowHistory = useDevToolsStore((s) => s.resetFlowHistory)
 
+  const networkMode = useDevToolsStore((s) => s.networkMode)
+  const setNetworkMode = useDevToolsStore((s) => s.setNetworkMode)
+  const fontScale = useDevToolsStore((s) => s.fontScale)
+  const setFontScale = useDevToolsStore((s) => s.setFontScale)
+  const language = useDevToolsStore((s) => s.language)
+  const setLanguage = useDevToolsStore((s) => s.setLanguage)
+  const listItemCount = useDevToolsStore((s) => s.listItemCount)
+  const setListItemCount = useDevToolsStore((s) => s.setListItemCount)
+  const featureFlags = useDevToolsStore((s) => s.featureFlags)
+  const setFeatureFlag = useDevToolsStore((s) => s.setFeatureFlag)
+
   const modules = useScreenModules()
   const currentModule = modules.find((m) => m.route === selectedRoute)
   const scenarios = currentModule?.scenarios
   const stateKeys = scenarios ? Object.keys(scenarios) : []
+  const currentFlags = currentModule?.flags
+
+  // Sync persisted language with i18n on mount
+  useEffect(() => {
+    if (language && language !== i18n.language) {
+      i18n.changeLanguage(language)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const device = getDevice(activeDevice)
   const displayWidth =
@@ -187,6 +211,120 @@ export function InspectorPanel() {
             </div>
           </Section>
         )}
+
+        {/* Language section */}
+        <Section title="Language">
+          <div className="flex gap-1">
+            {['en', 'de'].map((lang) => (
+              <button
+                key={lang}
+                onClick={() => {
+                  setLanguage(lang)
+                  i18n.changeLanguage(lang)
+                }}
+                className={
+                  language === lang
+                    ? 'flex-1 rounded-md bg-neutral-900/5 px-2 py-1 text-center text-sm font-medium text-neutral-900'
+                    : 'flex-1 rounded-md px-2 py-1 text-center text-sm text-neutral-600 hover:bg-neutral-50'
+                }
+              >
+                {lang.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </Section>
+
+        {/* Feature Flags section (per-screen) */}
+        {currentFlags && Object.keys(currentFlags).length > 0 && (
+          <Section title="Feature Flags">
+            <div className="flex flex-col gap-2">
+              {Object.entries(currentFlags).map(([key, def]) => (
+                <div key={key} className="flex items-center justify-between">
+                  <Label htmlFor={`flag-${key}`} className="text-xs text-neutral-600">
+                    {def.label}
+                  </Label>
+                  <Switch
+                    id={`flag-${key}`}
+                    checked={featureFlags[key] ?? def.default}
+                    onCheckedChange={(checked) => setFeatureFlag(key, checked)}
+                  />
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* List Item Count section */}
+        <Section title="List Items">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setListItemCount(listItemCount - 1)}
+              disabled={listItemCount <= 0}
+              className="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-40"
+            >
+              &minus;
+            </button>
+            <input
+              type="number"
+              value={listItemCount}
+              onChange={(e) => setListItemCount(Number(e.target.value))}
+              min={0}
+              max={99}
+              className="h-7 w-14 rounded-md border border-neutral-200 bg-white px-2 text-center text-sm text-neutral-900 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            />
+            <button
+              onClick={() => setListItemCount(listItemCount + 1)}
+              disabled={listItemCount >= 99}
+              className="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-40"
+            >
+              +
+            </button>
+          </div>
+        </Section>
+
+        {/* Network section */}
+        <Section title="Network">
+          <div className="flex gap-1">
+            {([
+              { mode: 'online' as NetworkMode, label: 'Online' },
+              { mode: 'slow-3g' as NetworkMode, label: 'Slow 3G' },
+              { mode: 'offline' as NetworkMode, label: 'Offline' },
+            ]).map(({ mode, label }) => (
+              <button
+                key={mode}
+                onClick={() => setNetworkMode(mode)}
+                className={
+                  networkMode === mode
+                    ? 'flex-1 rounded-md bg-neutral-900/5 px-2 py-1 text-center text-xs font-medium text-neutral-900'
+                    : 'flex-1 rounded-md px-2 py-1 text-center text-xs text-neutral-600 hover:bg-neutral-50'
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </Section>
+
+        {/* Font Scale section */}
+        <Section title="Font Scale">
+          <div className="flex flex-col gap-2">
+            <Slider
+              value={[fontScale]}
+              onValueChange={([v]) => setFontScale(v)}
+              min={0.75}
+              max={2}
+              step={0.05}
+              className="w-full"
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-neutral-400">0.75x</span>
+              <span className="font-mono text-xs font-medium text-neutral-700">
+                {fontScale.toFixed(2)}x
+              </span>
+              <span className="text-xs text-neutral-400">2.0x</span>
+            </div>
+          </div>
+        </Section>
 
         {/* Screen info */}
         {selectedRoute && (
