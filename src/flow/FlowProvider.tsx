@@ -1,7 +1,6 @@
 import { useCallback, useRef, type ReactNode } from 'react'
 import { useDevToolsStore } from '@/devtools/useDevToolsStore'
-import { useFlowConfig } from '@/flow/useFlowConfig'
-import { findAction } from '@/flow/FlowEngine'
+import { useFlowActions } from '@/flow/useFlowConfig'
 import { resolveTrigger } from '@/flow/trigger-matcher'
 
 interface FlowProviderProps {
@@ -17,23 +16,22 @@ export function FlowProvider({ children }: FlowProviderProps) {
   const pushFlowHistory = useDevToolsStore((s) => s.pushFlowHistory)
   const navigateFlow = useDevToolsStore((s) => s.navigateFlow)
 
-  const flowConfig = useFlowConfig(selectedRoute)
+  const actions = useFlowActions(selectedRoute)
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!playMode || !flowConfig || !selectedRoute) return
+      if (!playMode || !actions || !selectedRoute) return
       if (!containerRef.current) return
 
       const trigger = resolveTrigger(e.target, containerRef.current)
       if (!trigger) return
 
-      const action = findAction(flowConfig, selectedRoute, trigger)
+      const action = actions.find((a) => a.trigger === trigger)
       if (!action) return
 
       e.preventDefault()
       e.stopPropagation()
 
-      // Push current position to history before navigating
       const currentState = useDevToolsStore.getState().selectedState
 
       if (action.setState && !action.navigate) {
@@ -46,14 +44,14 @@ export function FlowProvider({ children }: FlowProviderProps) {
         navigateFlow(action.navigate, action.navigateState ?? null)
       }
     },
-    [playMode, flowConfig, selectedRoute, setSelectedState, pushFlowHistory, navigateFlow]
+    [playMode, actions, selectedRoute, setSelectedState, pushFlowHistory, navigateFlow]
   )
 
   return (
     <div
       ref={containerRef}
       onClick={handleClick}
-      className={playMode && flowConfig ? 'cursor-pointer' : undefined}
+      className={playMode && actions ? 'cursor-pointer' : undefined}
     >
       {children}
     </div>

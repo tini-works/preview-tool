@@ -1,21 +1,30 @@
 import { useMemo } from 'react'
-import { parseFlowConfig, type FlowConfig } from '@/flow/FlowEngine'
+import type { FlowAction } from '@/flow/types'
 
-const flowFiles = import.meta.glob<string>(
-  '/src/screens/**/flow.yaml',
-  { query: '?raw', import: 'default', eager: true }
+interface FlowModule {
+  actions: FlowAction[]
+}
+
+const flowModules = import.meta.glob<FlowModule>(
+  '/src/screens/*/flow.ts',
+  { eager: true }
 )
 
-/**
- * Returns the FlowConfig for the given route, if one exists.
- * Matches by checking if the route appears in any flow config's actions.
- */
-export function useFlowConfig(route: string | null): FlowConfig | null {
-  const flows = useMemo(() => {
-    return Object.values(flowFiles).map((raw) => parseFlowConfig(raw))
+function filePathToRoute(filePath: string): string {
+  const match = filePath.match(/\/src\/screens\/([^/]+)\/flow\.ts$/)
+  if (!match) return filePath
+  return '/' + match[1].replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
+}
+
+export function useFlowActions(route: string | null): FlowAction[] | null {
+  const routeMap = useMemo(() => {
+    const map = new Map<string, FlowAction[]>()
+    for (const [filePath, mod] of Object.entries(flowModules)) {
+      map.set(filePathToRoute(filePath), mod.actions)
+    }
+    return map
   }, [])
 
   if (!route) return null
-
-  return flows.find((config) => config.actions[route] != null) ?? null
+  return routeMap.get(route) ?? null
 }
