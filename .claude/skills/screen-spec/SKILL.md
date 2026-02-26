@@ -134,12 +134,25 @@ Read the template at `references/spec-template.md` from this skill. Adapt it to 
 
 ### Required Sections
 
-**1. Header**
+**0. Flow Overview** *(multi-screen flows only)*
 ```markdown
-# `/route/path` — Screen Name
+## Flow Overview
 
-**Source:** [requirement reference if available]
+\`\`\`
+[1. Screen A] → [2. Screen B] → [3. Screen C]
+                                   ↑ adapts based on selection
+\`\`\`
+```
+Required for flows with 2+ screens. Shows the full flow as an ASCII diagram with branching logic. Omit for standalone screens.
+
+**1. Header** — includes companion files and state model
+```markdown
+## `/route/path` — Screen Name
+
 **File:** `path/to/page-file.tsx`
+**Companion files:** `scenarios.ts`, `flow.ts`
+**Layout pattern:** LP-N (pattern name)
+**State model:** flat scenarios (`TypeName`) | regions (`regionName` region, `TypeName`)
 ```
 
 **2. Navigation Context**
@@ -154,19 +167,29 @@ Read the template at `references/spec-template.md` from this skill. Adapt it to 
 - **On success:** [action result — API call, store update, navigation, toast]
 ```
 
-**3. Elements** — Use detailed table for 5+ elements, bullet list for simpler screens.
+**3. Flow Actions** — Required for screens in a multi-step flow. Optional for standalone screens. Map every interactive element (buttons, radio cards, screen header back arrow) to its `data-flow-target` trigger and `flow.ts` action. See `references/spec-template.md` for the table format and validation rules.
+
+**4. Elements** — Use variant sub-tables when a screen has conditional sections (e.g., different content based on selection). Use a single table when all elements are always visible. Add **Element Detail** sub-sections for complex composite elements (cards with multiple fields, list items with rich content).
 
 Common element types: Text, Input, Button, Link, Image, Badge, Card, List, List Item, Tab, Dropdown, Navigation, Switch, Checkbox, Read-only, Date Input, Date Range, Textarea, Tags, Timer, Selector, Toggle, Visual, Widget, Grid, Calendar, Table, Banner, Alert, Preview, Status Indicator, Upload, Static, Email
 
 Adapt to the project's component library (e.g., shadcn/ui, MUI, Ant Design, Chakra).
 
-**4. States** — Check all that apply: Loading, Empty, Populated, Error, Not found, Offline. Include conditional elements (show/hide/disable logic).
+**5. States** — Declare the state model (flat scenarios or regions), describe each state with concrete details, include inline TypeScript type definition, and list conditional elements.
 
-**5. Data** — Reads (collections, stores, API calls, URL params) and Writes (API calls, store updates, toasts).
+**6. Data** — Reads (collections, stores, API calls, URL params) and Writes (API calls, store updates, toasts).
+
+**7. Layout Sketches** — Always required. Generate one sketch per significant visual variant (e.g., pickup vs delivery, review vs success). Annotate interactive elements with trigger names. Generate separate sketches for terminal states (success, error) when they replace screen content.
+
+**8. i18n Keys** — Required if the project uses i18n. Provide both `en.json` and `de.json` with actual JSON content. Keys are flat (no nesting), matching the co-located locale convention.
+
+**9. Edge Cases & Known Limitations** *(optional)* — Document workarounds, framework constraints, conditional routing gaps, state loss on navigation, guard enforcement limitations.
+
+**10. Definition of Done** — Always required. Contains runnable verification commands (not manual checkboxes). The skill populates file paths and scenario keys from the spec content. All commands must pass with zero error output for the screen to be done. Reference the reusable `verify-screen.sh` script.
 
 ### Layout Reference
 
-If the screen matches an existing layout pattern or an existing page in the codebase, add a reference:
+If the screen matches an existing layout pattern or an existing page in the codebase, add a reference in the header:
 
 ```markdown
 **Layout pattern:** LP-4 (Detail page with read-only rows) — see `path/to/similar-page.tsx`
@@ -174,42 +197,24 @@ If the screen matches an existing layout pattern or an existing page in the code
 
 This tells the implementer to read that file for structural patterns.
 
-### ASCII Layout Preview
+### Flow-Level Spec Guidance
 
-ALWAYS generate an ASCII layout sketch. Use box-drawing characters:
+When the user requests a multi-screen flow (not just a single screen):
 
-```
-┌─── ┐  └─── ┘  │  ─  ├  ┤  ┬  ┴  ┼
-```
-
-Rules:
-- 42-char wide outer frame
-- Label each section on the right side with a comment
-- Show conditional elements with a note (e.g., "conditional alert")
-- Show all states inline where possible (e.g., "[Badge]" for status)
-- Use realistic placeholder data relevant to the app's domain, not "Lorem ipsum"
-
-Example:
-```
-┌──────────────────────────────────────────┐
-│ ← Back link                              │  nav
-├──────────────────────────────────────────┤
-│ "Page Title"                   [Badge]   │  header
-│ Subtitle text                            │
-├──────────────────────────────────────────┤
-│ ┌──────────────────────────────────────┐ │
-│ │ Content area                         │ │  card
-│ └──────────────────────────────────────┘ │
-├──────────────────────────────────────────┤
-│ [Action 1]  [Action 2]                   │  actions
-└──────────────────────────────────────────┘
-```
+1. Generate a **Flow Overview** section at the top with an ASCII flow diagram showing all screens and branching
+2. Each screen within the flow gets its own H2 section with **all** required sub-sections
+3. Add flow-level sections at the bottom:
+   - **i18n Namespace Mapping** — table of screen → namespace → file paths
+   - **Mock Data Summary** — table of screen → type → source file
+   - **Migration Notes** *(optional)* — what to delete/merge/update when replacing existing screens
+4. **Edge Cases & Known Limitations** — document flow-level issues (conditional routing gaps, state loss on navigation, guard enforcement limitations)
 
 ### Optional Sections
 
 Add only when relevant:
 - **Constraints** — Validation rules, rate limits, privacy/GDPR, accessibility
-- **i18n Keys** — Only if the project uses i18n and new keys are needed
+- **Edge Cases & Known Limitations** — Framework workarounds, routing gaps, state loss, guard limitations
+- **Migration Notes** — What to delete/merge/update when the spec replaces existing screens
 
 ## Phase 4: Present for Approval
 
@@ -244,4 +249,5 @@ For screens not yet documented, suggest elements and flows based on common patte
 
 - **Spec template**: `references/spec-template.md` — canonical template with all required and optional sections
 - **Layout patterns catalog**: `references/layout-patterns.md` — 15 universal layout patterns with ASCII sketches
+- **Verification script**: `references/verify-screen.sh` — reusable screen verification script (run `bash verify-screen.sh section/screen`)
 - **Project context**: `docs/plans/screens/project-context.md` (generated on first run) — cached project conventions, tech stack, and layout patterns in use
