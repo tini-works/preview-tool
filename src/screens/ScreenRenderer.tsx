@@ -1,5 +1,7 @@
 import { useEffect, useState, type ComponentType } from 'react'
 import { FlowProvider } from '@/flow/FlowProvider'
+import { NetworkSimulationLayer } from '@/devtools/NetworkSimulationLayer'
+import { useDevToolsStore } from '@/devtools/useDevToolsStore'
 import { useScreenModules } from '@/screens/useScreenModules'
 import type { ScreenModule } from '@/screens/types'
 
@@ -15,6 +17,7 @@ interface LoadedScreen {
 
 export function ScreenRenderer({ route, activeState }: ScreenRendererProps) {
   const modules = useScreenModules()
+  const fontScale = useDevToolsStore((s) => s.fontScale)
   const [loaded, setLoaded] = useState<LoadedScreen | null>(null)
 
   useEffect(() => {
@@ -73,8 +76,12 @@ export function ScreenRenderer({ route, activeState }: ScreenRendererProps) {
   const data = activeScenario?.data ?? {}
 
   return (
-    <FlowProvider>
-      <Component data={data} />
-    </FlowProvider>
+    <div style={{ fontSize: `${fontScale * 100}%` }} className="h-full">
+      <NetworkSimulationLayer>
+        <FlowProvider>
+          <Component data={data} />
+        </FlowProvider>
+      </NetworkSimulationLayer>
+    </div>
   )
 }
