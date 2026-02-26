@@ -13,8 +13,8 @@ digraph generate {
   "Read 2-3 existing screens" [shape=box];
   "Match to screen pattern" [shape=diamond];
   "Confirm pattern + scenarios with user" [shape=box];
-  "Generate scenarios.ts + index.tsx" [shape=box];
-  "Write files, verify build" [shape=box];
+  "Generate scenarios.ts + index.tsx + spec" [shape=box];
+  "Write files, verify build + tests" [shape=box];
 
   "User describes screen" -> "Description detailed enough?";
   "Description detailed enough?" -> "Read component library" [label="yes"];
@@ -23,9 +23,9 @@ digraph generate {
   "Read component library" -> "Read 2-3 existing screens";
   "Read 2-3 existing screens" -> "Match to screen pattern";
   "Match to screen pattern" -> "Confirm pattern + scenarios with user";
-  "Confirm pattern + scenarios with user" -> "Generate scenarios.ts + index.tsx" [label="approved"];
+  "Confirm pattern + scenarios with user" -> "Generate scenarios.ts + index.tsx + spec" [label="approved"];
   "Confirm pattern + scenarios with user" -> "Match to screen pattern" [label="revise"];
-  "Generate scenarios.ts + index.tsx" -> "Write files, verify build";
+  "Generate scenarios.ts + index.tsx + spec" -> "Write files, verify build + tests";
 }
 ```
 
@@ -220,7 +220,7 @@ Use `AskUserQuestion` to confirm.
 
 ## Step 4: Generate screen files
 
-Each screen is a folder with two required files and optional locale files:
+Each screen is a folder with required files and optional locale files:
 
 ### `src/screens/{section}/{screen}/scenarios.ts`
 
@@ -290,9 +290,64 @@ export default function ScreenNameScreen({ data }: { data: ScreenNameData }) {
 - Section headers: `<p className="mb-2 text-xs font-semibold tracking-wider text-neutral-400">SECTION</p>`
 - Copy Tailwind class patterns from existing screens — do NOT invent new styling conventions
 
+### `src/screens/{section}/{screen}/{screen}.spec.ts`
+
+Generate a co-located Playwright test file. The test imports the shared fixture and verifies each scenario renders without crashing.
+
+**For flat scenarios** (screen exports `scenarios`):
+
+```typescript
+import { test, expect } from '../../_test-helpers/fixtures'
+
+test.describe('{section}/{screen}', () => {
+  test.beforeEach(async ({ screen }) => {
+    await screen.select('{section}/{screen}')
+  })
+
+  test('{scenarioKey} — renders without error', async ({ screen }) => {
+    await screen.switchState('{scenarioKey}')
+    await expect(screen.frame).not.toBeEmpty()
+  })
+
+  // ... one test per scenario key
+})
+```
+
+**For region-based screens** (screen exports `regions`):
+
+```typescript
+import { test, expect } from '../../_test-helpers/fixtures'
+
+test.describe('{section}/{screen}', () => {
+  test.beforeEach(async ({ screen }) => {
+    await screen.select('{section}/{screen}')
+  })
+
+  test('{regionKey}:{stateKey} — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('{Region Label}', '{stateKey}')
+    await expect(screen.frame).not.toBeEmpty()
+  })
+
+  // ... one test per region+state combination
+})
+```
+
+**Rules for .spec.ts:**
+- Import path: `'../../_test-helpers/fixtures'` for sectioned screens, `'../_test-helpers/fixtures'` for standalone
+- `screen.select()` takes the full path (`'{section}/{screen}'` for sectioned, `'{screen}'` for standalone)
+- Flat scenarios use `switchState(key)`, region-based use `switchRegionState(label, key)`
+- One test per scenario key (flat) or per region+state combination (regions)
+- Test name format: `'{key} — renders without error'` (flat) or `'{regionKey}:{stateKey} — renders without error'` (regions)
+
 ### After writing
 
-Run `pnpm exec tsc --noEmit` to verify. Report the folder path and scenario keys.
+Run `pnpm exec tsc --noEmit` to verify TypeScript. Then run the Playwright test:
+
+```bash
+pnpm exec playwright test src/screens/{section}/{screen}/
+```
+
+Report the folder path, scenario keys, and test results.
 
 ## Common Mistakes
 
@@ -308,3 +363,5 @@ Run `pnpm exec tsc --noEmit` to verify. Report the folder path and scenario keys
 | Forgetting footer | Most screens need a sticky `<Footer>` with action buttons |
 | Guessing patterns | Read 2-3 existing screens first to match conventions |
 | Missing data-flow-target | Add to interactive components that participate in flows |
+| Missing .spec.ts | Every screen needs a co-located Playwright spec — generate it alongside index.tsx |
+| Wrong fixture import path | Sectioned: `'../../_test-helpers/fixtures'`, standalone: `'../_test-helpers/fixtures'` |
