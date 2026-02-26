@@ -51,6 +51,7 @@ export default function BookingTypeScreen({ data }: { data: BookingTypeData }) {
               label="Specialty & Doctor"
               description="Select..."
               required
+              data-flow-target="ListItem:Specialty & Doctor"
             />
             <ListItem icon="📄" label="Referral" description="Optional" />
           </Card>
