@@ -3,7 +3,19 @@ import { FlowProvider } from '@/flow/FlowProvider'
 import { NetworkSimulationLayer } from '@/devtools/NetworkSimulationLayer'
 import { useDevToolsStore } from '@/devtools/useDevToolsStore'
 import { useScreenModules } from '@/screens/useScreenModules'
-import type { ScreenModule, RegionsMap } from '@/screens/types'
+import type { ScreenModule, RegionsMap, FlagDefinition } from '@/screens/types'
+
+function resolveFlags(
+  definitions: Record<string, FlagDefinition> | undefined,
+  overrides: Record<string, boolean>
+): Record<string, boolean> {
+  if (!definitions) return {}
+  const resolved: Record<string, boolean> = {}
+  for (const [key, def] of Object.entries(definitions)) {
+    resolved[key] = overrides[key] ?? def.default
+  }
+  return resolved
+}
 
 function assembleRegionData(
   regions: RegionsMap,
@@ -37,12 +49,13 @@ interface ScreenRendererProps {
 
 interface LoadedScreen {
   route: string
-  Component: ComponentType<{ data: unknown }>
+  Component: ComponentType<{ data: unknown; flags?: Record<string, boolean> }>
 }
 
 export function ScreenRenderer({ route, activeState }: ScreenRendererProps) {
   const modules = useScreenModules()
   const fontScale = useDevToolsStore((s) => s.fontScale)
+  const featureFlags = useDevToolsStore((s) => s.featureFlags)
   const regionStates = useDevToolsStore((s) => s.regionStates)
   const regionListCounts = useDevToolsStore((s) => s.regionListCounts)
   const [loaded, setLoaded] = useState<LoadedScreen | null>(null)
@@ -92,6 +105,7 @@ export function ScreenRenderer({ route, activeState }: ScreenRendererProps) {
 
   const { Component } = loaded
   const regions = entry.regions
+  const resolvedFlags = resolveFlags(entry.flags, featureFlags)
   let data: Record<string, unknown>
 
   if (regions && Object.keys(regions).length > 0) {
@@ -114,7 +128,7 @@ export function ScreenRenderer({ route, activeState }: ScreenRendererProps) {
     <NetworkSimulationLayer key={route}>
       <div style={{ zoom: fontScale }} className="h-full">
         <FlowProvider>
-          <Component data={data} />
+          <Component data={data} flags={resolvedFlags} />
         </FlowProvider>
       </div>
     </NetworkSimulationLayer>

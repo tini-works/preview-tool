@@ -25,7 +25,7 @@ export interface RegionDefinition {
 export type RegionsMap = Record<string, RegionDefinition>
 
 export interface ScreenModule {
-  default: ComponentType<{ data: unknown }>
+  default: ComponentType<{ data: unknown; flags?: Record<string, boolean> }>
 }
 
 export interface ScenarioModule {
