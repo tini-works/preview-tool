@@ -1,10 +1,10 @@
 import { FileText, PanelLeftClose, PanelLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useContentModules } from '@/content/useContentModules'
+import { useScreenModules } from '@/screens/useScreenModules'
 import { useDevToolsStore } from '@/devtools/useDevToolsStore'
 
 export function CatalogPanel() {
-  const modules = useContentModules()
+  const modules = useScreenModules()
   const selectedRoute = useDevToolsStore((s) => s.selectedRoute)
   const setSelectedRoute = useDevToolsStore((s) => s.setSelectedRoute)
   const catalogCollapsed = useDevToolsStore((s) => s.catalogCollapsed)

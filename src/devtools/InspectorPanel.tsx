@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/select'
 import { useDevToolsStore } from '@/devtools/useDevToolsStore'
 import { getAllDevices, getDevice, type DeviceType } from '@/preview/device-frames'
-import { useContentModules } from '@/content/useContentModules'
+import { useScreenModules } from '@/screens/useScreenModules'
 
 export function InspectorPanel() {
   const activeDevice = useDevToolsStore((s) => s.activeDevice)
@@ -30,10 +30,10 @@ export function InspectorPanel() {
   const flowHistory = useDevToolsStore((s) => s.flowHistory)
   const resetFlowHistory = useDevToolsStore((s) => s.resetFlowHistory)
 
-  const modules = useContentModules()
+  const modules = useScreenModules()
   const currentModule = modules.find((m) => m.route === selectedRoute)
-  const states = currentModule?.frontmatter?.states
-  const stateKeys = states ? Object.keys(states) : []
+  const scenarios = currentModule?.scenarios
+  const stateKeys = scenarios ? Object.keys(scenarios) : []
 
   const device = getDevice(activeDevice)
   const displayWidth =
@@ -188,15 +188,10 @@ export function InspectorPanel() {
           </Section>
         )}
 
-        {/* Content info */}
-        {selectedRoute && currentModule?.frontmatter?.type && (
-          <Section title="Content">
-            <div className="flex items-center gap-2">
-              <span className="rounded bg-neutral-100 px-1.5 py-0.5 text-xs font-medium text-neutral-600">
-                {currentModule.frontmatter.type}
-              </span>
-              <span className="text-xs text-neutral-400">{selectedRoute}</span>
-            </div>
+        {/* Screen info */}
+        {selectedRoute && (
+          <Section title="Screen">
+            <span className="text-xs text-neutral-400">{selectedRoute}</span>
           </Section>
         )}
       </div>

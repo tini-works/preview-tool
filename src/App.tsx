@@ -3,8 +3,8 @@ import { useDevToolsStore } from '@/devtools/useDevToolsStore'
 import { CatalogPanel } from '@/devtools/CatalogPanel'
 import { InspectorPanel } from '@/devtools/InspectorPanel'
 import { DeviceFrame } from '@/preview/DeviceFrame'
-import { ContentRenderer } from '@/content/ContentRenderer'
-import { useContentModules } from '@/content/useContentModules'
+import { ScreenRenderer } from '@/screens/ScreenRenderer'
+import { useScreenModules } from '@/screens/useScreenModules'
 import { getDevice } from '@/preview/device-frames'
 
 function App() {
@@ -17,7 +17,7 @@ function App() {
   const responsiveHeight = useDevToolsStore((s) => s.responsiveHeight)
   const setResponsiveSize = useDevToolsStore((s) => s.setResponsiveSize)
 
-  const modules = useContentModules()
+  const modules = useScreenModules()
   const prevRouteRef = useRef<string | null>(null)
 
   // Auto-select the first state when navigating to a new route
@@ -28,8 +28,8 @@ function App() {
     if (!selectedRoute) return
 
     const mod = modules.find((m) => m.route === selectedRoute)
-    const states = mod?.frontmatter?.states
-    const firstState = states ? Object.keys(states)[0] ?? null : null
+    const scenarioKeys = mod ? Object.keys(mod.scenarios) : []
+    const firstState = scenarioKeys.length > 0 ? scenarioKeys[0] : null
     setSelectedState(firstState)
   }, [selectedRoute, modules, setSelectedState])
 
@@ -37,10 +37,8 @@ function App() {
 
   return (
     <div className="flex h-svh bg-neutral-100">
-      {/* Left: Catalog */}
       <CatalogPanel />
 
-      {/* Center: Device preview */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <DeviceFrame
           device={device}
@@ -49,14 +47,13 @@ function App() {
           responsiveHeight={responsiveHeight}
           onResponsiveResize={setResponsiveSize}
         >
-          <ContentRenderer
+          <ScreenRenderer
             route={selectedRoute}
             activeState={selectedState}
           />
         </DeviceFrame>
       </div>
 
-      {/* Right: Inspector */}
       <InspectorPanel />
     </div>
   )
