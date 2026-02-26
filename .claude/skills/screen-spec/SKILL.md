@@ -14,6 +14,7 @@ User says route or screen name
   → Phase 0: Discover project context
   → Phase 1: Gather screen context
   → Phase 2: Ask clarifying questions (AskUserQuestion)
+  → Phase 2.5: Propose spec details (Claude suggests, designer approves)
   → Phase 3: Draft spec with ASCII layout
   → Phase 4: Present for approval
   → Phase 5: Save spec file
@@ -127,6 +128,35 @@ Ask one question at a time. Prefer multiple-choice options when possible.
 **When to ask vs. when to infer:**
 - **Ask** if the answer affects layout structure, data flow, or user actions
 - **Infer** if the answer is obvious from the router, existing docs, or codebase patterns
+
+## Phase 2.5: Propose Spec Details
+
+After gathering context, Claude proposes the full spec details for designer approval. Read `docs/design-decisions.md` first to align with established conventions.
+
+**Present a single structured proposal using AskUserQuestion for approval:**
+
+1. **Layout hint** — Recommend one of: single-column, two-column, list, form-wizard, dashboard, detail-view. Reference the matching layout pattern (LP-N) from `references/layout-patterns.md`.
+
+2. **Component preferences** — List the specific L2/L3 components to use:
+   - Header: `ScreenHeader` with back nav? Title text?
+   - Body: which blocks (DataList, DataTable, FormWizard, etc.) or L2 primitives?
+   - Footer: sticky CTA? Multiple actions?
+   - Reference `docs/design-decisions.md` for established choices.
+
+3. **State matrix** — Propose the full scenario/region structure:
+   - Flat scenarios or regions?
+   - List each state with a one-line description of what's visible
+   - For lists: propose mockItems count and defaultCount
+
+4. **Flow map** — Propose all flow actions:
+   - Which buttons navigate where?
+   - Which elements change state?
+   - Back navigation target?
+
+**Format:** Present as a concise summary, then ask:
+> "Here's what I'd suggest for this screen. Approve, or tell me what to change?"
+
+Only proceed to Phase 3 after the designer approves or adjusts the proposal.
 
 ## Phase 3: Draft the Spec
 
