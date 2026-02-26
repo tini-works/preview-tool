@@ -5,12 +5,12 @@ import {
   Note,
   Footer,
 } from '@/components/screen'
-import { Stepper } from './Stepper'
+import { Stepper } from '../_shared/Stepper'
 import type { PrescriptionScanData } from './scenarios'
 
 export default function PrescriptionScanScreen({ data }: { data: PrescriptionScanData }) {
   const { state } = data
-  const { t } = useTranslation('prescription')
+  const { t } = useTranslation('prescription-scan')
 
   const steps = [
     t('steps.scan'),
@@ -23,7 +23,7 @@ export default function PrescriptionScanScreen({ data }: { data: PrescriptionSca
   return (
     <>
       <ScreenHeader
-        title={t('scan.title')}
+        title={t('title')}
         data-flow-target="ScreenHeader:Redeem Prescription"
       />
 
@@ -36,7 +36,7 @@ export default function PrescriptionScanScreen({ data }: { data: PrescriptionSca
               <span className="text-4xl">✅</span>
             </div>
             <h2 className="mb-2 text-xl font-semibold text-charcoal-500">
-              {t('scan.success')}
+              {t('success')}
             </h2>
           </>
         ) : state === 'error' ? (
@@ -45,12 +45,12 @@ export default function PrescriptionScanScreen({ data }: { data: PrescriptionSca
               <span className="text-4xl">📱</span>
             </div>
             <h2 className="mb-2 text-xl font-semibold text-charcoal-500">
-              {t('scan.instruction')}
+              {t('instruction')}
             </h2>
             <p className="mb-6 max-w-[280px] text-center text-sm text-slate-500">
-              {t('scan.subtitle')}
+              {t('subtitle')}
             </p>
-            <Note type="error">{t('scan.error')}</Note>
+            <Note type="error">{t('error')}</Note>
           </>
         ) : (
           <>
@@ -62,11 +62,11 @@ export default function PrescriptionScanScreen({ data }: { data: PrescriptionSca
               <span className="text-4xl">📱</span>
             </div>
             <h2 className="mb-2 text-xl font-semibold text-charcoal-500">
-              {state === 'scanning' ? t('scan.scanning') : t('scan.instruction')}
+              {state === 'scanning' ? t('scanning') : t('instruction')}
             </h2>
             {state === 'idle' && (
               <p className="max-w-[280px] text-center text-sm text-slate-500">
-                {t('scan.subtitle')}
+                {t('subtitle')}
               </p>
             )}
           </>
@@ -74,7 +74,7 @@ export default function PrescriptionScanScreen({ data }: { data: PrescriptionSca
       </div>
 
       <p className="pb-2 text-center text-xs text-slate-400">
-        {t('scan.poweredBy')}
+        {t('poweredBy')}
       </p>
 
       <Footer>
@@ -84,7 +84,7 @@ export default function PrescriptionScanScreen({ data }: { data: PrescriptionSca
             className="w-full"
             data-flow-target="Button:Try Again"
           >
-            {t('scan.tryAgainBtn')}
+            {t('tryAgainBtn')}
           </Button>
         ) : (
           <Button
@@ -93,7 +93,7 @@ export default function PrescriptionScanScreen({ data }: { data: PrescriptionSca
             variant={state === 'scanning' || state === 'success' ? 'secondary' : 'primary'}
             data-flow-target="Button:Simulate NFC Scan"
           >
-            {t('scan.simulateBtn')}
+            {t('simulateBtn')}
           </Button>
         )}
       </Footer>

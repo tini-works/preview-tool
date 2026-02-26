@@ -9,7 +9,7 @@ import {
   Footer,
   Button,
 } from '@/components/screen'
-import { Stepper } from '../PrescriptionScan/Stepper'
+import { Stepper } from '../_shared/Stepper'
 import type { PrescriptionListData } from './scenarios'
 
 const statusVariant = {
@@ -20,7 +20,7 @@ const statusVariant = {
 
 export default function PrescriptionListScreen({ data }: { data: PrescriptionListData }) {
   const { view, insurer, memberId, prescriptions, selectedIds } = data
-  const { t } = useTranslation('prescription')
+  const { t } = useTranslation('prescription-list')
 
   const steps = [
     t('steps.scan'),
@@ -35,7 +35,7 @@ export default function PrescriptionListScreen({ data }: { data: PrescriptionLis
   return (
     <>
       <ScreenHeader
-        title={t('list.title')}
+        title={t('title')}
         data-flow-target="ScreenHeader:Your Prescriptions"
       />
 
@@ -54,7 +54,7 @@ export default function PrescriptionListScreen({ data }: { data: PrescriptionLis
             <div className="flex items-center justify-center py-12">
               <div className="flex items-center gap-2 text-slate-500">
                 <Loader2 className="size-4 animate-spin" />
-                <span className="text-sm">{t('list.loading')}</span>
+                <span className="text-sm">{t('loading')}</span>
               </div>
             </div>
           </Stack>
@@ -65,7 +65,7 @@ export default function PrescriptionListScreen({ data }: { data: PrescriptionLis
               size="lg"
               className="w-full opacity-50"
             >
-              {t('list.continue')}
+              {t('continue')}
             </Button>
           </Footer>
         </>
@@ -81,7 +81,7 @@ export default function PrescriptionListScreen({ data }: { data: PrescriptionLis
                 <span className="text-xs text-slate-400">{memberId}</span>
               </div>
             </Card>
-            <Note type="info">{t('list.noResults')}</Note>
+            <Note type="info">{t('noResults')}</Note>
           </Stack>
 
           <Footer>
@@ -90,7 +90,7 @@ export default function PrescriptionListScreen({ data }: { data: PrescriptionLis
               size="lg"
               className="w-full opacity-50"
             >
-              {t('list.continue')}
+              {t('continue')}
             </Button>
           </Footer>
         </>
@@ -118,7 +118,7 @@ export default function PrescriptionListScreen({ data }: { data: PrescriptionLis
                 {selectedIds.length === readyCount && '✓'}
               </div>
               <span className="text-sm text-charcoal-500">
-                {t('list.selectAll', { count: readyCount })}
+                {t('selectAll', { count: readyCount })}
               </span>
             </div>
 
@@ -152,7 +152,7 @@ export default function PrescriptionListScreen({ data }: { data: PrescriptionLis
                             {rx.medication}
                           </span>
                           <Badge variant={statusVariant[rx.status]}>
-                            {t(`list.status${rx.status.charAt(0).toUpperCase()}${rx.status.slice(1)}`)}
+                            {t(`status${rx.status.charAt(0).toUpperCase()}${rx.status.slice(1)}`)}
                           </Badge>
                         </div>
                         <span className="text-xs text-slate-500">{rx.dosage}</span>
@@ -167,7 +167,7 @@ export default function PrescriptionListScreen({ data }: { data: PrescriptionLis
             </Stack>
 
             <p className="text-center text-xs text-slate-400">
-              {t('list.selectedCount', {
+              {t('selectedCount', {
                 selected: selectedIds.length,
                 total: prescriptions.length,
               })}
@@ -181,7 +181,7 @@ export default function PrescriptionListScreen({ data }: { data: PrescriptionLis
               className={`w-full ${selectedIds.length === 0 ? 'opacity-50' : ''}`}
               data-flow-target="Button:Continue"
             >
-              {t('list.continue')}
+              {t('continue')}
             </Button>
           </Footer>
         </>

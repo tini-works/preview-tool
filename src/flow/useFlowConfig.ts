@@ -6,14 +6,14 @@ interface FlowModule {
 }
 
 const flowModules = import.meta.glob<FlowModule>(
-  '/src/screens/*/flow.ts',
+  '/src/screens/**/flow.ts',
   { eager: true }
 )
 
 function filePathToRoute(filePath: string): string {
-  const match = filePath.match(/\/src\/screens\/([^/]+)\/flow\.ts$/)
+  const match = filePath.match(/\/src\/screens\/(.+)\/flow\.ts$/)
   if (!match) return filePath
-  return '/' + match[1].replace(/([a-z0-9])([A-Z])/g, '$1-$2').toLowerCase()
+  return `/${match[1]}`
 }
 
 export function useFlowActions(route: string | null): FlowAction[] | null {

@@ -1,0 +1,19 @@
+{
+  "flowTitle": "Redeem Prescription",
+  "steps": {
+    "scan": "Scan",
+    "select": "Select",
+    "delivery": "Delivery",
+    "location": "Location",
+    "confirm": "Confirm"
+  },
+  "title": "Redeem Prescription",
+  "instruction": "Hold your insurance card near your phone",
+  "subtitle": "Place your eGK (elektronische Gesundheitskarte) on the back of your device",
+  "scanning": "Reading card...",
+  "success": "Card verified!",
+  "error": "Card not recognized. Please try again.",
+  "simulateBtn": "Simulate NFC Scan",
+  "tryAgainBtn": "Try Again",
+  "poweredBy": "Powered by APO group"
+}

@@ -25,15 +25,17 @@ This is a **preview tool** — a design/prototyping workbench that renders scree
 - Use `<Variant state="stateName">` to conditionally render per state
 - MDX components are globally available (no imports needed)
 
-### 2. React Screens (legacy/alternative, in `src/screens/`)
-- Traditional React components with `useScenarios` hook + `<ScenarioSwitcher>`
-- Only one exists: `HelloWorld`
+### 2. React Screens (in `src/screens/`)
+- Traditional React components with scenarios + `<ScenarioSwitcher>`
+- Screens grouped by section: `src/screens/{section}/{screen}/` or `src/screens/{screen}/` for standalone
+- Locale files co-located in screen folders (e.g., `src/screens/prescription/scan/en.json`)
+- Auto-discovered via `import.meta.glob('**/index.tsx')` — `_shared/` folders excluded
 
 **New screens should use the MDX approach** unless React-specific logic is required.
 
 ## Project Structure
 - **Content directory:** `content/` (MDX screen files — writable)
-- **Pages directory:** `src/screens/` (React screen components — writable)
+- **Pages directory:** `src/screens/{section}/{screen}/` (React screen components — writable)
 - **UI components:** `src/components/ui/` (shadcn/ui — read-only)
 - **MDX components:** `src/content/mdx-components.tsx` (custom MDX primitives — read-only)
 - **Dev tools:** `src/devtools/` (CatalogPanel, InspectorPanel, DevToolsBar — read-only)

@@ -1,17 +1,23 @@
 import i18n from "i18next"
+import type { Resource } from "i18next"
 import { initReactI18next } from "react-i18next"
 
-const localeModules = import.meta.glob("@/locales/**/*.json", { eager: true })
+const localeModules = import.meta.glob(
+  "/src/screens/**/{en,de}.json",
+  { eager: true }
+)
 
-const resources: Record<string, Record<string, unknown>> = {}
+const resources: Resource = {}
 
-for (const [path, module] of Object.entries(localeModules)) {
-  const match = path.match(/\/locales\/(\w+)\/(\w+)\.json$/)
+for (const [filePath, mod] of Object.entries(localeModules)) {
+  const match = filePath.match(/\/src\/screens\/(.+)\/(en|de)\.json$/)
   if (!match) continue
 
-  const [, lang, namespace] = match
+  const namespace = match[1].replace(/\//g, "-")
+  const lang = match[2]
+
   resources[lang] ??= {}
-  resources[lang][namespace] = (module as { default: unknown }).default
+  resources[lang][namespace] = (mod as { default: Record<string, string> }).default
 }
 
 i18n.use(initReactI18next).init({

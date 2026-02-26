@@ -29,21 +29,29 @@ src/
 │   ├── ui/              # L2 — Generic primitives (Button, Card, Select)
 │   ├── screen.tsx       #   Screen layout component
 │   └── dev/             #   Dev tools (ScenarioSwitcher)
-├── screens/             # App — One screen per folder
-│   ├── Hello/
-│   ├── HelloWorld/
-│   ├── LoginForm/
-│   ├── BookingSearch/
-│   ├── BookingType/
-│   ├── BookingDoctor/
-│   ├── BookingLocation/
-│   ├── BookingTimeSlots/
-│   ├── BookingPatient/
-│   ├── BookingAppointments/
-│   ├── BookingConfirmation/
+├── screens/             # App — Screens grouped by section
+│   ├── booking/         #   8 booking flow screens
+│   │   ├── search/
+│   │   ├── type/
+│   │   ├── doctor/
+│   │   ├── location/
+│   │   ├── time-slots/
+│   │   ├── patient/
+│   │   ├── appointments/
+│   │   └── confirmation/
+│   ├── prescription/    #   5 prescription flow screens + _shared/
+│   │   ├── _shared/     #     Shared components (Stepper)
+│   │   ├── scan/
+│   │   ├── list/
+│   │   ├── delivery/
+│   │   ├── location/
+│   │   └── confirmation/
+│   ├── profile/         #   Standalone screens
+│   ├── login/
+│   ├── hello/
+│   ├── hello-world/
 │   ├── ScreenRenderer.tsx
 │   ├── useScreenModules.ts
-│   ├── flow.yaml        #   Screen flow definitions
 │   └── types.ts
 ├── flow/                # Flow engine (navigation between screens)
 ├── devtools/            # Inspector, catalog, dev tools bar
@@ -63,7 +71,7 @@ Dependencies flow one direction: **tokens → ui → blocks → screens**. Never
 | L1 Tokens | `src/tokens/` | Design values as TS constants + CSS custom properties |
 | L2 UI | `src/components/ui/` | Generic React primitives — domain-free |
 | L3 Blocks | `src/blocks/` | Composed patterns from L2 — domain-aware (planned) |
-| App | `src/screens/<Name>/` | Screen layouts importing L2 + L3 |
+| App | `src/screens/{section}/{screen}/` | Screen layouts importing L2 + L3, co-located locales |
 
 ## Design Tokens
 
@@ -113,15 +121,17 @@ Full token reference: [docs/design-tokens.md](docs/design-tokens.md)
 
 ## Adding a Screen
 
-Each screen lives in `src/screens/<ScreenName>/`:
+Each screen lives in `src/screens/{section}/{screen}/` or `src/screens/{screen}/`:
 
 ```
-src/screens/MyScreen/
+src/screens/booking/search/
 ├── index.tsx        # Screen component (default export)
-└── scenarios.ts     # Scenario definitions for dev tools
+├── scenarios.ts     # Scenario definitions for dev tools
+├── flow.ts          # Flow actions (optional)
+└── en.json          # Co-located locale file (optional)
 ```
 
-Register the screen in `src/App.tsx`.
+Screens are auto-discovered — no manual registration needed.
 
 ## Scripts
 

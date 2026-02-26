@@ -17,8 +17,7 @@ Dependencies flow one direction: **tokens → ui → blocks → screens**. Never
 | L1 Tokens | `src/tokens/` | Read-only | Exists | Design values (colors, spacing, radii) as TS constants and CSS custom properties |
 | L2 UI | `src/components/ui/` | Read-only | Exists | Generic React primitives (Button, Input, Card) — domain-free, no business logic |
 | L3 Blocks | `src/blocks/` | Read-only | Planned | Composed, data-driven patterns from L2 — domain-aware, opinionated layout |
-| App | `src/screens/<ScreenName>/` | **Writable** | Active | One-off screen layouts importing L2 + L3 |
-| App | `src/locales/<lang>/` | **Writable** | Active | Translation JSON files — one per screen per language |
+| App | `src/screens/{section}/{screen}/` | **Writable** | Active | One-off screen layouts importing L2 + L3, with co-located locale JSON |
 
 ### Scaffolding (read-only)
 
@@ -33,10 +32,14 @@ Dependencies flow one direction: **tokens → ui → blocks → screens**. Never
 
 ### Rules
 
-- Each screen lives in its own folder: `src/screens/<ScreenName>/index.tsx`
-- Screens are auto-discovered via `import.meta.glob` — no manual registration needed
+- Screens live in `src/screens/{section}/{screen}/index.tsx` (sectioned) or `src/screens/{screen}/index.tsx` (standalone)
+- Folder names use **lowercase kebab-case** (e.g., `booking/time-slots/`, `hello-world/`)
+- Screens are auto-discovered via `import.meta.glob('**/index.tsx')` — no manual registration needed
 - Screen folders may contain sub-components, mock data, and types specific to that screen
-- Translation files go in `src/locales/<lang>/<screenName>.json` (one per screen per language)
+- Shared components within a section go in `src/screens/{section}/_shared/` (excluded from screen discovery)
+- Translation files are **co-located** in the screen folder: `src/screens/{section}/{screen}/en.json`
+- Locale namespace is derived from the path: `prescription/scan/en.json` → namespace `prescription-scan`
+- Locales are auto-discovered via `import.meta.glob` — no manual registration in `i18n.ts`
 - L2 components accept standard React props — no domain logic, all strings via props
 - L3 blocks use data-driven API (accept structured data, not children assembly)
 - Blocks cannot import other blocks — extract shared logic to L2
@@ -48,6 +51,8 @@ Dependencies flow one direction: **tokens → ui → blocks → screens**. Never
 - **Tailwind CSS v4** — utility classes only, no custom CSS files
 - **shadcn/ui** (New York style, neutral theme) — add components via `pnpm dlx shadcn@latest add <component>`
 - **react-i18next** — all client-facing strings must use `t()` from `useTranslation()`
+  - **Supported locales:** `de` (German, default), `en` (English)
+  - Every screen with user-facing text must ship both `de.json` and `en.json`
 - **pnpm** — package manager (not npm, not yarn)
 
 ## Brand

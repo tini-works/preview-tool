@@ -1,0 +1,25 @@
+{
+  "flowTitle": "Redeem Prescription",
+  "steps": {
+    "scan": "Scan",
+    "select": "Select",
+    "delivery": "Delivery",
+    "location": "Location",
+    "confirm": "Confirm"
+  },
+  "title": "Review & Confirm",
+  "prescriptionsSection": "Prescriptions",
+  "deliverySection": "Delivery",
+  "insuranceSection": "Insurance",
+  "memberId": "Member ID: {{id}}",
+  "edit": "Edit",
+  "availableToday": "Available today",
+  "estimatedDays": "1–3 business days",
+  "consent": "I confirm that I am authorized to redeem these prescriptions",
+  "confirmBtn": "Confirm Redemption",
+  "submitting": "Processing...",
+  "successTitle": "Prescription Redeemed!",
+  "successPickup": "Your medication will be ready for pickup at {{location}}.",
+  "successDelivery": "Your medication will be delivered to {{address}} within 1–3 business days.",
+  "backToHome": "Back to Home"
+}

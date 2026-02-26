@@ -10,12 +10,12 @@ import {
   Footer,
   Button,
 } from '@/components/screen'
-import { Stepper } from '../PrescriptionScan/Stepper'
+import { Stepper } from '../_shared/Stepper'
 import type { PrescriptionLocationData } from './scenarios'
 
 export default function PrescriptionLocationScreen({ data }: { data: PrescriptionLocationData }) {
   const { method, savedAddress, pickupView, apotheken, selectedApothekeId } = data
-  const { t } = useTranslation('prescription')
+  const { t } = useTranslation('prescription-location')
 
   const steps = [
     t('steps.scan'),
@@ -26,7 +26,7 @@ export default function PrescriptionLocationScreen({ data }: { data: Prescriptio
   ]
 
   const isDelivery = method === 'delivery'
-  const title = isDelivery ? t('location.deliveryTitle') : t('location.pickupTitle')
+  const title = isDelivery ? t('deliveryTitle') : t('pickupTitle')
 
   return (
     <>
@@ -48,13 +48,13 @@ export default function PrescriptionLocationScreen({ data }: { data: Prescriptio
                     <span>📍</span>
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-charcoal-500">
-                        {t('location.savedAddress')}
+                        {t('savedAddress')}
                       </span>
                       <span className="text-xs text-slate-500">{savedAddress}</span>
                     </div>
                   </div>
                   <button className="text-xs font-medium text-teal-600">
-                    {t('location.changeAddress')}
+                    {t('changeAddress')}
                   </button>
                 </div>
               </Card>
@@ -62,25 +62,25 @@ export default function PrescriptionLocationScreen({ data }: { data: Prescriptio
               <Card>
                 <Stack gap="sm">
                   <div className="flex gap-3">
-                    <Input label={t('location.street')} placeholder="Marienplatz" className="flex-1" />
-                    <Input label={t('location.houseNumber')} placeholder="1" className="w-24 whitespace-nowrap" />
+                    <Input label={t('street')} placeholder="Marienplatz" className="flex-1" />
+                    <Input label={t('houseNumber')} placeholder="1" className="w-24 whitespace-nowrap" />
                   </div>
                   <div className="flex gap-3">
-                    <Input label={t('location.postalCode')} placeholder="80331" className="w-28" />
-                    <Input label={t('location.city')} placeholder="München" className="flex-1" />
+                    <Input label={t('postalCode')} placeholder="80331" className="w-28" />
+                    <Input label={t('city')} placeholder="München" className="flex-1" />
                   </div>
                 </Stack>
               </Card>
             )}
 
             <Textarea
-              label={t('location.deliveryNote')}
-              placeholder={t('location.deliveryNotePlaceholder')}
+              label={t('deliveryNote')}
+              placeholder={t('deliveryNotePlaceholder')}
             />
 
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <span>📦</span>
-              <span>{t('location.estimatedDelivery')}</span>
+              <span>{t('estimatedDelivery')}</span>
             </div>
           </Stack>
 
@@ -90,7 +90,7 @@ export default function PrescriptionLocationScreen({ data }: { data: Prescriptio
               className="w-full"
               data-flow-target="Button:Continue"
             >
-              {t('location.continue')}
+              {t('continue')}
             </Button>
           </Footer>
         </>
@@ -111,7 +111,7 @@ export default function PrescriptionLocationScreen({ data }: { data: Prescriptio
             <div className="flex items-center justify-center py-12">
               <div className="flex items-center gap-2 text-slate-500">
                 <Loader2 className="size-4 animate-spin" />
-                <span className="text-sm">{t('location.loading')}</span>
+                <span className="text-sm">{t('loading')}</span>
               </div>
             </div>
           )}
@@ -119,7 +119,7 @@ export default function PrescriptionLocationScreen({ data }: { data: Prescriptio
           {(pickupView === 'list' || pickupView === 'selected') && apotheken && (
             <Stack gap="md" className="p-4">
               <p className="text-xs font-semibold tracking-wider text-slate-400">
-                {t('location.nearbyCount', { count: apotheken.length }).toUpperCase()}
+                {t('nearbyCount', { count: apotheken.length }).toUpperCase()}
               </p>
 
               <Stack gap="sm">
@@ -152,14 +152,14 @@ export default function PrescriptionLocationScreen({ data }: { data: Prescriptio
                           <span className="text-xs text-slate-500">{apo.address}</span>
                           <div className="flex items-center justify-between">
                             <span className="text-xs text-slate-400">
-                              {t('location.openUntil', { time: apo.openUntil })}
+                              {t('openUntil', { time: apo.openUntil })}
                             </span>
                             <Badge
                               variant={apo.availability === 'available' ? 'success' : 'warning'}
                             >
                               {apo.availability === 'available'
-                                ? t('location.available')
-                                : t('location.limited')}
+                                ? t('available')
+                                : t('limited')}
                             </Badge>
                           </div>
                         </div>
@@ -178,7 +178,7 @@ export default function PrescriptionLocationScreen({ data }: { data: Prescriptio
               className={`w-full ${!selectedApothekeId ? 'opacity-50' : ''}`}
               data-flow-target="Button:Continue"
             >
-              {t('location.continue')}
+              {t('continue')}
             </Button>
           </Footer>
         </>

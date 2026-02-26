@@ -6,12 +6,12 @@ import {
   Footer,
   Button,
 } from '@/components/screen'
-import { Stepper } from '../PrescriptionScan/Stepper'
+import { Stepper } from '../_shared/Stepper'
 import type { PrescriptionDeliveryData } from './scenarios'
 
 export default function PrescriptionDeliveryScreen({ data }: { data: PrescriptionDeliveryData }) {
   const { selected } = data
-  const { t } = useTranslation('prescription')
+  const { t } = useTranslation('prescription-delivery')
   const hasSelection = selected !== 'none'
 
   const steps = [
@@ -25,14 +25,14 @@ export default function PrescriptionDeliveryScreen({ data }: { data: Prescriptio
   return (
     <>
       <ScreenHeader
-        title={t('delivery.title')}
+        title={t('title')}
         data-flow-target="ScreenHeader:Delivery Method"
       />
 
       <Stepper current={2} steps={steps} />
 
       <Stack gap="md" className="p-4">
-        <p className="text-sm text-charcoal-400">{t('delivery.instruction')}</p>
+        <p className="text-sm text-charcoal-400">{t('instruction')}</p>
 
         <Stack gap="sm">
           <RadioCard
@@ -42,9 +42,9 @@ export default function PrescriptionDeliveryScreen({ data }: { data: Prescriptio
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 <span>🚚</span>
-                <span className="font-semibold">{t('delivery.homeDelivery')}</span>
+                <span className="font-semibold">{t('homeDelivery')}</span>
               </div>
-              <span className="text-xs text-slate-500">{t('delivery.homeDeliveryDesc')}</span>
+              <span className="text-xs text-slate-500">{t('homeDeliveryDesc')}</span>
             </div>
           </RadioCard>
 
@@ -55,9 +55,9 @@ export default function PrescriptionDeliveryScreen({ data }: { data: Prescriptio
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2">
                 <span>🏪</span>
-                <span className="font-semibold">{t('delivery.apothekePickup')}</span>
+                <span className="font-semibold">{t('apothekePickup')}</span>
               </div>
-              <span className="text-xs text-slate-500">{t('delivery.apothekePickupDesc')}</span>
+              <span className="text-xs text-slate-500">{t('apothekePickupDesc')}</span>
             </div>
           </RadioCard>
         </Stack>
@@ -70,7 +70,7 @@ export default function PrescriptionDeliveryScreen({ data }: { data: Prescriptio
           className={`w-full ${!hasSelection ? 'opacity-50' : ''}`}
           data-flow-target="Button:Continue"
         >
-          {t('delivery.continue')}
+          {t('continue')}
         </Button>
       </Footer>
     </>

@@ -58,8 +58,8 @@ Do NOT guess and generate. Ask first, then proceed to Step 1.
 Read these files BEFORE generating anything:
 
 1. `src/components/screen.tsx` — the screen component library (props, variants, available components)
-2. 2-3 existing `src/screens/*/index.tsx` files — to learn the project's layout conventions
-3. Their matching `src/screens/*/scenarios.ts` files — to learn the scenario data pattern
+2. 2-3 existing `src/screens/{section}/{screen}/index.tsx` files — to learn the project's layout conventions
+3. Their matching `src/screens/{section}/{screen}/scenarios.ts` files — to learn the scenario data pattern
 
 NEVER invent components. Use only what exists in `src/components/screen.tsx`.
 
@@ -202,7 +202,7 @@ Present this to the user BEFORE generating:
 
 ```
 Screen: [name]
-Folder: src/screens/[ScreenName]/
+Folder: src/screens/{section}/{screen}/  (or src/screens/{screen}/ for standalone)
 Pattern: [List/Selection/Form/Detail/Status/Picker]
 
 Layout:
@@ -220,9 +220,9 @@ Use `AskUserQuestion` to confirm.
 
 ## Step 4: Generate screen files
 
-Each screen is a folder with two files:
+Each screen is a folder with two required files and optional locale files:
 
-### `src/screens/<ScreenName>/scenarios.ts`
+### `src/screens/{section}/{screen}/scenarios.ts`
 
 ```typescript
 export type ScreenNameData = {
@@ -248,7 +248,11 @@ export const scenarios = {
 - Keep mock data (arrays, objects) as module-level constants above `scenarios`
 - Use single quotes for strings
 
-### `src/screens/<ScreenName>/index.tsx`
+### `src/screens/{section}/{screen}/en.json` (if screen uses i18n)
+
+Create a co-located locale file with translation keys. The namespace is auto-derived from the path (`section/screen` → `section-screen`), so use `useTranslation('section-screen')` in the component.
+
+### `src/screens/{section}/{screen}/index.tsx`
 
 ```tsx
 import { ScreenHeader, Stack, /* ... */ } from '@/components/screen'

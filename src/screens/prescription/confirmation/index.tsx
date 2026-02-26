@@ -8,7 +8,7 @@ import {
   Footer,
   Button,
 } from '@/components/screen'
-import { Stepper } from '../PrescriptionScan/Stepper'
+import { Stepper } from '../_shared/Stepper'
 import type { PrescriptionConfirmationData } from './scenarios'
 
 export default function PrescriptionConfirmationScreen({ data }: { data: PrescriptionConfirmationData }) {
@@ -24,7 +24,7 @@ export default function PrescriptionConfirmationScreen({ data }: { data: Prescri
     memberId,
     consentChecked,
   } = data
-  const { t } = useTranslation('prescription')
+  const { t } = useTranslation('prescription-confirmation')
 
   const steps = [
     t('steps.scan'),
@@ -52,12 +52,12 @@ export default function PrescriptionConfirmationScreen({ data }: { data: Prescri
             <span className="text-4xl">✅</span>
           </div>
           <h2 className="mb-2 text-xl font-semibold text-charcoal-500">
-            {t('confirmation.successTitle')}
+            {t('successTitle')}
           </h2>
           <p className="max-w-[280px] text-center text-sm text-slate-500">
             {deliveryMethod === 'pickup'
-              ? t('confirmation.successPickup', { location: locationLabel })
-              : t('confirmation.successDelivery', { address: locationLabel })}
+              ? t('successPickup', { location: locationLabel })
+              : t('successDelivery', { address: locationLabel })}
           </p>
         </div>
 
@@ -67,7 +67,7 @@ export default function PrescriptionConfirmationScreen({ data }: { data: Prescri
             className="w-full"
             data-flow-target="Button:Back to Home"
           >
-            {t('confirmation.backToHome')}
+            {t('backToHome')}
           </Button>
         </Footer>
       </>
@@ -78,7 +78,7 @@ export default function PrescriptionConfirmationScreen({ data }: { data: Prescri
   return (
     <>
       <ScreenHeader
-        title={t('confirmation.title')}
+        title={t('title')}
         data-flow-target="ScreenHeader:Review & Confirm"
       />
 
@@ -88,7 +88,7 @@ export default function PrescriptionConfirmationScreen({ data }: { data: Prescri
         {/* Prescriptions Section */}
         <div>
           <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">
-            {t('confirmation.prescriptionsSection').toUpperCase()}
+            {t('prescriptionsSection').toUpperCase()}
           </p>
           <Card className="overflow-hidden p-0">
             {prescriptions.map((rx, i) => (
@@ -106,7 +106,7 @@ export default function PrescriptionConfirmationScreen({ data }: { data: Prescri
         {/* Delivery Section */}
         <div>
           <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">
-            {t('confirmation.deliverySection').toUpperCase()}
+            {t('deliverySection').toUpperCase()}
           </p>
           <Card className="overflow-hidden p-0">
             <ListItem
@@ -114,7 +114,7 @@ export default function PrescriptionConfirmationScreen({ data }: { data: Prescri
               label={deliveryLabel}
               trailing={
                 <button className="text-xs font-medium text-teal-600">
-                  {t('confirmation.edit')}
+                  {t('edit')}
                 </button>
               }
             />
@@ -124,7 +124,7 @@ export default function PrescriptionConfirmationScreen({ data }: { data: Prescri
               description={locationDetail}
               trailing={
                 <button className="text-xs font-medium text-teal-600">
-                  {t('confirmation.edit')}
+                  {t('edit')}
                 </button>
               }
             />
@@ -139,13 +139,13 @@ export default function PrescriptionConfirmationScreen({ data }: { data: Prescri
         {/* Insurance Section */}
         <div>
           <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">
-            {t('confirmation.insuranceSection').toUpperCase()}
+            {t('insuranceSection').toUpperCase()}
           </p>
           <Card className="overflow-hidden p-0">
             <ListItem
               icon="🏥"
               label={insurer}
-              description={t('confirmation.memberId', { id: memberId })}
+              description={t('memberId', { id: memberId })}
               trailing={<span />}
             />
           </Card>
@@ -163,7 +163,7 @@ export default function PrescriptionConfirmationScreen({ data }: { data: Prescri
             {consentChecked && '✓'}
           </div>
           <span className="text-sm text-charcoal-400">
-            {t('confirmation.consent')}
+            {t('consent')}
           </span>
         </div>
       </Stack>
@@ -178,10 +178,10 @@ export default function PrescriptionConfirmationScreen({ data }: { data: Prescri
           {isSubmitting ? (
             <span className="flex items-center gap-2">
               <Loader2 className="size-4 animate-spin" />
-              {t('confirmation.submitting')}
+              {t('submitting')}
             </span>
           ) : (
-            t('confirmation.confirmBtn')
+            t('confirmBtn')
           )}
         </Button>
       </Footer>

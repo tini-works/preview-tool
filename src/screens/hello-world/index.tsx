@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,8 +12,12 @@ import {
 import type { HelloWorldData } from './scenarios'
 
 export default function HelloWorldScreen({ data }: { data: HelloWorldData }) {
-  const { isLoading, items } = data
-  const { t } = useTranslation('helloWorld')
+  const { isLoading, items, lang } = data
+  const { t, i18n } = useTranslation('hello-world')
+
+  useEffect(() => {
+    i18n.changeLanguage(lang)
+  }, [lang, i18n])
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-4">
