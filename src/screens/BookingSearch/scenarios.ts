@@ -52,3 +52,8 @@ export const scenarios = {
     data: { fields: readyFields, reason: 'Persistent headache for 3 days', canSearch: false, isSearching: true } satisfies BookingSearchData,
   },
 }
+
+export const flags = {
+  showRecentSearches: { label: 'Recent Searches', default: true },
+  showSpecialties: { label: 'Specialties Filter', default: true },
+}
