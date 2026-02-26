@@ -19,6 +19,19 @@ Dependencies flow one direction: **tokens → ui → blocks → screens**. Never
 | L3 Blocks | `src/blocks/` | Read-only | Active | Composed, data-driven patterns from L2 — domain-aware, opinionated layout |
 | App | `src/screens/{section}/{screen}/` | **Writable** | Active | One-off screen layouts importing L2 + L3, with co-located locale JSON |
 
+### Available L3 Blocks
+
+| Block | Path | Props API | Use When |
+|-------|------|-----------|----------|
+| DataTable | `src/blocks/data-table/` | `columns`, `data`, `pageSize`, `loading`, `emptyMessage` | Tabular data with pagination (≥10 rows) |
+| DataList | `src/blocks/data-list/` | `data`, `renderItem`, `keyExtractor`, `loading`, `searchable`, `emptyMessage` | Scrollable item lists with optional search |
+
+When a screen spec calls for a pattern not covered by existing blocks, build the block first in `src/blocks/{block-name}/index.tsx`, then use it in the screen. Follow existing block conventions:
+- Generic TypeScript props (no domain types in block interface)
+- Handle loading/empty/populated states internally
+- Import only from L1 (tokens) and L2 (ui)
+- No block-to-block imports
+
 ### Scaffolding (read-only)
 
 | Path | Notes |
