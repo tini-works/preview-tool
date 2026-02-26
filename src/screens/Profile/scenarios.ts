@@ -68,37 +68,35 @@ const EMPTY_USER: User = {
   address: '',
 }
 
-export const scenarios = {
-  populated: {
-    label: 'Populated',
-    data: {
-      isLoading: false,
-      user: MOCK_USER,
-      insurances: MOCK_INSURANCES,
-      familyMembers: MOCK_FAMILY,
-      settings: MOCK_SETTINGS,
-    } satisfies ProfileData,
+export const regions = {
+  user: {
+    label: 'User Info',
+    states: {
+      loading: { isLoading: true, user: EMPTY_USER, settings: MOCK_SETTINGS },
+      populated: { isLoading: false, user: MOCK_USER, settings: MOCK_SETTINGS },
+    },
+    defaultState: 'populated',
   },
-  loading: {
-    label: 'Loading',
-    data: {
-      isLoading: true,
-      user: EMPTY_USER,
-      insurances: [] as Insurance[],
-      familyMembers: [] as FamilyMember[],
-      settings: { language: 'Deutsch', notificationsEnabled: true },
-    } satisfies ProfileData,
+  insurances: {
+    label: 'Insurance',
+    isList: true,
+    mockItems: MOCK_INSURANCES,
+    states: {
+      loading: { insurances: [] as Insurance[] },
+      empty: { insurances: [] as Insurance[] },
+      populated: { insurances: MOCK_INSURANCES },
+    },
+    defaultState: 'populated',
   },
-  minimal: {
-    label: 'Minimal (new user)',
-    data: {
-      isLoading: false,
-      user: MOCK_USER,
-      insurances: [] as Insurance[],
-      familyMembers: [] as FamilyMember[],
-      settings: MOCK_SETTINGS,
-    } satisfies ProfileData,
+  familyMembers: {
+    label: 'Family Members',
+    isList: true,
+    mockItems: MOCK_FAMILY,
+    states: {
+      loading: { familyMembers: [] as FamilyMember[] },
+      empty: { familyMembers: [] as FamilyMember[] },
+      populated: { familyMembers: MOCK_FAMILY },
+    },
+    defaultState: 'populated',
   },
 }
-
-export const hasListData = true
