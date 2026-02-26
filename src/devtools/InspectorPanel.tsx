@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Moon, Sun, Monitor, PanelRightClose, PanelRight } from 'lucide-react'
+import { Moon, Sun, Monitor, PanelRightClose, PanelRight, Play } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
@@ -43,6 +43,7 @@ export function InspectorPanel() {
   const setRegionState = useDevToolsStore((s) => s.setRegionState)
   const regionListCounts = useDevToolsStore((s) => s.regionListCounts)
   const setRegionListCount = useDevToolsStore((s) => s.setRegionListCount)
+  const togglePlayMode = useDevToolsStore((s) => s.togglePlayMode)
 
   const modules = useScreenModules()
   const currentModule = modules.find((m) => m.route === selectedRoute)
@@ -86,13 +87,22 @@ export function InspectorPanel() {
         <span className="text-xs font-semibold tracking-wider text-neutral-400">
           INSPECTOR
         </span>
-        <button
-          onClick={toggleInspectorCollapsed}
-          className="text-neutral-400 hover:text-neutral-600"
-          title="Collapse inspector"
-        >
-          <PanelRightClose className="size-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={togglePlayMode}
+            className="text-neutral-400 hover:text-neutral-600"
+            title="Enter play mode"
+          >
+            <Play className="size-4" />
+          </button>
+          <button
+            onClick={toggleInspectorCollapsed}
+            className="text-neutral-400 hover:text-neutral-600"
+            title="Collapse inspector"
+          >
+            <PanelRightClose className="size-4" />
+          </button>
+        </div>
       </div>
 
       {/* Controls */}

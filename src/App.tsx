@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useDevToolsStore } from '@/devtools/useDevToolsStore'
 import { CatalogPanel } from '@/devtools/CatalogPanel'
 import { InspectorPanel } from '@/devtools/InspectorPanel'
+import { PlayModeOverlay } from '@/devtools/PlayModeOverlay'
 import { DeviceFrame } from '@/preview/DeviceFrame'
 import { ScreenRenderer } from '@/screens/ScreenRenderer'
 import { useScreenModules } from '@/screens/useScreenModules'
@@ -16,6 +17,7 @@ function App() {
   const responsiveWidth = useDevToolsStore((s) => s.responsiveWidth)
   const responsiveHeight = useDevToolsStore((s) => s.responsiveHeight)
   const setResponsiveSize = useDevToolsStore((s) => s.setResponsiveSize)
+  const playMode = useDevToolsStore((s) => s.playMode)
 
   const modules = useScreenModules()
   const prevRouteRef = useRef<string | null>(null)
@@ -47,7 +49,7 @@ function App() {
 
   return (
     <div className="flex h-svh bg-neutral-100">
-      <CatalogPanel />
+      {!playMode && <CatalogPanel />}
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <DeviceFrame
@@ -64,7 +66,8 @@ function App() {
         </DeviceFrame>
       </div>
 
-      <InspectorPanel />
+      {!playMode && <InspectorPanel />}
+      {playMode && <PlayModeOverlay />}
     </div>
   )
 }
