@@ -5,7 +5,7 @@ export default function LoginFormScreen({ data }: { data: LoginFormData }) {
   if (data.state === 'success') {
     return (
       <div className="p-4">
-        <h1 className="mb-4 text-2xl font-bold">Login</h1>
+        <h1 className="mb-4 text-2xl font-bold leading-tight">Login</h1>
         <Card>
           <Note type="success">Welcome back! Redirecting...</Note>
         </Card>
@@ -15,7 +15,7 @@ export default function LoginFormScreen({ data }: { data: LoginFormData }) {
 
   return (
     <div className="p-4">
-      <h1 className="mb-4 text-2xl font-bold">Login</h1>
+      <h1 className="mb-4 text-2xl font-bold leading-tight">Login</h1>
       <Card>
         {data.state === 'error' && (
           <Note type="error" className="mb-4">
@@ -26,7 +26,7 @@ export default function LoginFormScreen({ data }: { data: LoginFormData }) {
         <Input label="Password" type="password" placeholder="Enter password" className="mt-3" />
         <Button className="mt-4">Sign In</Button>
         {data.state === 'filling' && (
-          <p className="mt-2 text-sm text-neutral-500">Typing...</p>
+          <p className="mt-2 text-sm text-slate-500">Typing...</p>
         )}
       </Card>
     </div>
