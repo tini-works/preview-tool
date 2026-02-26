@@ -67,7 +67,7 @@ export function InspectorPanel() {
 
   if (inspectorCollapsed) {
     return (
-      <div className="flex h-full w-10 flex-shrink-0 flex-col border-l border-neutral-200 bg-white">
+      <div data-testid="inspector-panel" className="flex h-full w-10 flex-shrink-0 flex-col border-l border-neutral-200 bg-white">
         <button
           onClick={toggleInspectorCollapsed}
           className="flex h-10 items-center justify-center text-neutral-400 hover:text-neutral-600"
@@ -80,7 +80,7 @@ export function InspectorPanel() {
   }
 
   return (
-    <div className="flex h-full w-72 flex-shrink-0 flex-col border-l border-neutral-200 bg-white">
+    <div data-testid="inspector-panel" className="flex h-full w-72 flex-shrink-0 flex-col border-l border-neutral-200 bg-white">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-2">
         <span className="text-xs font-semibold tracking-wider text-neutral-400">

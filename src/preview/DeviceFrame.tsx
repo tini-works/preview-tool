@@ -82,6 +82,7 @@ export function DeviceFrame({
   return (
     <div
       ref={containerRef}
+      data-testid="device-frame"
       className="flex flex-1 items-center justify-center overflow-hidden"
     >
       <div

@@ -52,7 +52,7 @@ export function CatalogPanel() {
 
   if (catalogCollapsed) {
     return (
-      <div className="flex h-full w-10 flex-shrink-0 flex-col border-r border-neutral-200 bg-white">
+      <div data-testid="catalog-panel" className="flex h-full w-10 flex-shrink-0 flex-col border-r border-neutral-200 bg-white">
         <button
           onClick={toggleCatalogCollapsed}
           className="flex h-10 items-center justify-center text-neutral-400 hover:text-neutral-600"
@@ -65,7 +65,7 @@ export function CatalogPanel() {
   }
 
   return (
-    <div className="flex h-full w-56 flex-shrink-0 flex-col border-r border-neutral-200 bg-white">
+    <div data-testid="catalog-panel" className="flex h-full w-56 flex-shrink-0 flex-col border-r border-neutral-200 bg-white">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-neutral-200 px-3 py-2">
         <span className="text-xs font-semibold tracking-wider text-neutral-400">
