@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Moon, Sun, Monitor, PanelRightClose, PanelRight, RotateCcw } from 'lucide-react'
+import { Moon, Sun, Monitor, PanelRightClose, PanelRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
@@ -30,8 +30,6 @@ export function InspectorPanel() {
   const toggleInspectorCollapsed = useDevToolsStore(
     (s) => s.toggleInspectorCollapsed
   )
-  const flowHistory = useDevToolsStore((s) => s.flowHistory)
-  const resetFlowHistory = useDevToolsStore((s) => s.resetFlowHistory)
 
   const networkMode = useDevToolsStore((s) => s.networkMode)
   const setNetworkMode = useDevToolsStore((s) => s.setNetworkMode)
@@ -99,44 +97,6 @@ export function InspectorPanel() {
 
       {/* Controls */}
       <div className="flex-1 overflow-y-auto">
-        {/* Flow breadcrumb */}
-        {flowHistory.length > 0 && (
-          <Section title="Flow History" trailing={
-            <button
-              onClick={resetFlowHistory}
-              className="text-neutral-400 hover:text-neutral-600"
-              title="Reset flow"
-            >
-              <RotateCcw className="size-3.5" />
-            </button>
-          }>
-            <div className="flex flex-col gap-1">
-              {flowHistory.map((entry, i) => (
-                <div key={i} className="flex items-center gap-1.5 text-xs text-neutral-400">
-                  <span className="truncate">{entry.route.split('/').pop()}</span>
-                  {entry.state && (
-                    <>
-                      <span>·</span>
-                      <span className="truncate text-neutral-300">{entry.state}</span>
-                    </>
-                  )}
-                </div>
-              ))}
-              {selectedRoute && (
-                <div className="flex items-center gap-1.5 text-xs font-medium text-neutral-700">
-                  <span className="truncate">{selectedRoute.split('/').pop()}</span>
-                  {selectedState && (
-                    <>
-                      <span>·</span>
-                      <span className="truncate text-teal-600">{selectedState}</span>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </Section>
-        )}
-
         {/* Device section */}
         <Section title="Device">
           <Select
