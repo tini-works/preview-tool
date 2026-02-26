@@ -28,7 +28,17 @@ function App() {
     if (!selectedRoute) return
 
     const mod = modules.find((m) => m.route === selectedRoute)
-    const scenarioKeys = mod ? Object.keys(mod.scenarios) : []
+    if (!mod) return
+
+    // Region-based screens don't use selectedState
+    const hasRegions = mod.regions && Object.keys(mod.regions).length > 0
+    if (hasRegions) {
+      setSelectedState(null)
+      return
+    }
+
+    // Legacy: auto-select first scenario
+    const scenarioKeys = Object.keys(mod.scenarios)
     const firstState = scenarioKeys.length > 0 ? scenarioKeys[0] : null
     setSelectedState(firstState)
   }, [selectedRoute, modules, setSelectedState])
