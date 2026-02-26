@@ -1,0 +1,69 @@
+---
+type: screen
+states:
+  acute:
+    description: Acute appointment selected
+  prevention:
+    description: Prevention appointment selected
+  follow-up:
+    description: Follow-up appointment selected
+---
+
+<ScreenHeader title="Booking type" />
+
+<Variant state="acute">
+  <Stack gap="md" className="p-4">
+    <p className="text-sm font-medium text-neutral-700">Select booking type</p>
+
+    <Stack gap="sm">
+      <RadioCard selected>Acute</RadioCard>
+      <RadioCard>Prevention</RadioCard>
+      <RadioCard>Follow-up</RadioCard>
+    </Stack>
+
+    <Footer>
+      <Button size="lg" className="w-full">Save</Button>
+    </Footer>
+  </Stack>
+</Variant>
+
+<Variant state="prevention">
+  <Stack gap="md" className="p-4">
+    <p className="text-sm font-medium text-neutral-700">Select booking type</p>
+
+    <Stack gap="sm">
+      <RadioCard>Acute</RadioCard>
+      <RadioCard selected>Prevention</RadioCard>
+      <RadioCard>Follow-up</RadioCard>
+    </Stack>
+
+    <Card className="p-0 overflow-hidden">
+      <ListItem icon="🩺" label="Specialty & Doctor" description="Select..." required />
+      <ListItem icon="📄" label="Referral" description="Optional" />
+    </Card>
+
+    <Footer>
+      <Button variant="secondary" size="lg" className="w-full opacity-50">Save</Button>
+    </Footer>
+  </Stack>
+</Variant>
+
+<Variant state="follow-up">
+  <Stack gap="md" className="p-4">
+    <p className="text-sm font-medium text-neutral-700">Select booking type</p>
+
+    <Stack gap="sm">
+      <RadioCard>Acute</RadioCard>
+      <RadioCard>Prevention</RadioCard>
+      <RadioCard selected>Follow-up</RadioCard>
+    </Stack>
+
+    <Card className="p-0 overflow-hidden">
+      <ListItem icon="👨‍⚕️" label="Doctor" description="Select..." required />
+    </Card>
+
+    <Footer>
+      <Button variant="secondary" size="lg" className="w-full opacity-50">Save</Button>
+    </Footer>
+  </Stack>
+</Variant>
