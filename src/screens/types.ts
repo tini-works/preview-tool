@@ -14,6 +14,16 @@ export interface FlagModule {
   flags: Record<string, FlagDefinition>
 }
 
+export interface RegionDefinition {
+  label: string
+  states: Record<string, Record<string, unknown>>
+  defaultState: string
+  isList?: boolean
+  mockItems?: unknown[]
+}
+
+export type RegionsMap = Record<string, RegionDefinition>
+
 export interface ScreenModule {
   default: ComponentType<{ data: unknown }>
 }
@@ -28,4 +38,5 @@ export interface ScreenEntry {
   scenarios: Record<string, Scenario>
   flags?: Record<string, FlagDefinition>
   hasListData?: boolean
+  regions?: RegionsMap
 }
