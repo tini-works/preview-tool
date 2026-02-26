@@ -21,7 +21,7 @@ export default function BookingAppointmentsScreen({ data }: { data: BookingAppoi
         <>
           <Stack gap="md" className="p-4">
             <div>
-              <p className="mb-2 text-xs font-semibold tracking-wider text-neutral-400">UPCOMING</p>
+              <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">UPCOMING</p>
               <Card className="overflow-hidden p-0">
                 <ListItem
                   icon="📅"
@@ -39,7 +39,7 @@ export default function BookingAppointmentsScreen({ data }: { data: BookingAppoi
             </div>
 
             <div>
-              <p className="mb-2 text-xs font-semibold tracking-wider text-neutral-400">PAST</p>
+              <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">PAST</p>
               <Card className="overflow-hidden p-0">
                 <ListItem
                   icon="📅"
@@ -92,7 +92,7 @@ export default function BookingAppointmentsScreen({ data }: { data: BookingAppoi
       {view === 'loading' && (
         <>
           <Stack gap="md" className="p-4">
-            <p className="text-sm text-neutral-500">Loading your appointments...</p>
+            <p className="text-sm text-slate-500">Loading your appointments...</p>
           </Stack>
 
           <Footer>
