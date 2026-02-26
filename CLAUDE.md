@@ -54,6 +54,31 @@ Dependencies flow one direction: **tokens → ui → blocks → screens**. Never
 
 Design tokens (colors, typography, spacing, radii) are defined in [docs/design-tokens.md](docs/design-tokens.md).
 
+### Color Rule (STRICT)
+
+**Never use Tailwind default color palettes** (`neutral-*`, `gray-*`, `zinc-*`, `red-*`, `green-*`, `blue-*`, `orange-*`). Always use brand tokens:
+
+| Role | Brand class | NOT this |
+|------|------------|----------|
+| Primary text | `text-charcoal-500` | `text-neutral-900` |
+| Secondary text label | `text-charcoal-400` | `text-neutral-700` |
+| Muted/description text | `text-slate-500` | `text-neutral-500` |
+| Disabled/placeholder | `text-slate-400` | `text-neutral-400` |
+| CTA / primary action | `bg-teal-500` | `bg-neutral-900` |
+| Accent | `text-coral-500` / `bg-coral-*` | `text-red-*` / `bg-orange-*` |
+| Subtle background | `bg-cream-200` | `bg-neutral-100` |
+| Surface / card bg | `bg-cream-50` | `bg-white` (inline) |
+| Hover background | `hover:bg-cream-100` | `hover:bg-neutral-50` |
+| Border default | `border-cream-400` | `border-neutral-200` |
+| Border subtle | `border-cream-300` | `border-neutral-100` |
+| Focus ring | `focus:ring-teal-500` | `focus:ring-neutral-500` |
+| Success | `bg-teal-100 text-teal-800` | `bg-green-*` |
+| Error | `bg-coral-100 text-coral-800` | `bg-red-*` |
+| Info | `bg-teal-50 text-teal-800` | `bg-blue-*` |
+| Overlay | `bg-charcoal-900/40` | `bg-black/40` |
+
+Allowed exceptions: `text-white`, `text-black`, Tailwind's `bg-background`/`text-foreground` semantic variables, and `yellow-*` for warnings (no brand yellow defined).
+
 ## UI Rules
 
 Follow all rules in [docs/ui-rules.md](docs/ui-rules.md):
