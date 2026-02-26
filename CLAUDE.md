@@ -70,6 +70,8 @@ Dependencies flow one direction: **tokens → ui → blocks → screens**. Never
 
 Design tokens (colors, typography, spacing, radii) are defined in [docs/design-tokens.md](docs/design-tokens.md).
 
+Visual conventions and component preferences are documented in [docs/design-decisions.md](docs/design-decisions.md). Read this before building any screen.
+
 ### Color Rule (STRICT)
 
 **Never use Tailwind default color palettes** (`neutral-*`, `gray-*`, `zinc-*`, `red-*`, `green-*`, `blue-*`, `orange-*`). Always use brand tokens:
