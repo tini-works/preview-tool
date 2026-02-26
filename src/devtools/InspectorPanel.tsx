@@ -360,8 +360,7 @@ function RegionGroup({
   onListCountChange: (count: number) => void
 }) {
   const stateKeys = Object.keys(states)
-  const maxItems = mockItems?.length ?? 0
-  const currentCount = listCount ?? maxItems
+  const currentCount = listCount ?? (mockItems?.length ?? 0)
 
   // Suppress unused variable warnings for props used only for keying
   void regionKey
@@ -413,12 +412,12 @@ function RegionGroup({
               if (!Number.isNaN(val)) onListCountChange(val)
             }}
             min={0}
-            max={maxItems}
+            max={99}
             className="h-6 w-12 rounded border border-neutral-200 bg-white px-1 text-center text-xs text-neutral-900 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
           <button
             onClick={() => onListCountChange(currentCount + 1)}
-            disabled={currentCount >= maxItems}
+            disabled={currentCount >= 99}
             className="flex size-6 items-center justify-center rounded border border-neutral-200 text-xs text-neutral-600 hover:bg-neutral-50 disabled:opacity-40"
           >
             +
