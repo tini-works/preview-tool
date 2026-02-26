@@ -22,10 +22,10 @@ export function Button({
       className={cn(
         'inline-flex items-center justify-center rounded-md font-medium transition-colors',
         {
-          'bg-neutral-900 text-white hover:bg-neutral-800': variant === 'primary',
-          'bg-neutral-100 text-neutral-900 hover:bg-neutral-200': variant === 'secondary',
-          'border border-neutral-300 bg-transparent hover:bg-neutral-50': variant === 'outline',
-          'bg-transparent hover:bg-neutral-100': variant === 'ghost',
+          'bg-teal-500 text-white hover:bg-teal-600': variant === 'primary',
+          'bg-cream-200 text-charcoal-500 hover:bg-cream-300': variant === 'secondary',
+          'border border-cream-500 bg-transparent hover:bg-cream-100': variant === 'outline',
+          'bg-transparent hover:bg-cream-200': variant === 'ghost',
         },
         {
           'h-8 px-3 text-sm': size === 'sm',
@@ -51,7 +51,7 @@ export function Card({ children, className, ...rest }: CardProps) {
     <div
       {...rest}
       className={cn(
-        'rounded-lg border border-neutral-200 bg-white p-6 shadow-sm',
+        'rounded-lg border border-cream-400 bg-cream-50 p-6 shadow-sm',
         className
       )}
     >
@@ -76,13 +76,13 @@ export function Input({
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
       {label && (
-        <label className="text-sm font-medium text-neutral-700">{label}</label>
+        <label className="text-sm font-medium text-charcoal-400">{label}</label>
       )}
       <input
         {...rest}
         type={type}
         placeholder={placeholder}
-        className="h-10 rounded-md border border-neutral-300 bg-white px-3 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+        className="h-10 rounded-md border border-cream-500 bg-cream-50 px-3 text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
       />
     </div>
   )
@@ -107,10 +107,10 @@ export function Badge({
       className={cn(
         'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
         {
-          'bg-neutral-100 text-neutral-800': variant === 'default',
-          'bg-green-100 text-green-800': variant === 'success',
+          'bg-cream-200 text-charcoal-500': variant === 'default',
+          'bg-teal-100 text-teal-800': variant === 'success',
           'bg-yellow-100 text-yellow-800': variant === 'warning',
-          'bg-red-100 text-red-800': variant === 'error',
+          'bg-coral-100 text-coral-800': variant === 'error',
         },
         className
       )}
@@ -139,10 +139,10 @@ export function Note({
       className={cn(
         'rounded-md border-l-4 p-4 text-sm',
         {
-          'border-blue-500 bg-blue-50 text-blue-800': type === 'info',
+          'border-teal-500 bg-teal-50 text-teal-800': type === 'info',
           'border-yellow-500 bg-yellow-50 text-yellow-800': type === 'warning',
-          'border-red-500 bg-red-50 text-red-800': type === 'error',
-          'border-green-500 bg-green-50 text-green-800': type === 'success',
+          'border-coral-500 bg-coral-50 text-coral-800': type === 'error',
+          'border-teal-600 bg-teal-50 text-teal-800': type === 'success',
         },
         className
       )}
@@ -164,17 +164,17 @@ export function ScreenHeader({ title, subtitle, className, ...rest }: ScreenHead
     <div
       {...rest}
       className={cn(
-        'sticky top-0 z-10 flex items-center gap-3 border-b border-neutral-200 bg-white px-4 py-3',
+        'sticky top-0 z-10 flex items-center gap-3 border-b border-cream-400 bg-cream-50 px-4 py-3',
         className
       )}
     >
-      <div className="flex size-8 items-center justify-center rounded-full text-neutral-500 hover:bg-neutral-100">
+      <div className="flex size-8 items-center justify-center rounded-full text-slate-500 hover:bg-cream-200">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m15 18-6-6 6-6"/></svg>
       </div>
       <div className="flex flex-col">
-        <span className="text-base font-semibold text-neutral-900">{title}</span>
+        <span className="text-base font-semibold text-charcoal-500">{title}</span>
         {subtitle && (
-          <span className="text-xs text-neutral-500">{subtitle}</span>
+          <span className="text-xs text-slate-500">{subtitle}</span>
         )}
       </div>
     </div>
@@ -206,27 +206,27 @@ export function ListItem({
     <div
       {...rest}
       className={cn(
-        'flex items-center gap-3 border-b border-neutral-100 px-4 py-3 last:border-b-0',
-        selected && 'bg-neutral-50',
+        'flex items-center gap-3 border-b border-cream-300 px-4 py-3 last:border-b-0',
+        selected && 'bg-cream-100',
         className
       )}
     >
       {icon && (
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-neutral-100 text-sm">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-cream-200 text-sm">
           {icon}
         </span>
       )}
       <div className="flex flex-1 flex-col">
-        <span className="text-sm font-medium text-neutral-900">
+        <span className="text-sm font-medium text-charcoal-500">
           {label}
-          {required && <span className="ml-1 text-red-500">*</span>}
+          {required && <span className="ml-1 text-coral-600">*</span>}
         </span>
         {description && (
-          <span className="text-xs text-neutral-500">{description}</span>
+          <span className="text-xs text-slate-500">{description}</span>
         )}
       </div>
       {trailing ?? (
-        <svg className="size-4 shrink-0 text-neutral-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        <svg className="size-4 shrink-0 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 18 6-6-6-6"/></svg>
       )}
     </div>
   )
@@ -247,19 +247,19 @@ export function RadioCard({ children, selected, className, ...rest }: RadioCardP
         'flex items-center gap-3 rounded-lg border-2 px-4 py-3',
         selected
           ? 'border-teal-500 bg-teal-50'
-          : 'border-neutral-200 bg-white',
+          : 'border-cream-400 bg-cream-50',
         className
       )}
     >
       <span
         className={cn(
           'flex size-5 shrink-0 items-center justify-center rounded-full border-2',
-          selected ? 'border-teal-500' : 'border-neutral-400'
+          selected ? 'border-teal-500' : 'border-slate-300'
         )}
       >
         {selected && <span className="size-2.5 rounded-full bg-teal-500" />}
       </span>
-      <span className="text-sm font-medium text-neutral-900">{children}</span>
+      <span className="text-sm font-medium text-charcoal-500">{children}</span>
     </div>
   )
 }
@@ -286,7 +286,7 @@ export function Avatar({
         'flex shrink-0 items-center justify-center rounded-full font-semibold',
         {
           'bg-teal-100 text-teal-700': variant === 'primary',
-          'bg-orange-100 text-orange-600': variant === 'secondary',
+          'bg-coral-100 text-coral-600': variant === 'secondary',
         },
         {
           'size-8 text-xs': size === 'sm',
@@ -311,13 +311,13 @@ export function Divider({ label, className, ...rest }: DividerProps) {
   if (label) {
     return (
       <div {...rest} className={cn('flex items-center gap-3 py-2', className)}>
-        <div className="h-px flex-1 bg-neutral-200" />
-        <span className="text-xs text-neutral-400">{label}</span>
-        <div className="h-px flex-1 bg-neutral-200" />
+        <div className="h-px flex-1 bg-cream-400" />
+        <span className="text-xs text-slate-400">{label}</span>
+        <div className="h-px flex-1 bg-cream-400" />
       </div>
     )
   }
-  return <div {...rest} className={cn('h-px bg-neutral-200', className)} />
+  return <div {...rest} className={cn('h-px bg-cream-400', className)} />
 }
 
 /* ─── Stack ─── */
@@ -363,7 +363,7 @@ export function Textarea({
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
       {label && (
-        <label className="text-sm font-medium text-neutral-700">{label}</label>
+        <label className="text-sm font-medium text-charcoal-400">{label}</label>
       )}
       <textarea
         {...rest}
@@ -371,10 +371,10 @@ export function Textarea({
         defaultValue={value}
         maxLength={maxLength}
         rows={3}
-        className="rounded-md border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500"
+        className="rounded-md border border-cream-500 bg-cream-50 px-3 py-2 text-sm outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
       />
       {maxLength && (
-        <span className="self-end text-xs text-neutral-400">
+        <span className="self-end text-xs text-slate-400">
           {typeof value === 'string' ? value.length : 0}/{maxLength}
         </span>
       )}
@@ -393,7 +393,7 @@ export function Footer({ children, className, ...rest }: FooterProps) {
     <div
       {...rest}
       className={cn(
-        'sticky bottom-0 border-t border-neutral-200 bg-white px-4 py-3',
+        'sticky bottom-0 border-t border-cream-400 bg-cream-50 px-4 py-3',
         className
       )}
     >
