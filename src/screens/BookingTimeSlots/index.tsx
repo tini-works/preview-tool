@@ -12,7 +12,7 @@ function SlotCell({ selected }: { selected: boolean }) {
       </div>
     )
   }
-  return <div className="aspect-square rounded-md bg-neutral-100" />
+  return <div className="aspect-square rounded-md bg-cream-200" />
 }
 
 export default function BookingTimeSlotsScreen({ data }: { data: BookingTimeSlotsData }) {
@@ -26,17 +26,17 @@ export default function BookingTimeSlotsScreen({ data }: { data: BookingTimeSlot
       />
 
       <Stack gap="md" className="p-4">
-        <p className="text-sm text-neutral-500">Tap to toggle preferred times</p>
+        <p className="text-sm text-slate-500">Tap to toggle preferred times</p>
 
         <div className="grid grid-cols-6 gap-1.5">
           <div />
           {DAYS.map((day) => (
-            <span key={day} className="text-center text-xs font-medium text-neutral-500">{day}</span>
+            <span key={day} className="text-center text-xs font-medium text-slate-500">{day}</span>
           ))}
 
           {TIMES.map((time, rowIdx) => (
             <div key={time} className="col-span-6 grid grid-cols-6 gap-1.5">
-              <span className="flex items-center text-xs text-neutral-500">{time}</span>
+              <span className="flex items-center text-xs text-slate-500">{time}</span>
               {slots[rowIdx].map((selected, colIdx) => (
                 <SlotCell key={`${rowIdx}-${colIdx}`} selected={selected} />
               ))}
@@ -44,9 +44,9 @@ export default function BookingTimeSlotsScreen({ data }: { data: BookingTimeSlot
           ))}
         </div>
 
-        <div className="flex items-center gap-4 text-xs text-neutral-500">
+        <div className="flex items-center gap-4 text-xs text-slate-500">
           <span className="flex items-center gap-1.5"><span className="size-3 rounded-sm bg-teal-500" /> Selected</span>
-          <span className="flex items-center gap-1.5"><span className="size-3 rounded-sm bg-neutral-100" /> Available</span>
+          <span className="flex items-center gap-1.5"><span className="size-3 rounded-sm bg-cream-200" /> Available</span>
         </div>
 
         {showWarning && (
