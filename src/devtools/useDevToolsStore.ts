@@ -126,7 +126,7 @@ export const useDevToolsStore = create<DevToolsStore>()(
         set({ flowHistory: [] }),
 
       navigateFlow: (route, state) =>
-        set({ selectedRoute: route, selectedState: state }),
+        set({ selectedRoute: route, selectedState: state, regionStates: {}, regionListCounts: {} }),
 
       setNetworkMode: (mode) =>
         set({ networkMode: mode }),
