@@ -21,26 +21,26 @@ export default function BookingConfirmationScreen({ data }: { data: BookingConfi
             <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-teal-100">
               <span className="text-4xl">🔍</span>
             </div>
-            <h2 className="mb-2 text-xl font-semibold text-neutral-900">Finding Your Match...</h2>
-            <p className="max-w-[280px] text-center text-sm text-neutral-500">
+            <h2 className="mb-2 text-xl font-semibold leading-tight text-charcoal-500">Finding Your Match...</h2>
+            <p className="max-w-[280px] text-center text-sm text-slate-500">
               We're searching for the best doctor match based on your preferences and availability.
             </p>
           </>
         ) : (
           <>
-            <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-green-100">
+            <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-teal-100">
               <span className="text-4xl">✅</span>
             </div>
-            <h2 className="mb-2 text-xl font-semibold text-neutral-900">Match Found!</h2>
-            <p className="max-w-[280px] text-center text-sm text-neutral-500">
+            <h2 className="mb-2 text-xl font-semibold leading-tight text-charcoal-500">Match Found!</h2>
+            <p className="max-w-[280px] text-center text-sm text-slate-500">
               Dr. Anna Schmidt is available for your appointment.
             </p>
             <Card className="mt-6 w-full max-w-[280px]">
               <div className="flex items-center gap-3">
                 <Avatar initials="AS" size="lg" />
                 <div className="flex flex-col">
-                  <span className="text-sm font-semibold text-neutral-900">Dr. Anna Schmidt</span>
-                  <span className="text-xs text-neutral-500">General Practice</span>
+                  <span className="text-sm font-semibold text-charcoal-500">Dr. Anna Schmidt</span>
+                  <span className="text-xs text-slate-500">General Practice</span>
                   <span className="text-xs text-teal-600">Wed, Mar 5 · 10:00 AM</span>
                 </div>
               </div>
