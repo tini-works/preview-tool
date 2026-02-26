@@ -1,0 +1,17 @@
+{
+  "flowTitle": "Rezept einlösen",
+  "steps": {
+    "scan": "Scannen",
+    "select": "Auswahl",
+    "delivery": "Lieferung",
+    "location": "Standort",
+    "confirm": "Bestätigen"
+  },
+  "title": "Lieferart",
+  "instruction": "Wie möchten Sie Ihre Medikamente erhalten?",
+  "homeDelivery": "Hauslieferung",
+  "homeDeliveryDesc": "Lieferung an Ihre Adresse innerhalb von 1–3 Werktagen",
+  "apothekePickup": "Abholung in der Apotheke",
+  "apothekePickupDesc": "Abholung in einer nahegelegenen APO group Apotheke — oft noch am selben Tag",
+  "continue": "Weiter"
+}
