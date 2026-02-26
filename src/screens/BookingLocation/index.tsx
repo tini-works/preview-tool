@@ -33,15 +33,15 @@ export default function BookingLocationScreen({ data }: { data: BookingLocationD
           <Input placeholder="Search address..." />
 
           <div>
-            <p className="mb-2 text-xs font-semibold tracking-wider text-neutral-400">RECENT LOCATIONS</p>
+            <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">RECENT LOCATIONS</p>
             <Card className="overflow-hidden p-0">
-              <div className="flex items-center gap-3 border-b border-neutral-100 px-4 py-3">
-                <span className="text-neutral-400">📍</span>
-                <span className="text-sm text-neutral-900">Friedrichstr. 123, 10117 Berlin</span>
+              <div className="flex items-center gap-3 border-b border-cream-300 px-4 py-3">
+                <span className="text-slate-400">📍</span>
+                <span className="text-sm text-charcoal-500">Friedrichstr. 123, 10117 Berlin</span>
               </div>
               <div className="flex items-center gap-3 px-4 py-3">
-                <span className="text-neutral-400">📍</span>
-                <span className="text-sm text-neutral-900">Kurfürstendamm 45, 10719 Berlin</span>
+                <span className="text-slate-400">📍</span>
+                <span className="text-sm text-charcoal-500">Kurfürstendamm 45, 10719 Berlin</span>
               </div>
             </Card>
           </div>
@@ -63,9 +63,9 @@ export default function BookingLocationScreen({ data }: { data: BookingLocationD
 
           <Card className="overflow-hidden p-0">
             {['Friedrichstr. 123, 10117 Berlin', 'Schönhauser Allee 78, 10439 Berlin', 'Torstr. 220, 10115 Berlin', 'Kantstr. 58, 10627 Berlin'].map((addr) => (
-              <div key={addr} className="flex items-center gap-3 border-b border-neutral-100 px-4 py-3 last:border-b-0 hover:bg-neutral-50">
-                <span className="text-neutral-400">📍</span>
-                <span className="text-sm text-neutral-900">{addr}</span>
+              <div key={addr} className="flex items-center gap-3 border-b border-cream-300 px-4 py-3 last:border-b-0 hover:bg-cream-100">
+                <span className="text-slate-400">📍</span>
+                <span className="text-sm text-charcoal-500">{addr}</span>
               </div>
             ))}
           </Card>
@@ -80,8 +80,8 @@ export default function BookingLocationScreen({ data }: { data: BookingLocationD
             <div className="flex items-center gap-3">
               <span className="text-teal-500">📍</span>
               <div className="flex flex-col">
-                <span className="text-sm font-medium text-neutral-900">Friedrichstr. 123</span>
-                <span className="text-xs text-neutral-500">10117 Berlin</span>
+                <span className="text-sm font-medium text-charcoal-500">Friedrichstr. 123</span>
+                <span className="text-xs text-slate-500">10117 Berlin</span>
               </div>
             </div>
           </Card>
