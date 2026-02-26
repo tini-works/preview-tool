@@ -136,3 +136,13 @@ Before declaring a screen implementation task complete:
 For comprehensive per-screen validation (i18n coverage, flow triggers, forbidden colors):
 
     bash .claude/skills/screen-spec/references/verify-screen.sh {section}/{screen}
+
+## Self-Correction Loop
+
+After generating or modifying screen files, automatically run the verification pipeline and fix issues before presenting the result to the designer:
+
+1. `pnpm exec tsc --noEmit` — fix any TypeScript errors
+2. `bash .claude/skills/screen-spec/references/verify-screen.sh {section}/{screen}` — fix i18n gaps, forbidden colors, missing flow triggers
+3. `pnpm exec playwright test src/screens/{section}/{screen}/` — fix any runtime/rendering errors
+
+Repeat until all three pass with zero errors. Only then tell the designer the screen is ready for review.
