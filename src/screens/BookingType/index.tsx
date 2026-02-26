@@ -21,7 +21,7 @@ export default function BookingTypeScreen({ data }: { data: BookingTypeData }) {
       />
 
       <Stack gap="md" className="p-4">
-        <p className="text-sm font-medium text-neutral-700">Select booking type</p>
+        <p className="text-sm font-medium text-charcoal-400">Select booking type</p>
 
         <Stack gap="sm">
           <RadioCard
