@@ -1,11 +1,11 @@
 import { useMemo } from 'react'
-import type { ScreenEntry, ScreenModule, ScenarioModule } from '@/screens/types'
+import type { ScreenEntry, ScreenModule, ScenarioModule, RegionsMap } from '@/screens/types'
 
 const screenModules = import.meta.glob<ScreenModule>(
   '/src/screens/*/index.tsx'
 )
 
-const scenarioModules = import.meta.glob<ScenarioModule & { flags?: Record<string, { label: string; default: boolean }>; hasListData?: boolean }>(
+const scenarioModules = import.meta.glob<ScenarioModule & { flags?: Record<string, { label: string; default: boolean }>; hasListData?: boolean; regions?: RegionsMap }>(
   '/src/screens/*/scenarios.ts',
   { eager: true }
 )
@@ -38,6 +38,7 @@ export function useScreenModules(): ScreenEntry[] {
         scenarios: scenarioMod?.scenarios ?? {},
         flags: scenarioMod?.flags,
         hasListData: scenarioMod?.hasListData,
+        regions: scenarioMod?.regions,
       }
     })
   }, [])
