@@ -14,16 +14,17 @@ Dependencies flow one direction: **tokens → ui → blocks → screens**. Never
 
 | Layer | Path | Permission | Status | Contains |
 |-------|------|-----------|--------|----------|
-| L1 Tokens | `src/tokens/` | Read-only | Planned | Design values (colors, spacing, radii) as TS constants and Tailwind preset |
+| L1 Tokens | `src/tokens/` | Read-only | Exists | Design values (colors, spacing, radii) as TS constants and CSS custom properties |
 | L2 UI | `src/components/ui/` | Read-only | Exists | Generic React primitives (Button, Input, Card) — domain-free, no business logic |
 | L3 Blocks | `src/blocks/` | Read-only | Planned | Composed, data-driven patterns from L2 — domain-aware, opinionated layout |
 | App | `src/screens/<ScreenName>/` | **Writable** | Active | One-off screen layouts importing L2 + L3 |
-| App | `src/App.tsx` | **Writable** | Exists | Edit only to add imports/routing for new screens |
+| App | `src/locales/<lang>/` | **Writable** | Active | Translation JSON files — one per screen per language |
 
 ### Scaffolding (read-only)
 
 | Path | Notes |
 |------|-------|
+| `src/App.tsx` | App shell — screens are auto-discovered, do not modify |
 | `src/components/dev/` | Dev tools (ScenarioSwitcher) — do not modify |
 | `src/hooks/` | Shared hooks — do not modify |
 | `src/lib/` | Utilities (cn, etc.) — do not modify |
@@ -33,7 +34,9 @@ Dependencies flow one direction: **tokens → ui → blocks → screens**. Never
 ### Rules
 
 - Each screen lives in its own folder: `src/screens/<ScreenName>/index.tsx`
+- Screens are auto-discovered via `import.meta.glob` — no manual registration needed
 - Screen folders may contain sub-components, mock data, and types specific to that screen
+- Translation files go in `src/locales/<lang>/<screenName>.json` (one per screen per language)
 - L2 components accept standard React props — no domain logic, all strings via props
 - L3 blocks use data-driven API (accept structured data, not children assembly)
 - Blocks cannot import other blocks — extract shared logic to L2
