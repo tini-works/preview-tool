@@ -21,6 +21,8 @@ interface DevToolsState {
   language: string
   listItemCount: number
   featureFlags: Record<string, boolean>
+  regionStates: Record<string, string>
+  regionListCounts: Record<string, number>
 }
 
 interface DevToolsActions {
@@ -43,6 +45,9 @@ interface DevToolsActions {
   setListItemCount: (count: number) => void
   setFeatureFlag: (key: string, value: boolean) => void
   resetFeatureFlags: () => void
+  setRegionState: (regionKey: string, state: string) => void
+  setRegionListCount: (regionKey: string, count: number) => void
+  resetRegions: () => void
 }
 
 export type DevToolsStore = DevToolsState & DevToolsActions
@@ -63,6 +68,8 @@ const DEFAULT_STATE: DevToolsState = {
   language: 'en',
   listItemCount: 5,
   featureFlags: {},
+  regionStates: {},
+  regionListCounts: {},
 }
 
 export const useDevToolsStore = create<DevToolsStore>()(
@@ -84,7 +91,12 @@ export const useDevToolsStore = create<DevToolsStore>()(
       setSelectedRoute: (route) =>
         set((prev) => {
           if (route === prev.selectedRoute) return {}
-          return { selectedRoute: route, selectedState: null }
+          return {
+            selectedRoute: route,
+            selectedState: null,
+            regionStates: {},
+            regionListCounts: {},
+          }
         }),
 
       setSelectedState: (state) =>
@@ -138,6 +150,22 @@ export const useDevToolsStore = create<DevToolsStore>()(
 
       resetFeatureFlags: () =>
         set({ featureFlags: {} }),
+
+      setRegionState: (regionKey, state) =>
+        set((prev) => ({
+          regionStates: { ...prev.regionStates, [regionKey]: state },
+        })),
+
+      setRegionListCount: (regionKey, count) =>
+        set((prev) => ({
+          regionListCounts: {
+            ...prev.regionListCounts,
+            [regionKey]: Math.max(0, Math.min(99, Math.round(count))),
+          },
+        })),
+
+      resetRegions: () =>
+        set({ regionStates: {}, regionListCounts: {} }),
     }),
     {
       name: 'preview-tool-devtools',
