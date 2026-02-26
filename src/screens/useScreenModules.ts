@@ -5,7 +5,7 @@ const screenModules = import.meta.glob<ScreenModule>(
   '/src/screens/*/index.tsx'
 )
 
-const scenarioModules = import.meta.glob<ScenarioModule & { flags?: Record<string, { label: string; default: boolean }> }>(
+const scenarioModules = import.meta.glob<ScenarioModule & { flags?: Record<string, { label: string; default: boolean }>; hasListData?: boolean }>(
   '/src/screens/*/scenarios.ts',
   { eager: true }
 )
@@ -37,6 +37,7 @@ export function useScreenModules(): ScreenEntry[] {
         module: loader,
         scenarios: scenarioMod?.scenarios ?? {},
         flags: scenarioMod?.flags,
+        hasListData: scenarioMod?.hasListData,
       }
     })
   }, [])

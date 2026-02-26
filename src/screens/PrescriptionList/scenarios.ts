@@ -53,3 +53,5 @@ export const scenarios = {
     } satisfies PrescriptionListData,
   },
 }
+
+export const hasListData = true

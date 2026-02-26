@@ -96,3 +96,5 @@ export const scenarios = {
     } satisfies PrescriptionConfirmationData,
   },
 }
+
+export const hasListData = true

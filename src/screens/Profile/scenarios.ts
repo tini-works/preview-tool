@@ -100,3 +100,5 @@ export const scenarios = {
     } satisfies ProfileData,
   },
 }
+
+export const hasListData = true

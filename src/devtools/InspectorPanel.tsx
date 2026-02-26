@@ -51,6 +51,7 @@ export function InspectorPanel() {
   const scenarios = currentModule?.scenarios
   const stateKeys = scenarios ? Object.keys(scenarios) : []
   const currentFlags = currentModule?.flags
+  const hasListData = currentModule?.hasListData
 
   // Sync persisted language with i18n on mount
   useEffect(() => {
@@ -254,36 +255,38 @@ export function InspectorPanel() {
           </Section>
         )}
 
-        {/* List Item Count section */}
-        <Section title="List Items">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setListItemCount(listItemCount - 1)}
-              disabled={listItemCount <= 0}
-              className="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-40"
-            >
-              &minus;
-            </button>
-            <input
-              type="number"
-              value={listItemCount}
-              onChange={(e) => {
-                const val = Number(e.target.value)
-                if (!Number.isNaN(val)) setListItemCount(val)
-              }}
-              min={0}
-              max={99}
-              className="h-7 w-14 rounded-md border border-neutral-200 bg-white px-2 text-center text-sm text-neutral-900 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            />
-            <button
-              onClick={() => setListItemCount(listItemCount + 1)}
-              disabled={listItemCount >= 99}
-              className="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-40"
-            >
-              +
-            </button>
-          </div>
-        </Section>
+        {/* List Item Count section (only for screens with list data) */}
+        {hasListData && (
+          <Section title="List Items">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setListItemCount(listItemCount - 1)}
+                disabled={listItemCount <= 0}
+                className="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-40"
+              >
+                &minus;
+              </button>
+              <input
+                type="number"
+                value={listItemCount}
+                onChange={(e) => {
+                  const val = Number(e.target.value)
+                  if (!Number.isNaN(val)) setListItemCount(val)
+                }}
+                min={0}
+                max={99}
+                className="h-7 w-14 rounded-md border border-neutral-200 bg-white px-2 text-center text-sm text-neutral-900 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <button
+                onClick={() => setListItemCount(listItemCount + 1)}
+                disabled={listItemCount >= 99}
+                className="flex size-7 items-center justify-center rounded-md border border-neutral-200 text-sm text-neutral-600 hover:bg-neutral-50 disabled:opacity-40"
+              >
+                +
+              </button>
+            </div>
+          </Section>
+        )}
 
         {/* Network section */}
         <Section title="Network">

@@ -57,3 +57,5 @@ export const flags = {
   showRecentSearches: { label: 'Recent Searches', default: true },
   showSpecialties: { label: 'Specialties Filter', default: true },
 }
+
+export const hasListData = true
