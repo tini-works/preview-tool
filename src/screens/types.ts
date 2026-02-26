@@ -5,6 +5,15 @@ export interface Scenario<T = unknown> {
   data: T
 }
 
+export interface FlagDefinition {
+  label: string
+  default: boolean
+}
+
+export interface FlagModule {
+  flags: Record<string, FlagDefinition>
+}
+
 export interface ScreenModule {
   default: ComponentType<{ data: unknown }>
 }
@@ -17,4 +26,5 @@ export interface ScreenEntry {
   route: string
   module: () => Promise<ScreenModule>
   scenarios: Record<string, Scenario>
+  flags?: Record<string, FlagDefinition>
 }
