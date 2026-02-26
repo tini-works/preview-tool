@@ -1,7 +1,5 @@
 # Design Tokens Reference
 
-Source: `packages/tokens/src/*.json`
-
 ## Colors
 
 **Bold** = primary brand value used in the app (see legend below table).
