@@ -29,7 +29,9 @@ export type ProfileData = {
   isLoading: boolean
   user: User
   insurances: Insurance[]
+  insurancesLoading?: boolean
   familyMembers: FamilyMember[]
+  familyMembersLoading?: boolean
   settings: Settings
 }
 
@@ -46,11 +48,17 @@ const MOCK_USER: User = {
 const MOCK_INSURANCES: Insurance[] = [
   { type: 'GKV', insurer: 'Techniker Krankenkasse', memberId: 'A123456789' },
   { type: 'PKV', insurer: 'Debeka', memberId: 'P987654321' },
+  { type: 'GKV', insurer: 'AOK Bayern', memberId: 'A555111222' },
+  { type: 'GKV', insurer: 'Barmer', memberId: 'B333444555' },
+  { type: 'PKV', insurer: 'Allianz Private', memberId: 'P111222333' },
 ]
 
 const MOCK_FAMILY: FamilyMember[] = [
   { initials: 'MM', name: 'Max Müller', relationship: 'Son' },
   { initials: 'LM', name: 'Lena Müller', relationship: 'Daughter' },
+  { initials: 'KM', name: 'Klaus Müller', relationship: 'Spouse' },
+  { initials: 'EM', name: 'Emma Müller', relationship: 'Mother' },
+  { initials: 'HM', name: 'Hans Müller', relationship: 'Father' },
 ]
 
 const MOCK_SETTINGS: Settings = {
@@ -82,9 +90,9 @@ export const regions = {
     isList: true,
     mockItems: MOCK_INSURANCES,
     states: {
-      loading: { insurances: [] as Insurance[] },
-      empty: { insurances: [] as Insurance[] },
-      populated: { insurances: MOCK_INSURANCES },
+      loading: { insurances: [] as Insurance[], insurancesLoading: true },
+      empty: { insurances: [] as Insurance[], insurancesLoading: false },
+      populated: { insurances: MOCK_INSURANCES, insurancesLoading: false },
     },
     defaultState: 'populated',
   },
@@ -93,9 +101,9 @@ export const regions = {
     isList: true,
     mockItems: MOCK_FAMILY,
     states: {
-      loading: { familyMembers: [] as FamilyMember[] },
-      empty: { familyMembers: [] as FamilyMember[] },
-      populated: { familyMembers: MOCK_FAMILY },
+      loading: { familyMembers: [] as FamilyMember[], familyMembersLoading: true },
+      empty: { familyMembers: [] as FamilyMember[], familyMembersLoading: false },
+      populated: { familyMembers: MOCK_FAMILY, familyMembersLoading: false },
     },
     defaultState: 'populated',
   },

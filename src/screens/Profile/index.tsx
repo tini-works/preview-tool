@@ -14,7 +14,7 @@ import {
 import type { ProfileData } from './scenarios'
 
 export default function ProfileScreen({ data }: { data: ProfileData }) {
-  const { isLoading, user, insurances, familyMembers, settings } = data
+  const { isLoading, user, insurances, insurancesLoading, familyMembers, familyMembersLoading, settings } = data
   const { t } = useTranslation('profile')
 
   if (isLoading) {
@@ -89,7 +89,14 @@ export default function ProfileScreen({ data }: { data: ProfileData }) {
           <p className="mb-2 text-xs font-semibold tracking-wider text-neutral-400">
             {t('insurance').toUpperCase()}
           </p>
-          {insurances.length === 0 ? (
+          {insurancesLoading ? (
+            <Card className="flex items-center justify-center py-8">
+              <div className="flex items-center gap-2 text-neutral-500">
+                <Loader2 className="size-4 animate-spin" />
+                <span className="text-sm">{t('loading')}</span>
+              </div>
+            </Card>
+          ) : insurances.length === 0 ? (
             <Note type="info">{t('noInsurance')}</Note>
           ) : (
             <Card className="overflow-hidden p-0">
@@ -114,7 +121,14 @@ export default function ProfileScreen({ data }: { data: ProfileData }) {
           <p className="mb-2 text-xs font-semibold tracking-wider text-neutral-400">
             {t('familyMembers').toUpperCase()}
           </p>
-          {familyMembers.length === 0 ? (
+          {familyMembersLoading ? (
+            <Card className="flex items-center justify-center py-8">
+              <div className="flex items-center gap-2 text-neutral-500">
+                <Loader2 className="size-4 animate-spin" />
+                <span className="text-sm">{t('loading')}</span>
+              </div>
+            </Card>
+          ) : familyMembers.length === 0 ? (
             <Stack gap="sm">
               <Note type="info">{t('noFamily')}</Note>
               <Card className="overflow-hidden p-0">
