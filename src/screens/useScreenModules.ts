@@ -1,16 +1,11 @@
 import { useMemo } from 'react'
-import type { ScreenEntry, ScreenModule, ScenarioModule, FlagModule } from '@/screens/types'
+import type { ScreenEntry, ScreenModule, ScenarioModule } from '@/screens/types'
 
 const screenModules = import.meta.glob<ScreenModule>(
   '/src/screens/*/index.tsx'
 )
 
-const scenarioModules = import.meta.glob<ScenarioModule>(
-  '/src/screens/*/scenarios.ts',
-  { eager: true }
-)
-
-const flagModules = import.meta.glob<FlagModule>(
+const scenarioModules = import.meta.glob<ScenarioModule & { flags?: Record<string, { label: string; default: boolean }> }>(
   '/src/screens/*/scenarios.ts',
   { eager: true }
 )
@@ -41,7 +36,7 @@ export function useScreenModules(): ScreenEntry[] {
         route: filePathToRoute(filePath),
         module: loader,
         scenarios: scenarioMod?.scenarios ?? {},
-        flags: flagModules[scenariosPath]?.flags,
+        flags: scenarioMod?.flags,
       }
     })
   }, [])
