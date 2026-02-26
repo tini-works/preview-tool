@@ -21,7 +21,6 @@
     "react-i18next": "^16.5.4",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.2.1",
-    "yaml": "^2.8.2",
     "zustand": "^5.0.11"
   },
   "pnpm": {
