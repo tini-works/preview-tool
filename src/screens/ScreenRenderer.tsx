@@ -76,12 +76,12 @@ export function ScreenRenderer({ route, activeState }: ScreenRendererProps) {
   const data = activeScenario?.data ?? {}
 
   return (
-    <div style={{ fontSize: `${fontScale * 100}%` }} className="h-full">
-      <NetworkSimulationLayer>
+    <NetworkSimulationLayer key={route}>
+      <div style={{ zoom: fontScale }} className="h-full">
         <FlowProvider>
           <Component data={data} />
         </FlowProvider>
-      </NetworkSimulationLayer>
-    </div>
+      </div>
+    </NetworkSimulationLayer>
   )
 }

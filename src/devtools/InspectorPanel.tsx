@@ -267,7 +267,10 @@ export function InspectorPanel() {
             <input
               type="number"
               value={listItemCount}
-              onChange={(e) => setListItemCount(Number(e.target.value))}
+              onChange={(e) => {
+                const val = Number(e.target.value)
+                if (!Number.isNaN(val)) setListItemCount(val)
+              }}
               min={0}
               max={99}
               className="h-7 w-14 rounded-md border border-neutral-200 bg-white px-2 text-center text-sm text-neutral-900 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"

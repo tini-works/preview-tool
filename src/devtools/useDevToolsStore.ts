@@ -148,7 +148,6 @@ export const useDevToolsStore = create<DevToolsStore>()(
         osMode: state.osMode,
         fontScale: state.fontScale,
         language: state.language,
-        networkMode: state.networkMode,
       }),
     }
   )
