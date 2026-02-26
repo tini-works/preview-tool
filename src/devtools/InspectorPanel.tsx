@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Moon, Sun, Monitor, PanelRightClose, PanelRight, Play, Square, RotateCcw } from 'lucide-react'
+import { Moon, Sun, Monitor, PanelRightClose, PanelRight, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Slider } from '@/components/ui/slider'
@@ -30,8 +30,6 @@ export function InspectorPanel() {
   const toggleInspectorCollapsed = useDevToolsStore(
     (s) => s.toggleInspectorCollapsed
   )
-  const playMode = useDevToolsStore((s) => s.playMode)
-  const togglePlayMode = useDevToolsStore((s) => s.togglePlayMode)
   const flowHistory = useDevToolsStore((s) => s.flowHistory)
   const resetFlowHistory = useDevToolsStore((s) => s.resetFlowHistory)
 
@@ -99,37 +97,19 @@ export function InspectorPanel() {
         </button>
       </div>
 
-      {/* Play mode toggle */}
-      <div className="flex items-center justify-between border-b border-neutral-100 px-3 py-2">
-        <div className="flex items-center gap-2">
-          <Button
-            variant={playMode ? 'default' : 'outline'}
-            size="icon-sm"
-            onClick={togglePlayMode}
-            title={playMode ? 'Stop play mode' : 'Start play mode'}
-          >
-            {playMode ? <Square className="size-3" /> : <Play className="size-3" />}
-          </Button>
-          <span className="text-xs font-medium text-neutral-500">
-            {playMode ? 'Playing' : 'Play'}
-          </span>
-        </div>
-        {playMode && flowHistory.length > 0 && (
-          <button
-            onClick={resetFlowHistory}
-            className="text-neutral-400 hover:text-neutral-600"
-            title="Reset flow"
-          >
-            <RotateCcw className="size-3.5" />
-          </button>
-        )}
-      </div>
-
       {/* Controls */}
       <div className="flex-1 overflow-y-auto">
-        {/* Flow breadcrumb (only in play mode with history) */}
-        {playMode && flowHistory.length > 0 && (
-          <Section title="Flow History">
+        {/* Flow breadcrumb */}
+        {flowHistory.length > 0 && (
+          <Section title="Flow History" trailing={
+            <button
+              onClick={resetFlowHistory}
+              className="text-neutral-400 hover:text-neutral-600"
+              title="Reset flow"
+            >
+              <RotateCcw className="size-3.5" />
+            </button>
+          }>
             <div className="flex flex-col gap-1">
               {flowHistory.map((entry, i) => (
                 <div key={i} className="flex items-center gap-1.5 text-xs text-neutral-400">
@@ -360,7 +340,8 @@ function RegionGroup({
   onListCountChange: (count: number) => void
 }) {
   const stateKeys = Object.keys(states)
-  const currentCount = listCount ?? (mockItems?.length ?? 0)
+  const maxItems = mockItems?.length ?? 0
+  const currentCount = listCount ?? maxItems
 
   // Suppress unused variable warnings for props used only for keying
   void regionKey
@@ -412,12 +393,12 @@ function RegionGroup({
               if (!Number.isNaN(val)) onListCountChange(val)
             }}
             min={0}
-            max={99}
+            max={maxItems}
             className="h-6 w-12 rounded border border-neutral-200 bg-white px-1 text-center text-xs text-neutral-900 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
           />
           <button
             onClick={() => onListCountChange(currentCount + 1)}
-            disabled={currentCount >= 99}
+            disabled={currentCount >= maxItems}
             className="flex size-6 items-center justify-center rounded border border-neutral-200 text-xs text-neutral-600 hover:bg-neutral-50 disabled:opacity-40"
           >
             +
@@ -430,14 +411,19 @@ function RegionGroup({
 
 function Section({
   title,
+  trailing,
   children,
 }: {
   title: string
+  trailing?: React.ReactNode
   children: React.ReactNode
 }) {
   return (
     <div className="border-b border-neutral-100 px-3 py-3">
-      <h3 className="mb-2 text-xs font-medium text-neutral-500">{title}</h3>
+      <div className="mb-2 flex items-center justify-between">
+        <h3 className="text-xs font-medium text-neutral-500">{title}</h3>
+        {trailing}
+      </div>
       <div className="flex flex-col gap-2">{children}</div>
     </div>
   )

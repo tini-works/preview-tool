@@ -10,7 +10,6 @@ interface FlowProviderProps {
 export function FlowProvider({ children }: FlowProviderProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const playMode = useDevToolsStore((s) => s.playMode)
   const selectedRoute = useDevToolsStore((s) => s.selectedRoute)
   const setSelectedState = useDevToolsStore((s) => s.setSelectedState)
   const pushFlowHistory = useDevToolsStore((s) => s.pushFlowHistory)
@@ -21,7 +20,7 @@ export function FlowProvider({ children }: FlowProviderProps) {
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
-      if (!playMode || !actions || !selectedRoute) return
+      if (!actions || !selectedRoute) return
       if (!containerRef.current) return
 
       const trigger = resolveTrigger(e.target, containerRef.current)
@@ -50,14 +49,14 @@ export function FlowProvider({ children }: FlowProviderProps) {
         navigateFlow(action.navigate, action.navigateState ?? null)
       }
     },
-    [playMode, actions, selectedRoute, setSelectedState, pushFlowHistory, navigateFlow, setRegionState]
+    [actions, selectedRoute, setSelectedState, pushFlowHistory, navigateFlow, setRegionState]
   )
 
   return (
     <div
       ref={containerRef}
       onClick={handleClick}
-      className={playMode && actions ? 'cursor-pointer' : undefined}
+      className={actions ? 'cursor-pointer' : undefined}
     >
       {children}
     </div>
