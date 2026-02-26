@@ -34,22 +34,16 @@ const readyFields: SearchField[] = [
   { icon: '📍', label: 'Location', description: 'Friedrichstr. 123, Berlin', filled: true },
 ]
 
-export const scenarios = {
-  empty: {
-    label: 'No selections made yet',
-    data: { fields: emptyFields, reason: '', canSearch: false, isSearching: false } satisfies BookingSearchData,
-  },
-  partial: {
-    label: 'Some fields filled, location missing',
-    data: { fields: partialFields, reason: 'Persistent headache for 3 days', canSearch: false, isSearching: false } satisfies BookingSearchData,
-  },
-  ready: {
-    label: 'All required fields filled',
-    data: { fields: readyFields, reason: 'Persistent headache for 3 days', canSearch: true, isSearching: false } satisfies BookingSearchData,
-  },
-  loading: {
-    label: 'Submitting search request',
-    data: { fields: readyFields, reason: 'Persistent headache for 3 days', canSearch: false, isSearching: true } satisfies BookingSearchData,
+export const regions = {
+  search: {
+    label: 'Search',
+    states: {
+      empty: { fields: emptyFields, reason: '', canSearch: false, isSearching: false },
+      partial: { fields: partialFields, reason: 'Persistent headache for 3 days', canSearch: false, isSearching: false },
+      ready: { fields: readyFields, reason: 'Persistent headache for 3 days', canSearch: true, isSearching: false },
+      loading: { fields: readyFields, reason: 'Persistent headache for 3 days', canSearch: false, isSearching: true },
+    },
+    defaultState: 'empty',
   },
 }
 
@@ -57,5 +51,3 @@ export const flags = {
   showRecentSearches: { label: 'Recent Searches', default: true },
   showSpecialties: { label: 'Specialties Filter', default: true },
 }
-
-export const hasListData = true

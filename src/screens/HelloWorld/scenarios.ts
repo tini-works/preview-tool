@@ -15,23 +15,16 @@ export type HelloWorldData = {
   items: Item[]
 }
 
-export const scenarios = {
-  loading: {
-    label: 'Loading',
-    data: { isLoading: true, items: [] as Item[] } satisfies HelloWorldData,
-  },
-  empty: {
-    label: 'Empty',
-    data: { isLoading: false, items: [] as Item[] } satisfies HelloWorldData,
-  },
-  populated: {
-    label: 'Populated',
-    data: { isLoading: false, items: MOCK_ITEMS } satisfies HelloWorldData,
-  },
-  singleItem: {
-    label: 'Single Item',
-    data: { isLoading: false, items: [MOCK_ITEMS[0]] } satisfies HelloWorldData,
+export const regions = {
+  items: {
+    label: 'Items',
+    isList: true,
+    mockItems: MOCK_ITEMS,
+    states: {
+      loading: { isLoading: true, items: [] as Item[] },
+      empty: { isLoading: false, items: [] as Item[] },
+      populated: { isLoading: false, items: MOCK_ITEMS },
+    },
+    defaultState: 'populated',
   },
 }
-
-export const hasListData = true

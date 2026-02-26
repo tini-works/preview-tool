@@ -22,46 +22,37 @@ const MOCK_APOTHEKEN: Apotheke[] = [
   { id: 'apo-003', name: 'APO Apotheke Stachus', address: 'Karlsplatz 3, 80335 München', distance: '1.2 km', openUntil: '19:00', availability: 'limited' },
 ]
 
-export const scenarios = {
-  'delivery-prefilled': {
-    label: 'Delivery with saved address',
-    data: {
-      method: 'delivery',
-      savedAddress: 'Marienplatz 1, 80331 München',
-      deliveryNote: '',
-    } satisfies PrescriptionLocationData,
-  },
-  'delivery-empty': {
-    label: 'Delivery with no saved address',
-    data: {
-      method: 'delivery',
-    } satisfies PrescriptionLocationData,
-  },
-  'pickup-loading': {
-    label: 'Loading Apotheke locations',
-    data: {
-      method: 'pickup',
-      pickupView: 'loading',
-      apotheken: [] as Apotheke[],
-    } satisfies PrescriptionLocationData,
-  },
-  'pickup-list': {
-    label: 'Apotheke list (no selection)',
-    data: {
-      method: 'pickup',
-      pickupView: 'list',
-      apotheken: MOCK_APOTHEKEN,
-    } satisfies PrescriptionLocationData,
-  },
-  'pickup-selected': {
-    label: 'Apotheke selected',
-    data: {
-      method: 'pickup',
-      pickupView: 'selected',
-      apotheken: MOCK_APOTHEKEN,
-      selectedApothekeId: 'apo-001',
-    } satisfies PrescriptionLocationData,
+export const regions = {
+  location: {
+    label: 'Location',
+    isList: true,
+    mockItems: MOCK_APOTHEKEN,
+    states: {
+      'delivery-prefilled': {
+        method: 'delivery',
+        savedAddress: 'Marienplatz 1, 80331 München',
+        deliveryNote: '',
+      },
+      'delivery-empty': {
+        method: 'delivery',
+      },
+      'pickup-loading': {
+        method: 'pickup',
+        pickupView: 'loading',
+        apotheken: [] as Apotheke[],
+      },
+      'pickup-list': {
+        method: 'pickup',
+        pickupView: 'list',
+        apotheken: MOCK_APOTHEKEN,
+      },
+      'pickup-selected': {
+        method: 'pickup',
+        pickupView: 'selected',
+        apotheken: MOCK_APOTHEKEN,
+        selectedApothekeId: 'apo-001',
+      },
+    },
+    defaultState: 'delivery-prefilled',
   },
 }
-
-export const hasListData = true

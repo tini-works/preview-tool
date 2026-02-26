@@ -21,37 +21,34 @@ const MOCK_PRESCRIPTIONS: Prescription[] = [
   { id: 'rx-003', medication: 'Metformin 850mg', dosage: '1 tablet, 2× daily', doctor: 'Dr. Fischer', date: '25 Feb 2026', status: 'pending' },
 ]
 
-export const scenarios = {
-  loading: {
-    label: 'Loading prescriptions',
-    data: {
-      view: 'loading',
-      insurer: 'TK Techniker Krankenkasse',
-      memberId: 'A123456789',
-      prescriptions: [] as Prescription[],
-      selectedIds: [] as string[],
-    } satisfies PrescriptionListData,
-  },
-  empty: {
-    label: 'No prescriptions found',
-    data: {
-      view: 'empty',
-      insurer: 'TK Techniker Krankenkasse',
-      memberId: 'A123456789',
-      prescriptions: [] as Prescription[],
-      selectedIds: [] as string[],
-    } satisfies PrescriptionListData,
-  },
-  populated: {
-    label: 'Prescriptions with selection',
-    data: {
-      view: 'populated',
-      insurer: 'TK Techniker Krankenkasse',
-      memberId: 'A123456789',
-      prescriptions: MOCK_PRESCRIPTIONS,
-      selectedIds: ['rx-001', 'rx-002'],
-    } satisfies PrescriptionListData,
+export const regions = {
+  prescriptions: {
+    label: 'Prescriptions',
+    isList: true,
+    mockItems: MOCK_PRESCRIPTIONS,
+    states: {
+      loading: {
+        view: 'loading',
+        insurer: 'TK Techniker Krankenkasse',
+        memberId: 'A123456789',
+        prescriptions: [] as Prescription[],
+        selectedIds: [] as string[],
+      },
+      empty: {
+        view: 'empty',
+        insurer: 'TK Techniker Krankenkasse',
+        memberId: 'A123456789',
+        prescriptions: [] as Prescription[],
+        selectedIds: [] as string[],
+      },
+      populated: {
+        view: 'populated',
+        insurer: 'TK Techniker Krankenkasse',
+        memberId: 'A123456789',
+        prescriptions: MOCK_PRESCRIPTIONS,
+        selectedIds: ['rx-001', 'rx-002'],
+      },
+    },
+    defaultState: 'populated',
   },
 }
-
-export const hasListData = true
