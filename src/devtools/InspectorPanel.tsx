@@ -45,6 +45,10 @@ export function InspectorPanel() {
   const setListItemCount = useDevToolsStore((s) => s.setListItemCount)
   const featureFlags = useDevToolsStore((s) => s.featureFlags)
   const setFeatureFlag = useDevToolsStore((s) => s.setFeatureFlag)
+  const regionStates = useDevToolsStore((s) => s.regionStates)
+  const setRegionState = useDevToolsStore((s) => s.setRegionState)
+  const regionListCounts = useDevToolsStore((s) => s.regionListCounts)
+  const setRegionListCount = useDevToolsStore((s) => s.setRegionListCount)
 
   const modules = useScreenModules()
   const currentModule = modules.find((m) => m.route === selectedRoute)
@@ -52,6 +56,8 @@ export function InspectorPanel() {
   const stateKeys = scenarios ? Object.keys(scenarios) : []
   const currentFlags = currentModule?.flags
   const hasListData = currentModule?.hasListData
+  const regions = currentModule?.regions
+  const hasRegions = regions && Object.keys(regions).length > 0
 
   // Sync persisted language with i18n on mount
   useEffect(() => {
@@ -192,8 +198,31 @@ export function InspectorPanel() {
           </div>
         </Section>
 
-        {/* State section (only when content has states) */}
-        {stateKeys.length > 0 && (
+        {/* Region-based controls (when screen exports regions) */}
+        {hasRegions && (
+          <Section title="Regions">
+            <div className="flex flex-col gap-3">
+              {Object.entries(regions!).map(([key, region]) => (
+                <RegionGroup
+                  key={key}
+                  regionKey={key}
+                  label={region.label}
+                  states={region.states}
+                  defaultState={region.defaultState}
+                  isList={region.isList}
+                  mockItems={region.mockItems}
+                  activeState={regionStates[key] ?? region.defaultState}
+                  listCount={regionListCounts[key]}
+                  onStateChange={(state) => setRegionState(key, state)}
+                  onListCountChange={(count) => setRegionListCount(key, count)}
+                />
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* Legacy state section (only when no regions and screen has scenarios) */}
+        {!hasRegions && stateKeys.length > 0 && (
           <Section title="States">
             <div className="flex flex-col gap-1">
               {stateKeys.map((key) => (
@@ -255,8 +284,8 @@ export function InspectorPanel() {
           </Section>
         )}
 
-        {/* List Item Count section (only for screens with list data) */}
-        {hasListData && (
+        {/* Legacy list items (only when no regions and screen has list data) */}
+        {!hasRegions && hasListData && (
           <Section title="List Items">
             <div className="flex items-center gap-2">
               <button
@@ -339,6 +368,99 @@ export function InspectorPanel() {
           </Section>
         )}
       </div>
+    </div>
+  )
+}
+
+function RegionGroup({
+  regionKey,
+  label,
+  states,
+  defaultState,
+  isList,
+  mockItems,
+  activeState,
+  listCount,
+  onStateChange,
+  onListCountChange,
+}: {
+  regionKey: string
+  label: string
+  states: Record<string, Record<string, unknown>>
+  defaultState: string
+  isList?: boolean
+  mockItems?: unknown[]
+  activeState: string
+  listCount?: number
+  onStateChange: (state: string) => void
+  onListCountChange: (count: number) => void
+}) {
+  const stateKeys = Object.keys(states)
+  const maxItems = mockItems?.length ?? 0
+  const currentCount = listCount ?? maxItems
+
+  // Suppress unused variable warnings for props used only for keying
+  void regionKey
+  void defaultState
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-neutral-600">{label}</span>
+        {isList && (
+          <span className="text-[10px] text-neutral-400">
+            {currentCount} {currentCount === 1 ? 'item' : 'items'}
+          </span>
+        )}
+      </div>
+
+      {/* State buttons */}
+      <div className="flex flex-wrap gap-1">
+        {stateKeys.map((key) => (
+          <button
+            key={key}
+            onClick={() => onStateChange(key)}
+            className={
+              activeState === key
+                ? 'rounded-md bg-neutral-900/5 px-2 py-0.5 text-xs font-medium text-neutral-900'
+                : 'rounded-md px-2 py-0.5 text-xs text-neutral-500 hover:bg-neutral-50'
+            }
+          >
+            {key}
+          </button>
+        ))}
+      </div>
+
+      {/* List counter (only when isList) */}
+      {isList && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onListCountChange(currentCount - 1)}
+            disabled={currentCount <= 0}
+            className="flex size-6 items-center justify-center rounded border border-neutral-200 text-xs text-neutral-600 hover:bg-neutral-50 disabled:opacity-40"
+          >
+            &minus;
+          </button>
+          <input
+            type="number"
+            value={currentCount}
+            onChange={(e) => {
+              const val = Number(e.target.value)
+              if (!Number.isNaN(val)) onListCountChange(val)
+            }}
+            min={0}
+            max={maxItems}
+            className="h-6 w-12 rounded border border-neutral-200 bg-white px-1 text-center text-xs text-neutral-900 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+          <button
+            onClick={() => onListCountChange(currentCount + 1)}
+            disabled={currentCount >= maxItems}
+            className="flex size-6 items-center justify-center rounded border border-neutral-200 text-xs text-neutral-600 hover:bg-neutral-50 disabled:opacity-40"
+          >
+            +
+          </button>
+        </div>
+      )}
     </div>
   )
 }
