@@ -28,12 +28,13 @@ export function useScreenModules(): ScreenEntry[] {
       .map(([filePath, loader]) => {
         const scenariosPath = toScenariosPath(filePath)
         const scenarioMod = scenarioModules[scenariosPath]
+        const route = filePathToRoute(filePath)
 
         return {
-          route: filePathToRoute(filePath),
+          route,
           module: loader,
           scenarios: scenarioMod?.scenarios ?? {},
-          flags: scenarioMod?.flags,
+          flags: featureFlagConfig[route] ?? scenarioMod?.flags,
           regions: scenarioMod?.regions,
         }
       })
