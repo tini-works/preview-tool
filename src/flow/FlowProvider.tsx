@@ -15,6 +15,7 @@ export function FlowProvider({ children }: FlowProviderProps) {
   const setSelectedState = useDevToolsStore((s) => s.setSelectedState)
   const pushFlowHistory = useDevToolsStore((s) => s.pushFlowHistory)
   const navigateFlow = useDevToolsStore((s) => s.navigateFlow)
+  const setRegionState = useDevToolsStore((s) => s.setRegionState)
 
   const actions = useFlowActions(selectedRoute)
 
@@ -39,12 +40,17 @@ export function FlowProvider({ children }: FlowProviderProps) {
         setSelectedState(action.setState)
       }
 
+      if (action.setRegionState && !action.navigate) {
+        pushFlowHistory(selectedRoute, currentState)
+        setRegionState(action.setRegionState.region, action.setRegionState.state)
+      }
+
       if (action.navigate) {
         pushFlowHistory(selectedRoute, currentState)
         navigateFlow(action.navigate, action.navigateState ?? null)
       }
     },
-    [playMode, actions, selectedRoute, setSelectedState, pushFlowHistory, navigateFlow]
+    [playMode, actions, selectedRoute, setSelectedState, pushFlowHistory, navigateFlow, setRegionState]
   )
 
   return (
