@@ -1,0 +1,22 @@
+{
+  "title": "Mein Profil",
+  "personalInfo": "Persönliche Daten",
+  "fullName": "Vollständiger Name",
+  "dateOfBirth": "Geburtsdatum",
+  "gender": "Geschlecht",
+  "phone": "Telefon",
+  "email": "E-Mail",
+  "address": "Adresse",
+  "insurance": "Versicherung",
+  "noInsurance": "Noch keine Versichertenkarten hinzugefügt.",
+  "familyMembers": "Familienmitglieder",
+  "noFamily": "Noch keine Familienmitglieder hinzugefügt.",
+  "addFamilyMember": "Familienmitglied hinzufügen",
+  "settings": "Einstellungen",
+  "language": "Sprache",
+  "notifications": "Benachrichtigungen",
+  "notificationsOn": "An",
+  "notificationsOff": "Aus",
+  "editProfile": "Profil bearbeiten",
+  "loading": "Ihr Profil wird geladen..."
+}

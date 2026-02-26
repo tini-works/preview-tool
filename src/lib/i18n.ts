@@ -1,16 +1,21 @@
 import i18n from "i18next"
 import { initReactI18next } from "react-i18next"
 
-import enHelloWorld from "@/locales/en/helloWorld.json"
-import deHelloWorld from "@/locales/de/helloWorld.json"
-import enProfile from "@/locales/en/profile.json"
-import enPrescription from "@/locales/en/prescription.json"
+const localeModules = import.meta.glob("@/locales/**/*.json", { eager: true })
+
+const resources: Record<string, Record<string, unknown>> = {}
+
+for (const [path, module] of Object.entries(localeModules)) {
+  const match = path.match(/\/locales\/(\w+)\/(\w+)\.json$/)
+  if (!match) continue
+
+  const [, lang, namespace] = match
+  resources[lang] ??= {}
+  resources[lang][namespace] = (module as { default: unknown }).default
+}
 
 i18n.use(initReactI18next).init({
-  resources: {
-    en: { helloWorld: enHelloWorld, profile: enProfile, prescription: enPrescription },
-    de: { helloWorld: deHelloWorld },
-  },
+  resources,
   lng: "en",
   fallbackLng: "en",
   interpolation: { escapeValue: false },
