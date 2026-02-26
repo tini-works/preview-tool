@@ -1,43 +1,52 @@
 # Redeem Prescription Flow
 
 **Source:** User request — APO group prescription redemption via NFC insurance card
-**Flow:** 5 screens (step 1–5)
-**Content directory:** `content/prescription/`
+**Flow:** 4 screens (step 1–4)
+**Screen directory:** `src/screens/prescription/`
 
 ---
 
 ## Flow Overview
 
 ```
-[1. NFC Scan] → [2. Prescription List] → [3. Delivery Method] → [4. Location/Address] → [5. Confirmation]
-                                                                   ↑ conditional:
-                                                                   pickup → Apotheke picker
-                                                                   delivery → address form
+[1. NFC Scan] → [2. Prescription List] → [3. Delivery & Location] → [4. Confirmation]
+                                            ↑ adapts based on selection:
+                                            pickup → radio + Apotheke picker
+                                            delivery → radio + address form
 ```
 
 ---
 
 ## Screen 1: `/prescription/scan` — NFC Insurance Card Scan
 
-**File:** `content/prescription/scan.mdx`
+**File:** `src/screens/prescription/scan/index.tsx`
+**Companion files:** `scenarios.ts`, `flow.ts`
 **Layout pattern:** LP-12 adapted (verification/action prompt)
+**State model:** flat scenarios (`PrescriptionScanData`)
 
 ### Navigation Context
 
-- **Flow:** Redeem Prescription (step 1 of 5)
+- **Flow:** Redeem Prescription (step 1 of 4)
 - **Previous:** main menu / home (entry point)
 - **Next:** /prescription/list (on successful scan)
 - **Back target:** previous screen
-- **Stepper:** Show steps 1–5, highlight step 1
+- **Stepper:** Show steps 1–4, highlight step 1
 - **Guard:** none
 - **On success:** mock NFC scan completes → navigate to prescription list
+
+### Flow Actions
+
+| Trigger | Action | Condition | Target | Target State | Notes |
+|---------|--------|-----------|--------|--------------|-------|
+| `Button:Simulate NFC Scan` | navigate | — | `/prescription/list` | `populated` | Skips scanning/success animation in flow mode |
+| `Button:Try Again` | setState | — | `idle` | — | Resets from error state |
 
 ### Elements
 
 | # | Element | Type | Data / Content |
 |---|---------|------|----------------|
 | 1 | Screen header | ScreenHeader | title: "Redeem Prescription" |
-| 2 | Stepper | Visual | Steps: Scan → Select → Delivery → Location → Confirm |
+| 2 | Stepper | Visual | Steps: Scan → Select → Delivery → Confirm |
 | 3 | NFC illustration | Visual | Animated phone + card illustration (CSS animation) |
 | 4 | Instruction title | Text | "Hold your insurance card near your phone" |
 | 5 | Instruction subtitle | Text | "Place your eGK (elektronische Gesundheitskarte) on the back of your device" |
@@ -49,10 +58,14 @@
 
 ### States
 
+Scenarios: `idle`, `scanning`, `success`, `error`
+
 - [x] **idle** — Default state: illustration + instruction + scan button
 - [x] **scanning** — Pulsing animation, instruction changes to "Reading card...", button disabled
 - [x] **success** — Checkmark animation, "Card verified!" text, auto-navigates to next step after 1.5s
 - [x] **error** — Error note shown, "Try Again" button replaces scan button
+
+**Type:** `PrescriptionScanData = { state: 'idle' | 'scanning' | 'success' | 'error' }`
 
 **Conditional elements:**
 - Scanning indicator shown only in `scanning` state
@@ -74,8 +87,8 @@
 ┌──────────────────────────────────────────┐
 │ ←  Redeem Prescription                   │  header
 ├──────────────────────────────────────────┤
-│  ● ─── ○ ─── ○ ─── ○ ─── ○              │  stepper
-│  Scan  Select Delivery Location Confirm  │
+│  ● ─── ○ ─── ○ ─── ○                    │  stepper
+│  Scan  Select Delivery Confirm           │
 ├──────────────────────────────────────────┤
 │                                          │
 │           ┌──────────┐                   │
@@ -101,25 +114,34 @@
 
 ## Screen 2: `/prescription/list` — Select Prescriptions
 
-**File:** `content/prescription/list.mdx`
+**File:** `src/screens/prescription/list/index.tsx`
+**Companion files:** `scenarios.ts`, `flow.ts`
 **Layout pattern:** LP-3 adapted (list with checkboxes instead of tabs)
+**State model:** regions (`prescriptions` region, `PrescriptionListData`)
 
 ### Navigation Context
 
-- **Flow:** Redeem Prescription (step 2 of 5)
+- **Flow:** Redeem Prescription (step 2 of 4)
 - **Previous:** /prescription/scan
 - **Next:** /prescription/delivery (on "Continue" with ≥1 selected)
 - **Back target:** /prescription/scan
-- **Stepper:** Show steps 1–5, highlight step 2
+- **Stepper:** Show steps 1–4, highlight step 2
 - **Guard:** NFC scan completed (insurance data in flow state)
 - **On success:** selected prescriptions stored in flow state → navigate to delivery
+
+### Flow Actions
+
+| Trigger | Action | Condition | Target | Target State | Notes |
+|---------|--------|-----------|--------|--------------|-------|
+| `Button:Continue` | navigate | — | `/prescription/delivery` | `none-selected` | Always resets delivery selection |
+| `ScreenHeader:Your Prescriptions` | navigate | — | `/prescription/scan` | `idle` | Back navigation via header |
 
 ### Elements
 
 | # | Element | Type | Data / Content |
 |---|---------|------|----------------|
 | 1 | Screen header | ScreenHeader | title: "Your Prescriptions" |
-| 2 | Stepper | Visual | Steps 1–5, highlight step 2 |
+| 2 | Stepper | Visual | Steps 1–4, highlight step 2 |
 | 3 | Insurance info banner | Card | Insurer name + member ID from scan (read-only) |
 | 4 | Select all toggle | Checkbox + Text | "Select all (N prescriptions)" |
 | 5 | Prescription card (×N) | Card + Checkbox | Medication name, dosage, prescribing doctor, date, status badge |
@@ -139,9 +161,17 @@ Each prescription card shows:
 
 ### States
 
+Region: `prescriptions` — states: `loading`, `empty`, `populated`
+
 - [x] **loading** — Skeleton cards while prescriptions load
 - [x] **populated** — List of prescription cards with checkboxes
 - [x] **empty** — "No prescriptions found for your insurance card." + Note with info
+
+**Type:**
+```typescript
+type Prescription = { id: string; medication: string; dosage: string; doctor: string; date: string; status: 'ready' | 'pending' | 'expired' }
+type PrescriptionListData = { view: 'loading' | 'empty' | 'populated'; insurer: string; memberId: string; prescriptions: Prescription[]; selectedIds: string[] }
+```
 
 **Conditional elements:**
 - Continue button disabled when 0 prescriptions selected
@@ -164,8 +194,8 @@ Each prescription card shows:
 ┌──────────────────────────────────────────┐
 │ ←  Your Prescriptions                    │  header
 ├──────────────────────────────────────────┤
-│  ○ ─── ● ─── ○ ─── ○ ─── ○              │  stepper
-│  Scan  Select Delivery Location Confirm  │
+│  ○ ─── ● ─── ○ ─── ○                    │  stepper
+│  Scan  Select Delivery Confirm           │
 ├──────────────────────────────────────────┤
 │ ┌──────────────────────────────────────┐ │
 │ │ 🏥 TK Techniker        A123456789   │ │  insurance
@@ -196,168 +226,70 @@ Each prescription card shows:
 
 ---
 
-## Screen 3: `/prescription/delivery` — Choose Delivery Method
+## Screen 3: `/prescription/delivery` — Delivery & Location
 
-**File:** `content/prescription/delivery.mdx`
-**Layout pattern:** LP-9 (Selection grid)
+**File:** `src/screens/prescription/delivery/index.tsx`
+**Companion files:** `scenarios.ts`, `flow.ts`
+**Layout pattern:** LP-9 adapted (selection grid + conditional detail section)
+**State model:** regions (`delivery` region, `PrescriptionDeliveryData`)
+
+This screen combines delivery method selection with the corresponding location input. The top section shows the delivery method radio cards; the bottom section dynamically renders the address form (home delivery) or Apotheke picker (pickup) based on selection.
 
 ### Navigation Context
 
-- **Flow:** Redeem Prescription (step 3 of 5)
+- **Flow:** Redeem Prescription (step 3 of 4)
 - **Previous:** /prescription/list
-- **Next:** /prescription/location (on selection)
+- **Next:** /prescription/confirmation
 - **Back target:** /prescription/list
-- **Stepper:** Show steps 1–5, highlight step 3
+- **Stepper:** Show steps 1–4, highlight step 3
 - **Guard:** ≥1 prescription selected
-- **On success:** delivery method stored → navigate to location step
+- **On success:** delivery method + location stored → navigate to confirmation
 
-### Elements
+### Flow Actions
+
+| Trigger | Action | Condition | Target | Target State | Notes |
+|---------|--------|-----------|--------|--------------|-------|
+| `RadioCard:Home Delivery` | setState | — | `home-delivery-prefilled` | — | Shows address form variant below radio cards |
+| `RadioCard:Apotheke Pickup` | setState | — | `apotheke-loading` | — | Shows Apotheke picker variant below radio cards |
+| `Button:Continue` | navigate | — | `/prescription/confirmation` | `review-pickup` | **Bug:** always sends `review-pickup` — see Known Limitations |
+| `ScreenHeader:Delivery` | navigate | — | `/prescription/list` | `populated` | Back navigation via header |
+
+### Elements — Delivery Method (top section, always visible)
 
 | # | Element | Type | Data / Content |
 |---|---------|------|----------------|
-| 1 | Screen header | ScreenHeader | title: "Delivery Method" |
-| 2 | Stepper | Visual | Steps 1–5, highlight step 3 |
+| 1 | Screen header | ScreenHeader | title: "Delivery" |
+| 2 | Stepper | Visual | Steps 1–4, highlight step 3 |
 | 3 | Instruction text | Text | "How would you like to receive your medication?" |
 | 4 | Delivery option card | RadioCard | Icon: 🚚, title: "Home Delivery", description: "Delivered to your address within 1–3 business days" |
 | 5 | Pickup option card | RadioCard | Icon: 🏪, title: "Apotheke Pickup", description: "Pick up at a nearby APO group Apotheke — often same day" |
-| 6 | Continue button | Footer + Button | "Continue" — disabled when no option selected |
 
-### States
-
-- [x] **default** — Both cards unselected, continue disabled
-- [x] **selected** — One card highlighted with primary border, continue enabled
-
-**Conditional elements:**
-- Continue button enabled only when an option is selected
-- Selected card shows check icon + teal border
-
-### Data
-
-**Reads:**
-- Flow state: selected prescriptions from step 2
-
-**Writes:**
-- Flow state: delivery method ("delivery" | "pickup")
-- Navigation: → `/prescription/location`
-
-### Layout Sketch
-
-```
-┌──────────────────────────────────────────┐
-│ ←  Delivery Method                       │  header
-├──────────────────────────────────────────┤
-│  ○ ─── ○ ─── ● ─── ○ ─── ○              │  stepper
-│  Scan  Select Delivery Location Confirm  │
-├──────────────────────────────────────────┤
-│                                          │
-│  How would you like to receive           │
-│  your medication?                        │  instruction
-│                                          │
-│  ┌──────────────────────────────────────┐│
-│  │  🚚  Home Delivery            ○     ││  option 1
-│  │  Delivered to your address           ││
-│  │  within 1–3 business days            ││
-│  └──────────────────────────────────────┘│
-│                                          │
-│  ┌──────────────────────────────────────┐│
-│  │  🏪  Apotheke Pickup          ●     ││  option 2
-│  │  Pick up at a nearby APO group       ││  (selected)
-│  │  Apotheke — often same day           ││
-│  └──────────────────────────────────────┘│
-│                                          │
-├──────────────────────────────────────────┤
-│  [          Continue          ]          │  footer
-└──────────────────────────────────────────┘
-```
-
----
-
-## Screen 4: `/prescription/location` — Delivery Address or Apotheke Picker
-
-**File:** `content/prescription/location.mdx`
-**Layout pattern:** Custom (conditional: address form OR map + list)
-
-This screen adapts based on the delivery method selected in step 3.
-
-### Navigation Context
-
-- **Flow:** Redeem Prescription (step 4 of 5)
-- **Previous:** /prescription/delivery
-- **Next:** /prescription/confirmation
-- **Back target:** /prescription/delivery
-- **Stepper:** Show steps 1–5, highlight step 4
-- **Guard:** delivery method selected
-- **On success:** location stored → navigate to confirmation
-
----
-
-### Variant A: Home Delivery — Address Form
-
-**Layout pattern:** LP-6 adapted (sectioned form)
-
-#### Elements
+### Elements — Variant A: Home Delivery (shown when home delivery selected)
 
 | # | Element | Type | Data / Content |
 |---|---------|------|----------------|
-| 1 | Screen header | ScreenHeader | title: "Delivery Address" |
-| 2 | Stepper | Visual | Steps 1–5, highlight step 4 |
-| 3 | Pre-filled address card | Card | Current address from user profile (if available), with "Edit" link |
-| 4 | Or: Address form | Form | Street, House number, Postal code, City — input fields |
-| 5 | Delivery note textarea | Textarea | Optional: "Delivery instructions (e.g., ring twice)" |
-| 6 | Estimated delivery | Text | "Estimated delivery: 1–3 business days" |
-| 7 | Continue button | Footer + Button | "Continue" |
+| 6a | Divider | Visual | Separates method selection from detail section |
+| 7a | Pre-filled address card | Card | Current address from user profile (if available), with "Change" link |
+| 8a | Or: Address form | Form | Street, House number, Postal code, City — input fields |
+| 9a | Delivery note textarea | Textarea | Optional: "Delivery instructions (e.g., ring twice)" |
+| 10a | Estimated delivery | Text | "Estimated delivery: 1–3 business days" |
 
-#### States
-
-- [x] **prefilled** — Address from profile shown in read-only card with "Change" link
-- [x] **editing** — Address form fields editable
-- [x] **empty** — No saved address, form fields empty
-
-#### Layout Sketch (Variant A)
-
-```
-┌──────────────────────────────────────────┐
-│ ←  Delivery Address                      │  header
-├──────────────────────────────────────────┤
-│  ○ ─── ○ ─── ○ ─── ● ─── ○              │  stepper
-│  Scan  Select Delivery Location Confirm  │
-├──────────────────────────────────────────┤
-│ ┌──────────────────────────────────────┐ │
-│ │ 📍 Saved Address           [Change] │ │
-│ │    Marienplatz 1                     │ │  address
-│ │    80331 München                     │ │  card
-│ └──────────────────────────────────────┘ │
-├──────────────────────────────────────────┤
-│  Delivery instructions (optional)        │
-│  ┌──────────────────────────────────────┐│
-│  │ e.g., ring twice                     ││  textarea
-│  └──────────────────────────────────────┘│
-│                                          │
-│  📦 Estimated delivery: 1–3 business days│
-│                                          │
-├──────────────────────────────────────────┤
-│  [          Continue          ]          │  footer
-└──────────────────────────────────────────┘
-```
-
----
-
-### Variant B: Apotheke Pickup — Map + Location List
-
-**Layout pattern:** Custom (map + scrollable list)
-
-#### Elements
+### Elements — Variant B: Apotheke Pickup (shown when pickup selected)
 
 | # | Element | Type | Data / Content |
 |---|---------|------|----------------|
-| 1 | Screen header | ScreenHeader | title: "Choose Apotheke" |
-| 2 | Stepper | Visual | Steps 1–5, highlight step 4 |
-| 3 | Map placeholder | Visual | Static map image or colored rectangle showing Apotheke pins (mock) |
-| 4 | Location list | List | Scrollable list of APO group Apotheke locations |
-| 5 | Location card (×N) | RadioCard | Apotheke name, address, distance, opening hours, availability badge |
-| 6 | Continue button | Footer + Button | "Continue" — disabled when no location selected |
+| 6b | Divider | Visual | Separates method selection from detail section |
+| 7b | Map placeholder | Visual | Static map image or colored rectangle showing Apotheke pins (mock) |
+| 8b | Location count | Text | "N Apotheken nearby" |
+| 9b | Location card (×N) | RadioCard | Apotheke name, address, distance, opening hours, availability badge |
 
-#### Elements Detail — Location Card
+### Elements — Footer (always visible)
+
+| # | Element | Type | Data / Content |
+|---|---------|------|----------------|
+| 11 | Continue button | Footer + Button | "Continue" — disabled when no method selected, or when pickup selected but no Apotheke chosen |
+
+### Elements Detail — Location Card
 
 Each Apotheke location card shows:
 - **Radio selection** — left side
@@ -367,30 +299,72 @@ Each Apotheke location card shows:
 - **Opening hours** — tertiary text (e.g., "Open until 20:00")
 - **Availability badge** — AVAILABLE (emerald), LIMITED (amber) — indicates if selected medications are in stock
 
-#### States
+### States
 
-- [x] **loading** — Map placeholder + skeleton list
-- [x] **populated** — Map with pins + location list
-- [x] **selected** — One location highlighted, continue enabled
+Region: `delivery` — states: `none-selected`, `home-delivery-prefilled`, `home-delivery-empty`, `apotheke-loading`, `apotheke-list`, `apotheke-selected`
+
+- [x] **none-selected** — Radio cards shown, no detail section below, continue disabled
+- [x] **home-delivery-prefilled** — Home delivery selected, saved address shown in card with "Change" link, continue enabled
+- [x] **home-delivery-empty** — Home delivery selected, empty address form, continue enabled once address filled
+- [x] **apotheke-loading** — Pickup selected, map placeholder + skeleton list below radio cards
+- [x] **apotheke-list** — Pickup selected, Apotheke list shown, none selected, continue disabled
+- [x] **apotheke-selected** — Pickup selected, one Apotheke highlighted, continue enabled
+
+**Type:**
+```typescript
+type Apotheke = { id: string; name: string; address: string; distance: string; openUntil: string; availability: 'available' | 'limited' }
+type PrescriptionDeliveryData = {
+  selected: 'none' | 'delivery' | 'pickup'
+  savedAddress?: string
+  deliveryNote?: string
+  pickupView?: 'loading' | 'list' | 'selected'
+  apotheken?: Apotheke[]
+  selectedApothekeId?: string
+}
+```
 
 **Conditional elements:**
-- Continue button disabled until a location is selected
-- Selected card shows teal border + check icon
+- Detail section hidden when `none-selected`
+- Address form vs. Apotheke picker determined by radio selection
+- Continue button disabled when: no method selected, or pickup with no Apotheke chosen
+- Selected Apotheke card shows teal border + check icon
 
-#### Layout Sketch (Variant B)
+### Data
+
+**Reads:**
+- Flow state: selected prescriptions from step 2
+
+**Writes:**
+- Flow state: delivery method + address or selected Apotheke
+- Navigation: → `/prescription/confirmation`
+
+### Layout Sketch (Pickup variant — most complex)
 
 ```
 ┌──────────────────────────────────────────┐
-│ ←  Choose Apotheke                       │  header
+│ ←  Delivery                              │  header
 ├──────────────────────────────────────────┤
-│  ○ ─── ○ ─── ○ ─── ● ─── ○              │  stepper
-│  Scan  Select Delivery Location Confirm  │
+│  ○ ─── ○ ─── ● ─── ○                    │  stepper
+│  Scan  Select Delivery Confirm           │
+├──────────────────────────────────────────┤
+│                                          │
+│  How would you like to receive           │
+│  your medication?                        │  instruction
+│                                          │
+│  ┌──────────────────────────────────────┐│
+│  │  🚚  Home Delivery            ○     ││  option 1
+│  │  Delivered within 1–3 days           ││
+│  └──────────────────────────────────────┘│
+│                                          │
+│  ┌──────────────────────────────────────┐│
+│  │  🏪  Apotheke Pickup          ●     ││  option 2
+│  │  Often same day                      ││  (selected)
+│  └──────────────────────────────────────┘│
+│                                          │
 ├──────────────────────────────────────────┤
 │ ┌──────────────────────────────────────┐ │
-│ │                                      │ │
 │ │        [ Map with pins ]             │ │  map
 │ │          📍  📍  📍                  │ │  placeholder
-│ │                                      │ │
 │ └──────────────────────────────────────┘ │
 ├──────────────────────────────────────────┤
 │ 3 Apotheken nearby                       │
@@ -415,34 +389,86 @@ Each Apotheke location card shows:
 └──────────────────────────────────────────┘
 ```
 
+### Layout Sketch (Home delivery variant)
+
+```
+┌──────────────────────────────────────────┐
+│ ←  Delivery                              │  header
+├──────────────────────────────────────────┤
+│  ○ ─── ○ ─── ● ─── ○                    │  stepper
+│  Scan  Select Delivery Confirm           │
+├──────────────────────────────────────────┤
+│                                          │
+│  How would you like to receive           │
+│  your medication?                        │  instruction
+│                                          │
+│  ┌──────────────────────────────────────┐│
+│  │  🚚  Home Delivery            ●     ││  option 1
+│  │  Delivered within 1–3 days           ││  (selected)
+│  └──────────────────────────────────────┘│
+│                                          │
+│  ┌──────────────────────────────────────┐│
+│  │  🏪  Apotheke Pickup          ○     ││  option 2
+│  │  Often same day                      ││
+│  └──────────────────────────────────────┘│
+│                                          │
+├──────────────────────────────────────────┤
+│ ┌──────────────────────────────────────┐ │
+│ │ 📍 Saved Address           [Change] │ │
+│ │    Marienplatz 1                     │ │  address
+│ │    80331 München                     │ │  card
+│ └──────────────────────────────────────┘ │
+├──────────────────────────────────────────┤
+│  Delivery instructions (optional)        │
+│  ┌──────────────────────────────────────┐│
+│  │ e.g., ring twice                     ││  textarea
+│  └──────────────────────────────────────┘│
+│                                          │
+│  📦 Estimated delivery: 1–3 business days│
+│                                          │
+├──────────────────────────────────────────┤
+│  [          Continue          ]          │  footer
+└──────────────────────────────────────────┘
+```
+
 ---
 
-## Screen 5: `/prescription/confirmation` — Review & Confirm
+## Screen 4: `/prescription/confirmation` — Review & Confirm
 
-**File:** `content/prescription/confirmation.mdx`
+**File:** `src/screens/prescription/confirmation/index.tsx`
+**Companion files:** `scenarios.ts`, `flow.ts`
 **Layout pattern:** LP-14 (Summary / confirmation page)
+**State model:** regions (`confirmation` region, `PrescriptionConfirmationData`)
 
 ### Navigation Context
 
-- **Flow:** Redeem Prescription (step 5 of 5)
-- **Previous:** /prescription/location
+- **Flow:** Redeem Prescription (step 4 of 4)
+- **Previous:** /prescription/delivery
 - **Next:** none (terminal) — navigates to success/home after confirmation
-- **Back target:** /prescription/location
-- **Stepper:** Show steps 1–5, highlight step 5
-- **Guard:** location/address selected
+- **Back target:** /prescription/delivery
+- **Stepper:** Show steps 1–4, highlight step 4
+- **Guard:** delivery method + location selected
 - **On success:** mock API call → success toast → navigate to home or order tracking
+
+### Flow Actions
+
+| Trigger | Action | Condition | Target | Target State | Notes |
+|---------|--------|-----------|--------|--------------|-------|
+| `Button:Confirm Redemption` | setState | — | `success-pickup` | — | **Bug:** always sets `success-pickup` regardless of delivery method — see Known Limitations |
+| `Button:Back to Home` | navigate | — | `/prescription/scan` | `idle` | Returns to flow entry point |
+| `ScreenHeader:Review & Confirm` | navigate | — | `/prescription/delivery` | `apotheke-selected` | Back navigation via header |
 
 ### Elements
 
 | # | Element | Type | Data / Content |
 |---|---------|------|----------------|
 | 1 | Screen header | ScreenHeader | title: "Review & Confirm" |
-| 2 | Stepper | Visual | Steps 1–5, highlight step 5 |
+| 2 | Stepper | Visual | Steps 1–4, highlight step 4 |
 | 3 | "Prescriptions" section | Text | Section heading |
 | 4 | Prescription summary cards | Card(s) | Medication name, dosage — one row per selected prescription |
 | 5 | "Delivery" section | Text | Section heading |
 | 6 | Delivery method row | ListItem | Method label ("Home Delivery" or "Apotheke Pickup") with [Edit] link → step 3 |
-| 7 | Location/address row | ListItem | Address or Apotheke name with [Edit] link → step 4 |
+| 7 | Location/address row | ListItem | Address or Apotheke name with [Edit] link → step 3 |
 | 8 | Estimated timeline row | ListItem | "1–3 business days" or "Available today" |
 | 9 | "Insurance" section | Text | Section heading |
 | 10 | Insurance row | ListItem | Insurer name + member ID |
@@ -451,9 +477,29 @@ Each Apotheke location card shows:
 
 ### States
 
-- [x] **populated** — All summary rows filled from flow state
+Region: `confirmation` — states: `review-pickup`, `review-delivery`, `submitting`, `success-pickup`, `success-delivery`
+
+- [x] **review-pickup** — Summary with pickup details, consent checkbox unchecked
+- [x] **review-delivery** — Summary with delivery address details, consent checkbox unchecked
 - [x] **submitting** — Confirm button shows loading spinner, all inputs disabled
-- [x] **success** — Success illustration + "Prescription redeemed!" message + "Back to Home" button
+- [x] **success-pickup** — Success illustration + pickup confirmation message + "Back to Home" button
+- [x] **success-delivery** — Success illustration + delivery confirmation message + "Back to Home" button
+
+**Type:**
+```typescript
+type PrescriptionConfirmationData = {
+  state: 'review' | 'submitting' | 'success'
+  deliveryMethod: 'delivery' | 'pickup'
+  prescriptions: { medication: string; dosage: string }[]
+  deliveryLabel: string
+  locationLabel: string
+  locationDetail?: string
+  timeline: string
+  insurer: string
+  memberId: string
+  consentChecked: boolean
+}
+```
 
 **Conditional elements:**
 - Confirm button disabled until consent checkbox is checked
@@ -464,7 +510,7 @@ Each Apotheke location card shows:
 ### Data
 
 **Reads:**
-- Flow state: all data from steps 1–4 (insurance, prescriptions, delivery method, location)
+- Flow state: all data from steps 1–3 (insurance, prescriptions, delivery method, location)
 
 **Writes:**
 - Mock API: simulated prescription redemption call
@@ -477,8 +523,8 @@ Each Apotheke location card shows:
 ┌──────────────────────────────────────────┐
 │ ←  Review & Confirm                      │  header
 ├──────────────────────────────────────────┤
-│  ○ ─── ○ ─── ○ ─── ○ ─── ●              │  stepper
-│  Scan  Select Delivery Location Confirm  │
+│  ○ ─── ○ ─── ○ ─── ●                    │  stepper
+│  Scan  Select Delivery Confirm           │
 ├──────────────────────────────────────────┤
 │ PRESCRIPTIONS                            │  section
 │ ┌──────────────────────────────────────┐ │
@@ -518,8 +564,8 @@ Each Apotheke location card shows:
 ┌──────────────────────────────────────────┐
 │ ←  Redeem Prescription                   │  header
 ├──────────────────────────────────────────┤
-│  ● ─── ● ─── ● ─── ● ─── ●              │  stepper
-│  Scan  Select Delivery Location Confirm  │  (all done)
+│  ● ─── ● ─── ● ─── ●                    │  stepper
+│  Scan  Select Delivery Confirm           │  (all done)
 ├──────────────────────────────────────────┤
 │                                          │
 │            ┌────────┐                    │
@@ -539,153 +585,65 @@ Each Apotheke location card shows:
 
 ---
 
-## i18n Keys
+## i18n
 
-```json
-{
-  "prescription": {
-    "flowTitle": "Redeem Prescription",
-    "steps": {
-      "scan": "Scan",
-      "select": "Select",
-      "delivery": "Delivery",
-      "location": "Location",
-      "confirm": "Confirm"
-    },
-    "scan": {
-      "title": "Redeem Prescription",
-      "instruction": "Hold your insurance card near your phone",
-      "subtitle": "Place your eGK (elektronische Gesundheitskarte) on the back of your device",
-      "scanning": "Reading card...",
-      "success": "Card verified!",
-      "error": "Card not recognized. Please try again.",
-      "simulateBtn": "Simulate NFC Scan",
-      "tryAgainBtn": "Try Again",
-      "poweredBy": "Powered by APO group"
-    },
-    "list": {
-      "title": "Your Prescriptions",
-      "selectAll": "Select all ({{count}} prescriptions)",
-      "selectedCount": "{{selected}} of {{total}} selected",
-      "noResults": "No prescriptions found for your insurance card.",
-      "statusReady": "Ready",
-      "statusPending": "Pending",
-      "statusExpired": "Expired",
-      "continue": "Continue"
-    },
-    "delivery": {
-      "title": "Delivery Method",
-      "instruction": "How would you like to receive your medication?",
-      "homeDelivery": "Home Delivery",
-      "homeDeliveryDesc": "Delivered to your address within 1–3 business days",
-      "apothekePickup": "Apotheke Pickup",
-      "apothekePickupDesc": "Pick up at a nearby APO group Apotheke — often same day",
-      "continue": "Continue"
-    },
-    "location": {
-      "deliveryTitle": "Delivery Address",
-      "pickupTitle": "Choose Apotheke",
-      "savedAddress": "Saved Address",
-      "changeAddress": "Change",
-      "street": "Street",
-      "houseNumber": "House number",
-      "postalCode": "Postal code",
-      "city": "City",
-      "deliveryNote": "Delivery instructions (optional)",
-      "deliveryNotePlaceholder": "e.g., ring twice",
-      "estimatedDelivery": "Estimated delivery: 1–3 business days",
-      "nearbyCount": "{{count}} Apotheken nearby",
-      "openUntil": "Open until {{time}}",
-      "available": "Available",
-      "limited": "Limited",
-      "continue": "Continue"
-    },
-    "confirmation": {
-      "title": "Review & Confirm",
-      "prescriptionsSection": "Prescriptions",
-      "deliverySection": "Delivery",
-      "insuranceSection": "Insurance",
-      "memberId": "Member ID: {{id}}",
-      "edit": "Edit",
-      "availableToday": "Available today",
-      "estimatedDays": "1–3 business days",
-      "consent": "I confirm that I am authorized to redeem these prescriptions",
-      "confirmBtn": "Confirm Redemption",
-      "submitting": "Processing...",
-      "successTitle": "Prescription Redeemed!",
-      "successPickup": "Your medication will be ready for pickup at {{location}}.",
-      "successDelivery": "Your medication will be delivered to {{address}} within 1–3 business days.",
-      "backToHome": "Back to Home"
-    }
-  }
-}
-```
+All translations are **co-located** in each screen's folder as `en.json` and `de.json`. Namespaces are derived from the file path (section + screen name, hyphenated). There is no centralized i18n file for this flow.
+
+| Screen | Namespace | Files |
+|--------|-----------|-------|
+| scan | `prescription-scan` | `src/screens/prescription/scan/{en,de}.json` |
+| list | `prescription-list` | `src/screens/prescription/list/{en,de}.json` |
+| delivery | `prescription-delivery` | `src/screens/prescription/delivery/{en,de}.json` |
+| confirmation | `prescription-confirmation` | `src/screens/prescription/confirmation/{en,de}.json` |
+
+Locales are auto-discovered via `import.meta.glob` — no manual registration in `i18n.ts`.
+
+**Note:** The old `prescription-location` namespace is removed. Location-related i18n keys (Apotheke picker labels, address form labels) are merged into `prescription-delivery`.
 
 ---
 
 ## Mock Data
 
-```typescript
-// Prescription list mock
-const mockPrescriptions = [
-  {
-    id: "rx-001",
-    medication: "Ibuprofen 400mg",
-    dosage: "1 tablet, 3× daily",
-    doctor: "Dr. Schmidt",
-    date: "2026-02-20",
-    status: "ready" as const,
-  },
-  {
-    id: "rx-002",
-    medication: "Amoxicillin 500mg",
-    dosage: "1 capsule, 2× daily",
-    doctor: "Dr. Weber",
-    date: "2026-02-18",
-    status: "ready" as const,
-  },
-  {
-    id: "rx-003",
-    medication: "Metformin 850mg",
-    dosage: "1 tablet, 2× daily",
-    doctor: "Dr. Fischer",
-    date: "2026-02-25",
-    status: "pending" as const,
-  },
-];
+Each screen's `scenarios.ts` file is the canonical source for types and mock data. Key types are listed here for reference; see the individual files for full mock values.
 
-// Apotheke locations mock
-const mockApotheken = [
-  {
-    id: "apo-001",
-    name: "APO Apotheke Marienplatz",
-    address: "Marienplatz 1, 80331 München",
-    distance: "0.3 km",
-    openUntil: "20:00",
-    availability: "available" as const,
-  },
-  {
-    id: "apo-002",
-    name: "APO Apotheke Sendlinger Tor",
-    address: "Sendlinger Str. 5, 80331 München",
-    distance: "0.8 km",
-    openUntil: "18:30",
-    availability: "available" as const,
-  },
-  {
-    id: "apo-003",
-    name: "APO Apotheke Stachus",
-    address: "Karlsplatz 3, 80335 München",
-    distance: "1.2 km",
-    openUntil: "19:00",
-    availability: "limited" as const,
-  },
-];
+| Screen | Type | Source |
+|--------|------|--------|
+| scan | `PrescriptionScanData` | `src/screens/prescription/scan/scenarios.ts` |
+| list | `Prescription`, `PrescriptionListData` | `src/screens/prescription/list/scenarios.ts` |
+| delivery | `Apotheke`, `PrescriptionDeliveryData` | `src/screens/prescription/delivery/scenarios.ts` |
+| confirmation | `ConfirmationPrescription`, `PrescriptionConfirmationData` | `src/screens/prescription/confirmation/scenarios.ts` |
 
-// Insurance mock (from NFC scan)
-const mockInsurance = {
-  insurer: "TK Techniker Krankenkasse",
-  memberId: "A123456789",
-  type: "GKV",
-};
-```
+---
+
+## Edge Cases & Known Limitations
+
+### 1. Conditional routing not fully wired
+
+**Affected screens:** delivery (screen 3), confirmation (screen 4)
+
+The `FlowAction` type supports only a single `navigateState` or `setState` per trigger. It does not support conditional routing based on current screen state.
+
+**delivery `Button:Continue`** — Always navigates to `/prescription/confirmation` with state `review-pickup`. Ideal behavior: should send `review-delivery` when home delivery is selected.
+
+**confirmation `Button:Confirm Redemption`** — Always sets state to `success-pickup`. Ideal behavior: should set `success-delivery` when the delivery method is home delivery.
+
+**Root cause:** `FlowAction` interface (`src/flow/types.ts`) maps one trigger → one static action. Conditional logic (e.g., "if current state is X, navigate to Y") is not supported. This would require extending `FlowAction` to accept a condition function or state-dependent target map.
+
+### 2. Region state lost on back-navigation
+
+When `navigateFlow` in the flow store processes a back-navigation, `regionStates` for the target screen are reset to their default. This means navigating back from confirmation to delivery loses the user's Apotheke selection (resets to whatever state the flow action specifies, not the user's actual selection).
+
+### 3. No guard enforcement in preview tool
+
+The spec mentions guards (e.g., "≥1 prescription selected" on delivery, "NFC scan completed" on list) but the preview tool doesn't enforce guards — any screen is accessible directly from the screen catalog regardless of flow state.
+
+---
+
+## Migration Notes (from 5-screen to 4-screen flow)
+
+When implementing this spec:
+- **Delete** `src/screens/prescription/location/` (index.tsx, scenarios.ts, flow.ts, en.json, de.json)
+- **Merge** location scenarios and flow actions into `src/screens/prescription/delivery/`
+- **Update** stepper from 5 steps to 4 steps in all screens
+- **Update** confirmation back-navigation target from `/prescription/location` to `/prescription/delivery`
+- **Update** delivery flow actions to remove the intermediate navigation to `/prescription/location` — delivery method selection and location input are now internal state transitions within the same screen

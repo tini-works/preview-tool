@@ -1,23 +1,60 @@
 import { useTranslation } from 'react-i18next'
-import { Loader2 } from 'lucide-react'
-import {
-  ScreenHeader,
-  Stack,
-  Card,
-  ListItem,
-  Footer,
-  Button,
-} from '@/components/screen'
-import { Stepper } from '../_shared/Stepper'
+import { ScreenHeader, Stack, Card, Footer, Button } from '@/components/screen'
 import type { PrescriptionConfirmationData } from './scenarios'
 
-export default function PrescriptionConfirmationScreen({
-  data,
-  flags,
-}: {
-  data: PrescriptionConfirmationData
-  flags?: Record<string, boolean>
-}) {
+const steps = ['stepScan', 'stepSelect', 'stepDelivery', 'stepConfirm'] as const
+
+function Stepper({ currentStep, t }: { currentStep: number; t: (key: string) => string }) {
+  return (
+    <div className="flex items-center justify-between px-2">
+      {steps.map((stepKey, i) => (
+        <div key={stepKey} className="flex flex-1 items-center">
+          <div className="flex flex-col items-center gap-1">
+            <div
+              className={
+                i < currentStep
+                  ? 'flex size-8 items-center justify-center rounded-full bg-teal-500 text-xs font-semibold text-white'
+                  : i === currentStep
+                    ? 'flex size-8 items-center justify-center rounded-full bg-teal-500 text-xs font-semibold text-white ring-4 ring-teal-100'
+                    : 'flex size-8 items-center justify-center rounded-full bg-cream-200 text-xs font-semibold text-slate-500'
+              }
+            >
+              {i < currentStep ? (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6 9 17l-5-5" />
+                </svg>
+              ) : (
+                i + 1
+              )}
+            </div>
+            <span
+              className={
+                i <= currentStep
+                  ? 'text-xs font-medium text-charcoal-500'
+                  : 'text-xs text-slate-400'
+              }
+            >
+              {t(stepKey)}
+            </span>
+          </div>
+
+          {i < steps.length - 1 && (
+            <div
+              className={
+                i < currentStep
+                  ? 'mx-1 mt-[-1.25rem] h-0.5 flex-1 bg-teal-500'
+                  : 'mx-1 mt-[-1.25rem] h-0.5 flex-1 bg-cream-300'
+              }
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default function ConfirmationScreen({ data }: { data: PrescriptionConfirmationData }) {
+  const { t } = useTranslation('prescription-confirmation')
   const {
     state,
     deliveryMethod,
@@ -27,51 +64,55 @@ export default function PrescriptionConfirmationScreen({
     locationDetail,
     timeline,
     insurer,
-    memberId,
+    memberId: mId,
     consentChecked,
   } = data
-  const { t } = useTranslation('prescription-confirmation')
 
-  const steps = [
-    t('steps.scan'),
-    t('steps.select'),
-    t('steps.delivery'),
-    t('steps.location'),
-    t('steps.confirm'),
-  ]
-
-  const isSubmitting = state === 'submitting'
-
-  /* ─── Success State ─── */
   if (state === 'success') {
     return (
       <>
         <ScreenHeader
-          title={t('flowTitle')}
-          data-flow-target="ScreenHeader:Redeem Prescription"
+          title={t('title')}
+          data-flow-target="ScreenHeader:Review & Confirm"
         />
 
-        <Stepper current={5} steps={steps} />
-
-        <div className="flex flex-1 flex-col items-center justify-center px-6 py-16">
-          <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-teal-100">
-            <span className="text-4xl">✅</span>
+        <Stack gap="lg" className="flex min-h-[70vh] flex-col items-center justify-center p-4">
+          {/* Success icon */}
+          <div className="flex size-24 items-center justify-center rounded-full bg-teal-100">
+            <svg
+              width="48"
+              height="48"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-teal-600"
+            >
+              <path d="M20 6 9 17l-5-5" />
+            </svg>
           </div>
-          <h2 className="mb-2 text-xl font-semibold text-charcoal-500">
+
+          {/* Title */}
+          <h2 className="text-xl font-semibold text-charcoal-500">
             {t('successTitle')}
           </h2>
-          <p className="max-w-[280px] text-center text-sm text-slate-500">
+
+          {/* Contextual message */}
+          <p className="max-w-[300px] text-center text-sm text-slate-500">
             {deliveryMethod === 'pickup'
               ? t('successPickup', { location: locationLabel })
               : t('successDelivery', { address: locationLabel })}
           </p>
-        </div>
+        </Stack>
 
         <Footer>
           <Button
+            data-flow-target="Button:Back to Home"
+            variant="primary"
             size="lg"
             className="w-full"
-            data-flow-target="Button:Back to Home"
           >
             {t('backToHome')}
           </Button>
@@ -80,7 +121,8 @@ export default function PrescriptionConfirmationScreen({
     )
   }
 
-  /* ─── Review / Submitting State ─── */
+  const isSubmitting = state === 'submitting'
+
   return (
     <>
       <ScreenHeader
@@ -88,107 +130,97 @@ export default function PrescriptionConfirmationScreen({
         data-flow-target="ScreenHeader:Review & Confirm"
       />
 
-      <Stepper current={4} steps={steps} />
+      <Stack gap="lg" className="p-4 pb-20">
+        {/* Stepper */}
+        <Stepper currentStep={3} t={t} />
 
-      <Stack gap="md" className="p-4 pb-20">
         {/* Prescriptions Section */}
         <div>
-          <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">
+          <p className="mb-2 text-xs font-semibold tracking-wider text-charcoal-400">
             {t('prescriptionsSection').toUpperCase()}
           </p>
           <Card className="overflow-hidden p-0">
             {prescriptions.map((rx, i) => (
-              <ListItem
+              <div
                 key={i}
-                icon="💊"
-                label={rx.medication}
-                description={rx.dosage}
-                trailing={<span />}
-              />
+                className={
+                  i < prescriptions.length - 1
+                    ? 'border-b border-cream-300 px-4 py-3'
+                    : 'px-4 py-3'
+                }
+              >
+                <p className="text-sm font-medium text-charcoal-500">{rx.medication}</p>
+                <p className="text-xs text-slate-500">{rx.dosage}</p>
+              </div>
             ))}
           </Card>
         </div>
 
         {/* Delivery Section */}
         <div>
-          <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">
+          <p className="mb-2 text-xs font-semibold tracking-wider text-charcoal-400">
             {t('deliverySection').toUpperCase()}
           </p>
           <Card className="overflow-hidden p-0">
-            <ListItem
-              icon={deliveryMethod === 'pickup' ? '🏪' : '🚚'}
-              label={deliveryLabel}
-              trailing={
-                <button className="text-xs font-medium text-teal-600">
-                  {t('edit')}
-                </button>
-              }
-            />
-            <ListItem
-              icon="📍"
-              label={locationLabel}
-              description={locationDetail}
-              trailing={
-                <button className="text-xs font-medium text-teal-600">
-                  {t('edit')}
-                </button>
-              }
-            />
-            <ListItem
-              icon="🕐"
-              label={timeline}
-              trailing={<span />}
-            />
+            {/* Delivery method row */}
+            <div className="flex items-center justify-between border-b border-cream-300 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-charcoal-500">{deliveryLabel}</p>
+              </div>
+              <span className="text-xs font-medium text-teal-600">{t('edit')}</span>
+            </div>
+
+            {/* Location/address row */}
+            <div className="flex items-center justify-between border-b border-cream-300 px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-charcoal-500">{locationLabel}</p>
+                {locationDetail && (
+                  <p className="text-xs text-slate-500">{locationDetail}</p>
+                )}
+              </div>
+              <span className="text-xs font-medium text-teal-600">{t('edit')}</span>
+            </div>
+
+            {/* Timeline row */}
+            <div className="px-4 py-3">
+              <p className="text-sm text-charcoal-500">{timeline}</p>
+            </div>
           </Card>
         </div>
 
         {/* Insurance Section */}
         <div>
-          <p className="mb-2 text-xs font-semibold tracking-wider text-slate-400">
+          <p className="mb-2 text-xs font-semibold tracking-wider text-charcoal-400">
             {t('insuranceSection').toUpperCase()}
           </p>
           <Card className="overflow-hidden p-0">
-            <ListItem
-              icon="🏥"
-              label={insurer}
-              description={t('memberId', { id: memberId })}
-              trailing={<span />}
-            />
+            <div className="px-4 py-3">
+              <p className="text-sm font-medium text-charcoal-500">{insurer}</p>
+              <p className="text-xs text-slate-500">{t('memberId', { id: mId })}</p>
+            </div>
           </Card>
         </div>
 
         {/* Consent Checkbox */}
-        <div className="flex items-start gap-3 px-1">
+        <div className="flex items-center gap-3">
           <div
-            className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded border-2 text-xs ${
-              consentChecked
-                ? 'border-teal-500 bg-teal-500 text-white'
-                : 'border-slate-300'
-            }`}
+            className={`flex size-5 items-center justify-center rounded border-2 ${consentChecked ? 'border-teal-500 bg-teal-500' : 'border-slate-300'}`}
           >
-            {consentChecked && '✓'}
+            {consentChecked && <span className="text-xs text-white">✓</span>}
           </div>
-          <span className="text-sm text-charcoal-400">
-            {t('consent')}
-          </span>
+          <span className="text-sm text-charcoal-500">{t('consent')}</span>
         </div>
       </Stack>
 
       <Footer>
         <Button
-          size="lg"
-          variant={consentChecked && !isSubmitting ? 'primary' : 'secondary'}
-          className={`w-full ${!consentChecked || isSubmitting ? 'opacity-50' : ''}`}
           data-flow-target="Button:Confirm Redemption"
+          variant="primary"
+          size="lg"
+          className="w-full"
+          disabled={!consentChecked || isSubmitting}
         >
-          {isSubmitting ? (
-            <span className="flex items-center gap-2">
-              <Loader2 className="size-4 animate-spin" />
-              {t('submitting')}
-            </span>
-          ) : (
-            t('confirmBtn')
-          )}
+          {isSubmitting ? t('submitting') : t('confirmBtn')}
         </Button>
       </Footer>
     </>

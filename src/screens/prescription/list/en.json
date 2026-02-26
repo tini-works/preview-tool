@@ -1,16 +1,14 @@
 {
-  "flowTitle": "Redeem Prescription",
-  "steps": {
-    "scan": "Scan",
-    "select": "Select",
-    "delivery": "Delivery",
-    "location": "Location",
-    "confirm": "Confirm"
-  },
   "title": "Your Prescriptions",
+  "stepScan": "Scan",
+  "stepSelect": "Select",
+  "stepDelivery": "Delivery",
+  "stepConfirm": "Confirm",
+  "insurerLabel": "Insurance",
   "selectAll": "Select all ({{count}} prescriptions)",
   "selectedCount": "{{selected}} of {{total}} selected",
-  "noResults": "No prescriptions found for your insurance card.",
+  "noResults": "No prescriptions found",
+  "noResultsHint": "Scan a prescription to get started.",
   "statusReady": "Ready",
   "statusPending": "Pending",
   "statusExpired": "Expired",

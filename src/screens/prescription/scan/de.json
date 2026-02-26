@@ -1,19 +1,15 @@
 {
-  "flowTitle": "Rezept einlösen",
-  "steps": {
-    "scan": "Scannen",
-    "select": "Auswahl",
-    "delivery": "Lieferung",
-    "location": "Standort",
-    "confirm": "Bestätigen"
-  },
   "title": "Rezept einlösen",
+  "stepScan": "Scannen",
+  "stepSelect": "Auswählen",
+  "stepDelivery": "Lieferung",
+  "stepConfirm": "Bestätigen",
   "instruction": "Halten Sie Ihre Versichertenkarte an Ihr Telefon",
-  "subtitle": "Legen Sie Ihre eGK (elektronische Gesundheitskarte) auf die Rückseite Ihres Geräts",
+  "subtitle": "Legen Sie Ihre eGK auf die Rückseite Ihres Geräts",
   "scanning": "Karte wird gelesen...",
   "success": "Karte verifiziert!",
   "error": "Karte nicht erkannt. Bitte versuchen Sie es erneut.",
   "simulateBtn": "NFC-Scan simulieren",
   "tryAgainBtn": "Erneut versuchen",
-  "poweredBy": "Powered by APO group"
+  "poweredBy": "Betrieben von APO group"
 }

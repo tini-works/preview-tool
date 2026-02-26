@@ -1,8 +1,8 @@
 import type { FlowAction } from '@/flow/types'
 
 export const actions: FlowAction[] = [
-  { trigger: 'RadioCard:Home Delivery', setState: 'home-delivery' },
-  { trigger: 'RadioCard:Apotheke Pickup', setState: 'apotheke-pickup' },
-  { trigger: 'Button:Continue', navigate: '/prescription/location', navigateState: 'pickup-selected' },
-  { trigger: 'ScreenHeader:Delivery Method', navigate: '/prescription/list', navigateState: 'populated' },
+  { trigger: 'RadioCard:Home Delivery', setRegionState: { region: 'delivery', state: 'home-delivery-prefilled' } },
+  { trigger: 'RadioCard:Apotheke Pickup', setRegionState: { region: 'delivery', state: 'apotheke-loading' } },
+  { trigger: 'Button:Continue', navigate: '/prescription/confirmation', navigateState: 'review-pickup' },
+  { trigger: 'ScreenHeader:Delivery', navigate: '/prescription/list', navigateState: 'populated' },
 ]

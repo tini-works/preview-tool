@@ -8,7 +8,7 @@ export const scenarios = {
     data: { state: 'idle' } satisfies PrescriptionScanData,
   },
   scanning: {
-    label: 'Scanning NFC card',
+    label: 'Scanning insurance card',
     data: { state: 'scanning' } satisfies PrescriptionScanData,
   },
   success: {

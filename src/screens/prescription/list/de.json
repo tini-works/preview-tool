@@ -1,16 +1,14 @@
 {
-  "flowTitle": "Rezept einlösen",
-  "steps": {
-    "scan": "Scannen",
-    "select": "Auswahl",
-    "delivery": "Lieferung",
-    "location": "Standort",
-    "confirm": "Bestätigen"
-  },
   "title": "Ihre Rezepte",
+  "stepScan": "Scannen",
+  "stepSelect": "Auswahl",
+  "stepDelivery": "Lieferung",
+  "stepConfirm": "Bestätigung",
+  "insurerLabel": "Versicherung",
   "selectAll": "Alle auswählen ({{count}} Rezepte)",
   "selectedCount": "{{selected}} von {{total}} ausgewählt",
-  "noResults": "Keine Rezepte für Ihre Versichertenkarte gefunden.",
+  "noResults": "Keine Rezepte gefunden",
+  "noResultsHint": "Scannen Sie ein Rezept, um zu beginnen.",
   "statusReady": "Bereit",
   "statusPending": "Ausstehend",
   "statusExpired": "Abgelaufen",

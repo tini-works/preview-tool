@@ -1,15 +1,11 @@
 {
-  "flowTitle": "Redeem Prescription",
-  "steps": {
-    "scan": "Scan",
-    "select": "Select",
-    "delivery": "Delivery",
-    "location": "Location",
-    "confirm": "Confirm"
-  },
   "title": "Redeem Prescription",
+  "stepScan": "Scan",
+  "stepSelect": "Select",
+  "stepDelivery": "Delivery",
+  "stepConfirm": "Confirm",
   "instruction": "Hold your insurance card near your phone",
-  "subtitle": "Place your eGK (elektronische Gesundheitskarte) on the back of your device",
+  "subtitle": "Place your eGK on the back of your device",
   "scanning": "Reading card...",
   "success": "Card verified!",
   "error": "Card not recognized. Please try again.",
