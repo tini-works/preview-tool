@@ -1,0 +1,22 @@
+{
+  "title": "My Profile",
+  "personalInfo": "Personal Information",
+  "fullName": "Full name",
+  "dateOfBirth": "Date of birth",
+  "gender": "Gender",
+  "phone": "Phone",
+  "email": "Email",
+  "address": "Address",
+  "insurance": "Insurance",
+  "noInsurance": "No insurance cards added yet.",
+  "familyMembers": "Family Members",
+  "noFamily": "No family members added yet.",
+  "addFamilyMember": "Add family member",
+  "settings": "Settings",
+  "language": "Language",
+  "notifications": "Notifications",
+  "notificationsOn": "On",
+  "notificationsOff": "Off",
+  "editProfile": "Edit Profile",
+  "loading": "Loading your profile..."
+}
