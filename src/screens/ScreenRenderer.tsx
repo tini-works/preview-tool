@@ -29,12 +29,13 @@ function assembleRegionData(
     const stateData = region.states[activeState] ?? region.states[region.defaultState] ?? {}
     data = { ...data, ...stateData }
 
-    if (region.isList && regionListCounts[key] != null && region.mockItems) {
+    if (region.isList && region.mockItems) {
       const listField = Object.keys(stateData).find(
         (k) => Array.isArray(stateData[k])
       )
       if (listField) {
-        data = { ...data, [listField]: region.mockItems.slice(0, regionListCounts[key]) }
+        const count = regionListCounts[key] ?? region.defaultCount ?? region.mockItems.length
+        data = { ...data, [listField]: region.mockItems.slice(0, count) }
       }
     }
   }

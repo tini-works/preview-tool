@@ -20,6 +20,7 @@ export interface RegionDefinition {
   defaultState: string
   isList?: boolean
   mockItems?: unknown[]
+  defaultCount?: number
 }
 
 export type RegionsMap = Record<string, RegionDefinition>

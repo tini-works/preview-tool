@@ -148,6 +148,7 @@ export function InspectorPanel() {
                   defaultState={region.defaultState}
                   isList={region.isList}
                   mockItems={region.mockItems}
+                  defaultCount={region.defaultCount}
                   activeState={regionStates[key] ?? region.defaultState}
                   listCount={regionListCounts[key]}
                   onStateChange={(state) => setRegionState(key, state)}
@@ -283,6 +284,7 @@ function RegionGroup({
   defaultState,
   isList,
   mockItems,
+  defaultCount,
   activeState,
   listCount,
   onStateChange,
@@ -294,6 +296,7 @@ function RegionGroup({
   defaultState: string
   isList?: boolean
   mockItems?: unknown[]
+  defaultCount?: number
   activeState: string
   listCount?: number
   onStateChange: (state: string) => void
@@ -301,7 +304,7 @@ function RegionGroup({
 }) {
   const stateKeys = Object.keys(states)
   const maxItems = mockItems?.length ?? 0
-  const currentCount = listCount ?? maxItems
+  const currentCount = listCount ?? defaultCount ?? maxItems
 
   // Suppress unused variable warnings for props used only for keying
   void regionKey
