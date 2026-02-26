@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/select'
 import { useDevToolsStore } from '@/devtools/useDevToolsStore'
 import { getAllDevices, getDevice, type DeviceType } from '@/preview/device-frames'
-import { useContentModules } from '@/content/useContentModules'
+import { useScreenModules } from '@/screens/useScreenModules'
 
 export function DevToolsBar() {
   const activeDevice = useDevToolsStore((s) => s.activeDevice)
@@ -23,10 +23,10 @@ export function DevToolsBar() {
   const responsiveWidth = useDevToolsStore((s) => s.responsiveWidth)
   const responsiveHeight = useDevToolsStore((s) => s.responsiveHeight)
 
-  const modules = useContentModules()
+  const modules = useScreenModules()
   const currentModule = modules.find((m) => m.route === selectedRoute)
-  const states = currentModule?.frontmatter?.states
-  const stateKeys = states ? Object.keys(states) : []
+  const scenarios = currentModule?.scenarios
+  const stateKeys = scenarios ? Object.keys(scenarios) : []
 
   const device = getDevice(activeDevice)
   const displayWidth =
