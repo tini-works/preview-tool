@@ -17,7 +17,7 @@ Dependencies flow one direction: **tokens → ui → blocks → screens**. Never
 | L1 Tokens | `src/tokens/` | Read-only | Exists | Design values (colors, spacing, radii) as TS constants and CSS custom properties |
 | L2 UI | `src/components/ui/` | Read-only | Exists | Generic React primitives (Button, Input, Card) — domain-free, no business logic |
 | L3 Blocks | `src/blocks/` | Read-only | Active | Composed, data-driven patterns from L2 — domain-aware, opinionated layout |
-| App | `src/screens/{section}/{screen}/` | **Writable** | Active | One-off screen layouts importing L2 + L3, with co-located locale JSON |
+| App | `src/screens/{section}/{screen}/` | **Writable** | Active | One-off screen layouts importing L2 + L3, with co-located locale JSON and flags |
 
 ### Available L3 Blocks
 
@@ -62,11 +62,40 @@ When a screen spec calls for a pattern not covered by existing blocks, build the
 - If a scaffolding or read-only file needs changes, ask the user first
 - Every screen must include `scenarios.ts` — it drives both the dev tools UI and E2E tests
 - Every screen must include a co-located `.spec.ts` with one test per scenario/region state — follow existing screen patterns
+- `flags.ts` is optional — include it for screens with toggleable UI sections (see Feature Flags below)
 - `flow.ts` is optional — include it for screens with click-driven navigation or state transitions
 - Interactive elements with flow triggers must have `data-flow-target="ComponentType:Label"` attributes (e.g., `data-flow-target="Button:Continue"`)
 - List regions must have ≥ 10 `mockItems` and set `defaultCount: 3` — inspector loads showing 3, user can slide up to full set
 - Table regions must have ≥ 100 `mockItems` (10 pages × 10 rows) and set `defaultCount: 10`
 - Every region with `isList: true` must set `defaultCount`
+
+### Feature Flags
+
+Feature flags are **co-located per screen** — no global config file. Each screen that needs toggleable sections defines a `flags.ts` in its folder:
+
+```
+src/screens/booking/search/
+  ├── index.tsx       (consumes flags via props)
+  ├── scenarios.ts    (mock data + regions)
+  ├── flags.ts        (feature flag definitions)
+  ├── en.json / de.json
+```
+
+```typescript
+// src/screens/booking/search/flags.ts
+import type { FlagDefinition } from '@/screens/types'
+
+export const flags: Record<string, FlagDefinition> = {
+  showRecentSearches: { label: 'Recent Searches', default: true },
+}
+```
+
+**Rules:**
+- Never create a centralized flag config — flags belong in the screen folder
+- Flags are auto-discovered via `import.meta.glob('/src/screens/**/flags.ts')` in `useScreenModules.ts`
+- Screen components receive flags as `flags?: Record<string, boolean>` prop
+- Use `flags?.showXxx !== false && (...)` for conditional rendering
+- InspectorPanel automatically shows toggles for discovered flags
 
 ## Tech Stack (strict — do not deviate)
 
