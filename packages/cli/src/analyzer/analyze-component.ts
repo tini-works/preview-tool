@@ -40,39 +40,7 @@ function analyzeMvcScreen(
   }
 
   const sourceFile = project.addSourceFileAtPath(screen.modelFile)
-  const interfaces = sourceFile.getInterfaces()
-
-  for (const iface of interfaces) {
-    const properties = iface.getProperties()
-
-    for (const prop of properties) {
-      const propName = prop.getName()
-      const propType = prop.getType()
-      const typeText = propType.getText()
-
-      const region = inferRegionFromProperty(propName, typeText, prop)
-      if (region) {
-        regions[region.key] = region
-      }
-    }
-  }
-
-  // Also check for type aliases
-  const typeAliases = sourceFile.getTypeAliases()
-  for (const alias of typeAliases) {
-    const typeNode = alias.getTypeNode()
-    if (typeNode && typeNode.getKind() === SyntaxKind.TypeLiteral) {
-      const properties = typeNode.getDescendantsOfKind(SyntaxKind.PropertySignature)
-      for (const prop of properties) {
-        const propName = prop.getName()
-        const typeText = prop.getType().getText()
-        const region = inferRegionFromProperty(propName, typeText, prop)
-        if (region) {
-          regions[region.key] = region
-        }
-      }
-    }
-  }
+  analyzeInterfacesAndTypes(sourceFile, regions)
 
   return { screen, regions, flows }
 }
@@ -86,12 +54,20 @@ function analyzeMonolithicScreen(
 
   const sourceFile = project.addSourceFileAtPath(screen.filePath)
 
-  // Find useState calls
-  const useStateCalls = findUseStateCalls(sourceFile)
-  for (const stateCall of useStateCalls) {
-    const region = inferRegionFromState(stateCall)
-    if (region) {
-      regions[region.key] = region
+  // Strategy 1: Find the data prop type of the default export component
+  const dataTypeRegions = analyzeDataPropType(project, sourceFile, screen)
+  if (Object.keys(dataTypeRegions).length > 0) {
+    Object.assign(regions, dataTypeRegions)
+  }
+
+  // Strategy 2: Find useState calls (for screens that manage their own state)
+  if (Object.keys(regions).length === 0) {
+    const useStateCalls = findUseStateCalls(sourceFile)
+    for (const stateCall of useStateCalls) {
+      const region = inferRegionFromState(stateCall)
+      if (region) {
+        regions[region.key] = region
+      }
     }
   }
 
@@ -100,6 +76,126 @@ function analyzeMonolithicScreen(
   flows.push(...navigationFlows)
 
   return { screen, regions, flows }
+}
+
+/**
+ * Analyzes the default export component's `data` prop type.
+ * Follows type references to find the full interface definition.
+ * E.g.: `export default function Screen({ data }: { data: ProfileData })`
+ *   → resolves ProfileData → generates regions from its properties.
+ */
+function analyzeDataPropType(
+  project: Project,
+  sourceFile: SourceFile,
+  screen: DiscoveredScreen
+): Record<string, AnalyzedRegion> {
+  const regions: Record<string, AnalyzedRegion> = {}
+
+  // Find default export function
+  const defaultExport = sourceFile.getDefaultExportSymbol()
+  if (!defaultExport) return regions
+
+  const declarations = defaultExport.getDeclarations()
+  if (declarations.length === 0) return regions
+
+  const decl = declarations[0]
+
+  // Look for the function parameters
+  let parameterTypes: { name: string; typeText: string }[] = []
+
+  // Check if it's a function declaration
+  const funcDecl = decl.asKind(SyntaxKind.FunctionDeclaration)
+  if (funcDecl) {
+    parameterTypes = extractDataPropPropertiesFromParams(funcDecl.getParameters(), sourceFile)
+  }
+
+  // Check if it's a variable declaration (arrow function export)
+  if (parameterTypes.length === 0) {
+    const varDecl = decl.asKind(SyntaxKind.VariableDeclaration)
+    if (varDecl) {
+      const init = varDecl.getInitializer()
+      const arrowFunc = init?.asKind(SyntaxKind.ArrowFunction)
+      if (arrowFunc) {
+        parameterTypes = extractDataPropPropertiesFromParams(arrowFunc.getParameters(), sourceFile)
+      }
+    }
+  }
+
+  for (const { name, typeText } of parameterTypes) {
+    const region = inferRegionFromProperty(name, typeText)
+    if (region) {
+      regions[region.key] = region
+    }
+  }
+
+  return regions
+}
+
+function extractDataPropPropertiesFromParams(
+  params: { getType(): import('ts-morph').Type }[],
+  sourceFile: SourceFile,
+): { name: string; typeText: string }[] {
+  const results: { name: string; typeText: string }[] = []
+
+  for (const param of params) {
+    const paramType = param.getType()
+    const props = paramType.getProperties()
+
+    // Look for `data` property in the destructured parameter
+    const dataProp = props.find(p => p.getName() === 'data')
+    if (!dataProp) continue
+
+    // Get the type of the `data` property
+    const dataType = dataProp.getTypeAtLocation(sourceFile)
+
+    // Get the data type's properties (e.g. ProfileData { isLoading, user, ... })
+    const dataProps = dataType.getProperties()
+    for (const dp of dataProps) {
+      const propType = dp.getTypeAtLocation(sourceFile)
+      results.push({ name: dp.getName(), typeText: propType.getText() })
+    }
+  }
+
+  return results
+}
+
+/**
+ * Analyze interfaces and type aliases in a source file.
+ */
+function analyzeInterfacesAndTypes(
+  sourceFile: SourceFile,
+  regions: Record<string, AnalyzedRegion>
+): void {
+  const interfaces = sourceFile.getInterfaces()
+
+  for (const iface of interfaces) {
+    const properties = iface.getProperties()
+    for (const prop of properties) {
+      const propName = prop.getName()
+      const propType = prop.getType()
+      const typeText = propType.getText()
+      const region = inferRegionFromProperty(propName, typeText)
+      if (region) {
+        regions[region.key] = region
+      }
+    }
+  }
+
+  const typeAliases = sourceFile.getTypeAliases()
+  for (const alias of typeAliases) {
+    const typeNode = alias.getTypeNode()
+    if (typeNode && typeNode.getKind() === SyntaxKind.TypeLiteral) {
+      const properties = typeNode.getDescendantsOfKind(SyntaxKind.PropertySignature)
+      for (const prop of properties) {
+        const propName = prop.getName()
+        const typeText = prop.getType().getText()
+        const region = inferRegionFromProperty(propName, typeText)
+        if (region) {
+          regions[region.key] = region
+        }
+      }
+    }
+  }
 }
 
 interface UseStateInfo {
@@ -117,14 +213,12 @@ function findUseStateCalls(sourceFile: SourceFile): UseStateInfo[] {
     const expression = call.getExpression()
     if (expression.getText() !== 'useState') continue
 
-    // Get the variable declaration
     const parent = call.getParent()
     if (!parent) continue
 
     const grandParent = parent.getParent()
     if (!grandParent) continue
 
-    // Try to get destructured name [foo, setFoo] = useState(...)
     const arrayBinding = grandParent.getFirstDescendantByKind(
       SyntaxKind.ArrayBindingPattern
     )
@@ -137,13 +231,11 @@ function findUseStateCalls(sourceFile: SourceFile): UseStateInfo[] {
       }
     }
 
-    // Get type argument if present
     const typeArgs = call.getTypeArguments()
     let type = 'unknown'
     if (typeArgs.length > 0) {
       type = typeArgs[0].getText()
     } else {
-      // Infer from initial value
       const args = call.getArguments()
       if (args.length > 0) {
         const argText = args[0].getText()
@@ -174,7 +266,6 @@ function findNavigationFlows(sourceFile: SourceFile): AnalyzedFlow[] {
       if (args.length > 0) {
         const target = args[0].getText().replace(/['"]/g, '')
 
-        // Try to find the trigger (onClick handler parent)
         const ancestor = findClickHandlerAncestor(call)
         const trigger = ancestor ?? `Navigate to ${target}`
 
@@ -209,7 +300,6 @@ function findClickHandlerAncestor(node: { getParent(): unknown }): string | null
 function inferRegionFromProperty(
   propName: string,
   typeText: string,
-  _prop: PropertySignature
 ): AnalyzedRegion | null {
   const label = formatLabel(propName)
 
@@ -272,6 +362,18 @@ function inferRegionFromProperty(
     }
   }
 
+  // Complex object types — generate mock with default state
+  if (!typeText.startsWith('(') && typeText !== 'unknown') {
+    return {
+      key: propName,
+      label,
+      states: {
+        default: { [propName]: generateMockValue(propName, typeText) },
+      },
+      defaultState: 'default',
+    }
+  }
+
   return null
 }
 
@@ -279,7 +381,6 @@ function inferRegionFromState(stateInfo: UseStateInfo): AnalyzedRegion | null {
   const { name, type, initialValue } = stateInfo
   const label = formatLabel(name)
 
-  // Loading states
   if (name.startsWith('is') || name.startsWith('has') || type === 'boolean') {
     return {
       key: name,
@@ -292,7 +393,6 @@ function inferRegionFromState(stateInfo: UseStateInfo): AnalyzedRegion | null {
     }
   }
 
-  // Array states
   if (type.endsWith('[]') || initialValue === '[]') {
     const mockItems = generateMockArray(name, 10)
     return {
@@ -309,7 +409,6 @@ function inferRegionFromState(stateInfo: UseStateInfo): AnalyzedRegion | null {
     }
   }
 
-  // Null initial value
   if (initialValue === 'null' || initialValue === 'undefined') {
     return {
       key: name,
@@ -337,7 +436,6 @@ function inferTypeFromValue(value: string): string {
 }
 
 function formatLabel(name: string): string {
-  // Convert camelCase to Title Case
   return name
     .replace(/([A-Z])/g, ' $1')
     .replace(/^./, (s) => s.toUpperCase())

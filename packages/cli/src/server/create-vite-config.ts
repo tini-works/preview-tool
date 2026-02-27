@@ -1,17 +1,38 @@
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 import type { PreviewConfig } from '../lib/config.js'
 import { PREVIEW_DIR } from '../lib/config.js'
 
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+/**
+ * Resolve the @preview-tool/runtime package root.
+ */
+function resolveRuntimePath(): string {
+  const require = createRequire(import.meta.url)
+  const runtimeEntry = require.resolve('@preview-tool/runtime')
+  let dir = dirname(runtimeEntry)
+  for (let i = 0; i < 5; i++) {
+    try {
+      require.resolve(join(dir, 'package.json'))
+      return dir
+    } catch {
+      dir = dirname(dir)
+    }
+  }
+  return dirname(runtimeEntry)
+}
+
 /**
  * Creates a Vite InlineConfig for the preview dev server.
- * Dynamically requires @vitejs/plugin-react from the host project.
  */
 export async function createViteConfig(
   cwd: string,
   config: PreviewConfig
 ): Promise<Record<string, unknown>> {
   const previewDir = join(cwd, PREVIEW_DIR)
+  const runtimeRoot = resolveRuntimePath()
 
   // Dynamically import the React plugin from host project
   let reactPlugin: unknown = null
@@ -24,23 +45,43 @@ export async function createViteConfig(
     console.warn('Warning: @vitejs/plugin-react not found. Install it in your project.')
   }
 
-  const plugins = reactPlugin ? [reactPlugin] : []
+  // Try to load host project's Tailwind CSS v4 vite plugin
+  let tailwindPlugin: unknown = null
+  try {
+    const require = createRequire(join(cwd, 'package.json'))
+    const tailwindcss = require('@tailwindcss/vite')
+    const factory = tailwindcss.default ?? tailwindcss
+    tailwindPlugin = factory()
+  } catch {
+    // Tailwind CSS v4 vite plugin not available
+  }
+
+  const plugins = [
+    ...(tailwindPlugin ? [tailwindPlugin] : []),
+    ...(reactPlugin ? [reactPlugin] : []),
+  ]
 
   return {
     root: previewDir,
     server: {
       port: config.port,
       open: true,
+      fs: {
+        allow: [cwd, runtimeRoot, previewDir],
+      },
     },
     resolve: {
       alias: {
+        '@preview-tool/runtime': join(runtimeRoot, 'src', 'index.ts'),
         '@host': join(cwd, 'src'),
         '@preview': previewDir,
+        '@/': join(cwd, 'src') + '/',
+        '@': join(cwd, 'src'),
       },
     },
     plugins,
     optimizeDeps: {
-      include: ['react', 'react-dom'],
+      include: ['react', 'react-dom', 'zustand'],
     },
   }
 }
