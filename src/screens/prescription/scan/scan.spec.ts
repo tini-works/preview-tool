@@ -7,23 +7,23 @@ test.describe('prescription/scan', () => {
     await screen.select('prescription/scan')
   })
 
-  test('idle — renders without error', async ({ screen }) => {
-    await screen.switchState('idle')
+  test('scan:idle — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Scan', 'idle')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('scanning — renders without error', async ({ screen }) => {
-    await screen.switchState('scanning')
+  test('scan:scanning — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Scan', 'scanning')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('success — renders without error', async ({ screen }) => {
-    await screen.switchState('success')
+  test('scan:success — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Scan', 'success')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('error — renders without error', async ({ screen }) => {
-    await screen.switchState('error')
+  test('scan:error — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Scan', 'error')
     await expect(screen.frame).not.toBeEmpty()
   })
 })

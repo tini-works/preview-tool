@@ -2,13 +2,13 @@ export type BookingConfirmationData = {
   status: 'searching' | 'found'
 }
 
-export const scenarios = {
-  searching: {
-    label: 'Finding a doctor match',
-    data: { status: 'searching' } satisfies BookingConfirmationData,
-  },
-  found: {
-    label: 'Match found successfully',
-    data: { status: 'found' } satisfies BookingConfirmationData,
+export const regions = {
+  confirmation: {
+    label: 'Confirmation',
+    states: {
+      searching: { status: 'searching' } satisfies BookingConfirmationData,
+      found: { status: 'found' } satisfies BookingConfirmationData,
+    },
+    defaultState: 'searching',
   },
 }

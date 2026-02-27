@@ -2,17 +2,14 @@ export type BookingDoctorData = {
   view: 'browsing' | 'selected' | 'specialty-drawer'
 }
 
-export const scenarios = {
-  browsing: {
-    label: 'Viewing all doctors',
-    data: { view: 'browsing' } satisfies BookingDoctorData,
-  },
-  selected: {
-    label: 'A doctor is selected',
-    data: { view: 'selected' } satisfies BookingDoctorData,
-  },
-  'specialty-drawer': {
-    label: 'Specialty selection drawer open',
-    data: { view: 'specialty-drawer' } satisfies BookingDoctorData,
+export const regions = {
+  doctor: {
+    label: 'Doctor',
+    states: {
+      browsing: { view: 'browsing' } satisfies BookingDoctorData,
+      selected: { view: 'selected' } satisfies BookingDoctorData,
+      'specialty-drawer': { view: 'specialty-drawer' } satisfies BookingDoctorData,
+    },
+    defaultState: 'browsing',
   },
 }

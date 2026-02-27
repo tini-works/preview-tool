@@ -7,18 +7,18 @@ test.describe('booking/appointments', () => {
     await screen.select('booking/appointments')
   })
 
-  test('loaded — renders without error', async ({ screen }) => {
-    await screen.switchState('loaded')
+  test('appointments:loaded — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Appointments', 'loaded')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('empty — renders without error', async ({ screen }) => {
-    await screen.switchState('empty')
+  test('appointments:empty — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Appointments', 'empty')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('loading — renders without error', async ({ screen }) => {
-    await screen.switchState('loading')
+  test('appointments:loading — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Appointments', 'loading')
     await expect(screen.frame).not.toBeEmpty()
   })
 })

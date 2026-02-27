@@ -7,13 +7,13 @@ test.describe('booking/patient', () => {
     await screen.select('booking/patient')
   })
 
-  test('self — renders without error', async ({ screen }) => {
-    await screen.switchState('self')
+  test('patient:self — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Patient', 'self')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('family — renders without error', async ({ screen }) => {
-    await screen.switchState('family')
+  test('patient:family — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Patient', 'family')
     await expect(screen.frame).not.toBeEmpty()
   })
 })

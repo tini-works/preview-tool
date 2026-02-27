@@ -7,18 +7,18 @@ test.describe('booking/doctor', () => {
     await screen.select('booking/doctor')
   })
 
-  test('browsing — renders without error', async ({ screen }) => {
-    await screen.switchState('browsing')
+  test('doctor:browsing — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Doctor', 'browsing')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('selected — renders without error', async ({ screen }) => {
-    await screen.switchState('selected')
+  test('doctor:selected — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Doctor', 'selected')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('specialty-drawer — renders without error', async ({ screen }) => {
-    await screen.switchState('specialty-drawer')
+  test('doctor:specialty-drawer — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Doctor', 'specialty-drawer')
     await expect(screen.frame).not.toBeEmpty()
   })
 })

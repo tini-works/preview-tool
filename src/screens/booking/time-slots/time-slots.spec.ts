@@ -7,18 +7,18 @@ test.describe('booking/time-slots', () => {
     await screen.select('booking/time-slots')
   })
 
-  test('all-selected — renders without error', async ({ screen }) => {
-    await screen.switchState('all-selected')
+  test('timeSlots:all-selected — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Time Slots', 'all-selected')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('partial — renders without error', async ({ screen }) => {
-    await screen.switchState('partial')
+  test('timeSlots:partial — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Time Slots', 'partial')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('minimal — renders without error', async ({ screen }) => {
-    await screen.switchState('minimal')
+  test('timeSlots:minimal — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Time Slots', 'minimal')
     await expect(screen.frame).not.toBeEmpty()
   })
 })

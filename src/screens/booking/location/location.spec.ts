@@ -7,18 +7,18 @@ test.describe('booking/location', () => {
     await screen.select('booking/location')
   })
 
-  test('initial — renders without error', async ({ screen }) => {
-    await screen.switchState('initial')
+  test('location:initial — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Location', 'initial')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('search-results — renders without error', async ({ screen }) => {
-    await screen.switchState('search-results')
+  test('location:search-results — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Location', 'search-results')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('selected — renders without error', async ({ screen }) => {
-    await screen.switchState('selected')
+  test('location:selected — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Location', 'selected')
     await expect(screen.frame).not.toBeEmpty()
   })
 })

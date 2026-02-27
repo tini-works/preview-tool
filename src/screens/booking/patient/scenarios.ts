@@ -2,13 +2,13 @@ export type BookingPatientData = {
   selectedPatient: 'self' | 'family'
 }
 
-export const scenarios = {
-  self: {
-    label: 'Booking for self',
-    data: { selectedPatient: 'self' } satisfies BookingPatientData,
-  },
-  family: {
-    label: 'Booking for family member',
-    data: { selectedPatient: 'family' } satisfies BookingPatientData,
+export const regions = {
+  patient: {
+    label: 'Patient',
+    states: {
+      self: { selectedPatient: 'self' } satisfies BookingPatientData,
+      family: { selectedPatient: 'family' } satisfies BookingPatientData,
+    },
+    defaultState: 'self',
   },
 }

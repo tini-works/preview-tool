@@ -7,13 +7,13 @@ test.describe('booking/confirmation', () => {
     await screen.select('booking/confirmation')
   })
 
-  test('searching — renders without error', async ({ screen }) => {
-    await screen.switchState('searching')
+  test('confirmation:searching — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Confirmation', 'searching')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('found — renders without error', async ({ screen }) => {
-    await screen.switchState('found')
+  test('confirmation:found — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Confirmation', 'found')
     await expect(screen.frame).not.toBeEmpty()
   })
 })

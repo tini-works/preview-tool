@@ -7,23 +7,23 @@ test.describe('login', () => {
     await screen.select('login')
   })
 
-  test('idle — renders without error', async ({ screen }) => {
-    await screen.switchState('idle')
+  test('login:idle — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Login', 'idle')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('filling — renders without error', async ({ screen }) => {
-    await screen.switchState('filling')
+  test('login:filling — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Login', 'filling')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('error — renders without error', async ({ screen }) => {
-    await screen.switchState('error')
+  test('login:error — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Login', 'error')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('success — renders without error', async ({ screen }) => {
-    await screen.switchState('success')
+  test('login:success — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Login', 'success')
     await expect(screen.frame).not.toBeEmpty()
   })
 })

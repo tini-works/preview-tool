@@ -1,8 +1,11 @@
 export type HelloData = Record<string, never>
 
-export const scenarios = {
-  default: {
-    label: 'Default view',
-    data: {} as HelloData,
+export const regions = {
+  hello: {
+    label: 'Hello',
+    states: {
+      default: {} as HelloData,
+    },
+    defaultState: 'default',
   },
 }

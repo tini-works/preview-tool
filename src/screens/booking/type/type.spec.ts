@@ -7,18 +7,18 @@ test.describe('booking/type', () => {
     await screen.select('booking/type')
   })
 
-  test('acute — renders without error', async ({ screen }) => {
-    await screen.switchState('acute')
+  test('type:acute — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Type', 'acute')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('prevention — renders without error', async ({ screen }) => {
-    await screen.switchState('prevention')
+  test('type:prevention — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Type', 'prevention')
     await expect(screen.frame).not.toBeEmpty()
   })
 
-  test('follow-up — renders without error', async ({ screen }) => {
-    await screen.switchState('follow-up')
+  test('type:follow-up — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Type', 'follow-up')
     await expect(screen.frame).not.toBeEmpty()
   })
 })

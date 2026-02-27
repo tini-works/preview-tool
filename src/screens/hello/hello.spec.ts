@@ -7,8 +7,8 @@ test.describe('hello', () => {
     await screen.select('hello')
   })
 
-  test('default — renders without error', async ({ screen }) => {
-    await screen.switchState('default')
+  test('hello:default — renders without error', async ({ screen }) => {
+    await screen.switchRegionState('Hello', 'default')
     await expect(screen.frame).not.toBeEmpty()
   })
 })
