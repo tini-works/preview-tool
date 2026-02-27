@@ -9,7 +9,7 @@ if [ -z "${1:-}" ]; then
   exit 1
 fi
 
-SCREEN_PATH="src/screens/$1"
+SCREEN_PATH="apps/preview/src/screens/$1"
 ERRORS=0
 TMPFILE=$(mktemp)
 trap 'rm -f "$TMPFILE"' EXIT
@@ -39,7 +39,7 @@ fi
 # 2. TypeScript compiles
 echo ""
 echo "2. TypeScript compilation..."
-if pnpm exec tsc --noEmit 2>&1; then
+if pnpm --filter @preview-tool/demo exec tsc --noEmit 2>&1; then
   echo "   ✓ TypeScript compiles"
 else
   echo "   ✗ TypeScript errors"
@@ -49,7 +49,7 @@ fi
 # 3. Build succeeds
 echo ""
 echo "3. Build check..."
-if pnpm build 2>&1; then
+if pnpm --filter @preview-tool/demo build 2>&1; then
   echo "   ✓ Build succeeds"
 else
   echo "   ✗ Build failed"

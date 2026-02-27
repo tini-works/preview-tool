@@ -13,6 +13,7 @@ export const MOCK_ITEMS: Item[] = [
 export type HelloWorldData = {
   isLoading: boolean
   items: Item[]
+  lang?: string
 }
 
 export const regions = {

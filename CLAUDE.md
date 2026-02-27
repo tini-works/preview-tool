@@ -1,5 +1,21 @@
 # Preview Tool
 
+## Monorepo Structure
+
+This is a pnpm workspace monorepo. The demo app lives in `apps/preview/`. All `src/` paths below are relative to `apps/preview/`.
+
+| Directory | Purpose |
+|-----------|---------|
+| `apps/preview/` | The preview demo app (Vite + React) |
+| `packages/` | Shared packages (runtime, CLI — future) |
+| `docs/` | Project-wide documentation |
+| `.claude/` | Claude configuration and skills |
+
+Workspace commands from the repo root:
+- `pnpm dev` — start the preview app dev server
+- `pnpm build` — build the preview app
+- `pnpm test:e2e` — run E2E tests for the preview app
+
 ## Scope
 
 - Generate UI screens only — no backend code, no API endpoints, no server logic, no database schemas
@@ -42,7 +58,7 @@ When a screen spec calls for a pattern not covered by existing blocks, build the
 | `src/lib/` | Utilities (cn, etc.) — do not modify |
 | `src/main.tsx` | App entry point — do not modify |
 | `src/index.css` | Tailwind imports + CSS variables — do not modify |
-| `playwright.config.ts` | E2E test config — do not modify |
+| `apps/preview/playwright.config.ts` | E2E test config — do not modify |
 | `src/screens/_test-helpers/` | Playwright fixtures and helpers — do not modify |
 | `src/blocks/` | L3 composed blocks (DataTable, etc.) — do not modify |
 
@@ -163,13 +179,13 @@ Follow layout and component conventions in [docs/ui-patterns.md](docs/ui-pattern
 - Keep renders clean: no stray `console.log` / `console.warn` in committed code
 - Run tests during development, not just at the end:
   - All screens: `pnpm test:e2e`
-  - Single screen: `pnpm exec playwright test src/screens/{section}/{screen}/`
+  - Single screen: `pnpm --filter @preview-tool/demo exec playwright test src/screens/{section}/{screen}/`
 
 ## Verification
 
 Before declaring a screen implementation task complete:
 
-1. Confirm TypeScript compiles: `pnpm exec tsc --noEmit`
+1. Confirm TypeScript compiles: `pnpm --filter @preview-tool/demo exec tsc --noEmit`
 2. Run E2E smoke tests: `pnpm test:e2e` (auto-starts dev server)
 3. All scenario states must render without console errors
 4. Verify both locales (`de` and `en`) display correctly
@@ -183,8 +199,8 @@ For comprehensive per-screen validation (i18n coverage, flow triggers, forbidden
 
 After generating or modifying screen files, automatically run the verification pipeline and fix issues before presenting the result to the designer:
 
-1. `pnpm exec tsc --noEmit` — fix any TypeScript errors
+1. `pnpm --filter @preview-tool/demo exec tsc --noEmit` — fix any TypeScript errors
 2. `bash .claude/skills/screen-spec/references/verify-screen.sh {section}/{screen}` — fix i18n gaps, forbidden colors, missing flow triggers
-3. `pnpm exec playwright test src/screens/{section}/{screen}/` — fix any runtime/rendering errors
+3. `pnpm --filter @preview-tool/demo exec playwright test src/screens/{section}/{screen}/` — fix any runtime/rendering errors
 
 Repeat until all three pass with zero errors. Only then tell the designer the screen is ready for review.
