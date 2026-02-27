@@ -50,28 +50,53 @@ import { createRoot } from 'react-dom/client'
 import { PreviewShell, registerScreens } from '@preview-tool/runtime'
 import type { ScreenEntry } from '@preview-tool/runtime'
 
-// Auto-discover adapters via import.meta.glob
+// Auto-discover adapters and mocks via import.meta.glob
 const adapterModules = import.meta.glob('./adapters/*.adapter.ts')
 const mockModules = import.meta.glob('./mocks/*.mock.ts', { eager: true }) as Record<
   string,
   { meta: { route: string }; regions: Record<string, unknown>; flows: readonly unknown[] }
 >
 
-// Build screen entries from discovered adapters + mocks
+// Auto-discover user overrides (eager, so they're available at build time)
+const overrideModules = import.meta.glob('./overrides/*.ts', { eager: true }) as Record<
+  string,
+  { regions?: Record<string, unknown>; flows?: readonly unknown[] }
+>
+
+/**
+ * Merge override regions/flows into the base mock data.
+ * Override regions are shallow-merged by key; override flows replace entirely.
+ */
+function mergeOverrides(
+  base: { regions: Record<string, unknown>; flows: readonly unknown[] },
+  override: { regions?: Record<string, unknown>; flows?: readonly unknown[] } | undefined
+): { regions: Record<string, unknown>; flows: readonly unknown[] } {
+  if (!override) return base
+  return {
+    regions: { ...base.regions, ...(override.regions ?? {}) },
+    flows: override.flows ?? base.flows,
+  }
+}
+
+// Build screen entries from discovered adapters + mocks + overrides
 const entries: ScreenEntry[] = []
 
 for (const [adapterPath, importFn] of Object.entries(adapterModules)) {
-  // Derive mock path from adapter path
+  // Derive mock path and override path from adapter path
   const fileName = adapterPath.split('/').pop()?.replace('.adapter.ts', '') ?? ''
   const mockPath = \`./mocks/\${fileName}.mock.ts\`
+  const overridePath = \`./overrides/\${fileName}.ts\`
   const mock = mockModules[mockPath]
 
   if (!mock) continue
 
+  const override = overrideModules[overridePath]
+  const merged = mergeOverrides(mock, override)
+
   entries.push({
     route: mock.meta.route,
     module: importFn as () => Promise<{ default: React.ComponentType<{ data: unknown; flags?: Record<string, boolean> }> }>,
-    regions: mock.regions as ScreenEntry['regions'],
+    regions: merged.regions as ScreenEntry['regions'],
   })
 }
 

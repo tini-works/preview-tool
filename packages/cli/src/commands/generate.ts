@@ -1,4 +1,5 @@
 import { Command } from 'commander'
+import { resolve } from 'node:path'
 import chalk from 'chalk'
 import { readConfig } from '../lib/config.js'
 import { generateAll } from '../generator/index.js'
@@ -7,7 +8,7 @@ export const generateCommand = new Command('generate')
   .description('Discover screens and generate preview artifacts')
   .option('-c, --cwd <path>', 'Working directory', process.cwd())
   .action(async (options: { cwd: string }) => {
-    const cwd = options.cwd
+    const cwd = resolve(options.cwd)
 
     console.log(chalk.bold('\nPreview Tool — Generate\n'))
 
@@ -23,6 +24,9 @@ export const generateCommand = new Command('generate')
       console.log(`  Screens found:     ${result.screensFound}`)
       console.log(`  Mocks generated:   ${result.mocksGenerated}`)
       console.log(`  Adapters generated: ${result.adaptersGenerated}`)
+      if (result.overridesSkipped > 0) {
+        console.log(`  Overrides skipped:  ${result.overridesSkipped}`)
+      }
 
       if (result.analyses.length > 0) {
         console.log('')

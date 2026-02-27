@@ -11,35 +11,45 @@ const PREVIEW_SUBDIRS = ['adapters', 'mocks', 'interceptors', 'overrides'] as co
 
 export const initCommand = new Command('init')
   .description('Initialize preview tool in current project')
-  .action(async () => {
+  .option('-y, --yes', 'Accept defaults without prompting')
+  .action(async (options: { yes?: boolean }) => {
     const cwd = process.cwd()
 
     console.log(chalk.bold('\nPreview Tool — Init\n'))
 
-    const response = await prompts([
-      {
-        type: 'text',
-        name: 'screenGlob',
-        message: 'Screen file glob pattern',
-        initial: DEFAULT_CONFIG.screenGlob,
-      },
-      {
-        type: 'number',
-        name: 'port',
-        message: 'Dev server port',
-        initial: DEFAULT_CONFIG.port,
-      },
-    ])
+    let config: PreviewConfig
 
-    if (!response.screenGlob) {
-      console.log(chalk.yellow('Init cancelled.'))
-      return
-    }
+    if (options.yes) {
+      config = { ...DEFAULT_CONFIG }
+      console.log(chalk.dim('Using defaults (--yes):'))
+      console.log(chalk.dim(`  screenGlob: ${config.screenGlob}`))
+      console.log(chalk.dim(`  port: ${config.port}`))
+    } else {
+      const response = await prompts([
+        {
+          type: 'text',
+          name: 'screenGlob',
+          message: 'Screen file glob pattern',
+          initial: DEFAULT_CONFIG.screenGlob,
+        },
+        {
+          type: 'number',
+          name: 'port',
+          message: 'Dev server port',
+          initial: DEFAULT_CONFIG.port,
+        },
+      ])
 
-    const config: PreviewConfig = {
-      screenGlob: response.screenGlob as string,
-      port: (response.port as number) ?? DEFAULT_CONFIG.port,
-      title: DEFAULT_CONFIG.title,
+      if (!response.screenGlob) {
+        console.log(chalk.yellow('Init cancelled.'))
+        return
+      }
+
+      config = {
+        screenGlob: response.screenGlob as string,
+        port: (response.port as number) ?? DEFAULT_CONFIG.port,
+        title: DEFAULT_CONFIG.title,
+      }
     }
 
     // Create .preview/ directory structure
@@ -63,13 +73,13 @@ export const initCommand = new Command('init')
     }
     console.log(`  ${chalk.dim('└──')} preview.config.json`)
 
-    // Check .gitignore
-    await checkGitignore(cwd)
+    // Ensure .gitignore has preview entries
+    await ensureGitignore(cwd)
 
     console.log(chalk.green('\nDone! Run `preview generate` to discover screens.\n'))
   })
 
-async function checkGitignore(cwd: string): Promise<void> {
+async function ensureGitignore(cwd: string): Promise<void> {
   const gitignorePath = join(cwd, '.gitignore')
   const entriesToAdd = [
     '.preview/adapters',
@@ -77,21 +87,39 @@ async function checkGitignore(cwd: string): Promise<void> {
     '.preview/interceptors',
   ]
 
-  try {
-    let content = ''
-    if (existsSync(gitignorePath)) {
-      content = await readFile(gitignorePath, 'utf-8')
-    }
+  let content = ''
+  const fileExists = existsSync(gitignorePath)
 
-    const missing = entriesToAdd.filter((entry) => !content.includes(entry))
+  if (fileExists) {
+    content = await readFile(gitignorePath, 'utf-8')
+  }
 
-    if (missing.length > 0) {
-      console.log(chalk.yellow('\nConsider adding to .gitignore:'))
-      for (const entry of missing) {
-        console.log(`  ${entry}`)
-      }
-    }
-  } catch {
-    console.log(chalk.yellow('\nNo .gitignore found. Consider creating one.'))
+  const missing = entriesToAdd.filter((entry) => !content.includes(entry))
+
+  if (missing.length === 0) {
+    return
+  }
+
+  // Build the block to append
+  const block = [
+    '',
+    '# Preview Tool (auto-generated artifacts)',
+    ...missing,
+    '',
+  ].join('\n')
+
+  if (fileExists) {
+    // Append to existing .gitignore — ensure we start on a new line
+    const separator = content.endsWith('\n') ? '' : '\n'
+    await writeFile(gitignorePath, content + separator + block, 'utf-8')
+    console.log(chalk.green('\nUpdated .gitignore with preview entries:'))
+  } else {
+    // Create new .gitignore
+    await writeFile(gitignorePath, block.trimStart() + '\n', 'utf-8')
+    console.log(chalk.green('\nCreated .gitignore with preview entries:'))
+  }
+
+  for (const entry of missing) {
+    console.log(`  ${chalk.dim(entry)}`)
   }
 }

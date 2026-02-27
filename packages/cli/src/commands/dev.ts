@@ -1,7 +1,7 @@
 import { Command } from 'commander'
 import chalk from 'chalk'
 import { createRequire } from 'node:module'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { readConfig } from '../lib/config.js'
 import { createViteConfig } from '../server/create-vite-config.js'
 import { generateEntryFiles } from '../server/generate-entry.js'
@@ -11,7 +11,7 @@ export const devCommand = new Command('dev')
   .option('-c, --cwd <path>', 'Working directory', process.cwd())
   .option('-p, --port <port>', 'Dev server port')
   .action(async (options: { cwd: string; port?: string }) => {
-    const cwd = options.cwd
+    const cwd = resolve(options.cwd)
 
     console.log(chalk.bold('\nPreview Tool — Dev Server\n'))
 
