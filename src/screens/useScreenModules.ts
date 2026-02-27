@@ -1,13 +1,17 @@
 import { useMemo } from 'react'
-import type { ScreenEntry, ScreenModule, RegionsModule, RegionsMap } from '@/screens/types'
-import { featureFlagConfig } from '@/config/feature-flags'
+import type { ScreenEntry, ScreenModule, RegionsModule, RegionsMap, FlagDefinition } from '@/screens/types'
 
 const screenModules = import.meta.glob<ScreenModule>(
   '/src/screens/**/index.tsx'
 )
 
-const scenarioModules = import.meta.glob<RegionsModule & { flags?: Record<string, { label: string; default: boolean }> }>(
+const scenarioModules = import.meta.glob<RegionsModule & { flags?: Record<string, FlagDefinition> }>(
   '/src/screens/**/scenarios.ts',
+  { eager: true }
+)
+
+const flagModules = import.meta.glob<{ flags: Record<string, FlagDefinition> }>(
+  '/src/screens/**/flags.ts',
   { eager: true }
 )
 
@@ -17,8 +21,8 @@ function filePathToRoute(filePath: string): string {
   return `/${match[1]}`
 }
 
-function toScenariosPath(screenPath: string): string {
-  return screenPath.replace(/\/index\.tsx$/, '/scenarios.ts')
+function toCompanionPath(screenPath: string, filename: string): string {
+  return screenPath.replace(/\/index\.tsx$/, `/${filename}`)
 }
 
 export function useScreenModules(): ScreenEntry[] {
@@ -26,14 +30,16 @@ export function useScreenModules(): ScreenEntry[] {
     return Object.entries(screenModules)
       .filter(([filePath]) => !filePath.includes('/_shared/'))
       .map(([filePath, loader]) => {
-        const scenariosPath = toScenariosPath(filePath)
+        const scenariosPath = toCompanionPath(filePath, 'scenarios.ts')
+        const flagsPath = toCompanionPath(filePath, 'flags.ts')
         const scenarioMod = scenarioModules[scenariosPath]
+        const flagMod = flagModules[flagsPath]
         const route = filePathToRoute(filePath)
 
         return {
           route,
           module: loader,
-          flags: featureFlagConfig[route] ?? scenarioMod?.flags,
+          flags: flagMod?.flags ?? scenarioMod?.flags,
           regions: scenarioMod?.regions,
         }
       })
