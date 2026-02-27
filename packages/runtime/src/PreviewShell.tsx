@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useMemo } from 'react'
 import { useDevToolsStore } from './store/useDevToolsStore.ts'
 import { CatalogPanel } from './devtools/CatalogPanel.tsx'
 import { InspectorPanel } from './devtools/InspectorPanel.tsx'
@@ -16,7 +16,9 @@ interface PreviewShellProps {
 }
 
 export function PreviewShell({ screens, onLanguageChange }: PreviewShellProps) {
-  useEffect(() => {
+  // Register synchronously during render so CatalogPanel/InspectorPanel
+  // can read screens on the very first render cycle
+  useMemo(() => {
     registerScreens(screens)
   }, [screens])
 
