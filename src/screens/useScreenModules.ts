@@ -1,12 +1,12 @@
 import { useMemo } from 'react'
-import type { ScreenEntry, ScreenModule, ScenarioModule, RegionsMap } from '@/screens/types'
+import type { ScreenEntry, ScreenModule, RegionsModule, RegionsMap } from '@/screens/types'
 import { featureFlagConfig } from '@/config/feature-flags'
 
 const screenModules = import.meta.glob<ScreenModule>(
   '/src/screens/**/index.tsx'
 )
 
-const scenarioModules = import.meta.glob<ScenarioModule & { flags?: Record<string, { label: string; default: boolean }>; regions?: RegionsMap }>(
+const scenarioModules = import.meta.glob<RegionsModule & { flags?: Record<string, { label: string; default: boolean }> }>(
   '/src/screens/**/scenarios.ts',
   { eager: true }
 )
@@ -33,7 +33,6 @@ export function useScreenModules(): ScreenEntry[] {
         return {
           route,
           module: loader,
-          scenarios: scenarioMod?.scenarios ?? {},
           flags: featureFlagConfig[route] ?? scenarioMod?.flags,
           regions: scenarioMod?.regions,
         }

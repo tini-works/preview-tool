@@ -18,15 +18,10 @@ export function DevToolsBar() {
   const toggleOsMode = useDevToolsStore((s) => s.toggleOsMode)
   const selectedRoute = useDevToolsStore((s) => s.selectedRoute)
   const setSelectedRoute = useDevToolsStore((s) => s.setSelectedRoute)
-  const selectedState = useDevToolsStore((s) => s.selectedState)
-  const setSelectedState = useDevToolsStore((s) => s.setSelectedState)
   const responsiveWidth = useDevToolsStore((s) => s.responsiveWidth)
   const responsiveHeight = useDevToolsStore((s) => s.responsiveHeight)
 
   const modules = useScreenModules()
-  const currentModule = modules.find((m) => m.route === selectedRoute)
-  const scenarios = currentModule?.scenarios
-  const stateKeys = scenarios ? Object.keys(scenarios) : []
 
   const device = getDevice(activeDevice)
   const displayWidth =
@@ -81,25 +76,6 @@ export function DevToolsBar() {
             {modules.map((m) => (
               <SelectItem key={m.route} value={m.route}>
                 {m.route}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-
-      {/* State selector (only when content has states) */}
-      {stateKeys.length > 0 && (
-        <Select
-          value={selectedState ?? ''}
-          onValueChange={(value) => setSelectedState(value || null)}
-        >
-          <SelectTrigger className="w-[150px]">
-            <SelectValue placeholder="State..." />
-          </SelectTrigger>
-          <SelectContent>
-            {stateKeys.map((key) => (
-              <SelectItem key={key} value={key}>
-                {key}
               </SelectItem>
             ))}
           </SelectContent>

@@ -1,10 +1,5 @@
 import type { ComponentType } from 'react'
 
-export interface Scenario<T = unknown> {
-  label: string
-  data: T
-}
-
 export interface FlagDefinition {
   label: string
   default: boolean
@@ -29,14 +24,13 @@ export interface ScreenModule {
   default: ComponentType<{ data: unknown; flags?: Record<string, boolean> }>
 }
 
-export interface ScenarioModule {
-  scenarios: Record<string, Scenario>
+export interface RegionsModule {
+  regions: RegionsMap
 }
 
 export interface ScreenEntry {
   route: string
   module: () => Promise<ScreenModule>
-  scenarios: Record<string, Scenario>
   flags?: Record<string, FlagDefinition>
   regions?: RegionsMap
 }

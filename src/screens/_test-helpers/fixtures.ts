@@ -3,9 +3,7 @@ import { test as base, expect, type Locator } from '@playwright/test'
 type ScreenHelper = {
   /** Click a screen by path in the CatalogPanel sidebar (e.g., "scan" or "prescription/scan") */
   select: (screenPath: string) => Promise<void>
-  /** Switch state for flat-scenario screens (click state button in InspectorPanel) */
-  switchState: (stateName: string) => Promise<void>
-  /** Switch state for region-based screens (find region label, then click state button) */
+  /** Switch state for a region (find region label, then click state button) */
   switchRegionState: (regionLabel: string, stateName: string) => Promise<void>
   /** Locator scoped to the DeviceFrame content area */
   frame: Locator
@@ -43,10 +41,6 @@ export const test = base.extend<ScreenFixtures>({
         }
         // Wait for lazy-loaded screen component to render
         await page.waitForTimeout(500)
-      },
-      switchState: async (state: string) => {
-        await inspector.locator(`button:text-is("${state}")`).click()
-        await page.waitForTimeout(300)
       },
       switchRegionState: async (region: string, state: string) => {
         // DOM: <div.region-container> → <div><span>{label}</span></div> → <div><button>...</button></div>

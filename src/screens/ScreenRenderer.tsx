@@ -45,7 +45,6 @@ function assembleRegionData(
 
 interface ScreenRendererProps {
   route: string | null
-  activeState: string | null
 }
 
 interface LoadedScreen {
@@ -53,7 +52,7 @@ interface LoadedScreen {
   Component: ComponentType<{ data: unknown; flags?: Record<string, boolean> }>
 }
 
-export function ScreenRenderer({ route, activeState }: ScreenRendererProps) {
+export function ScreenRenderer({ route }: ScreenRendererProps) {
   const modules = useScreenModules()
   const fontScale = useDevToolsStore((s) => s.fontScale)
   const featureFlags = useDevToolsStore((s) => s.featureFlags)
@@ -107,23 +106,9 @@ export function ScreenRenderer({ route, activeState }: ScreenRendererProps) {
   const { Component } = loaded
   const regions = entry.regions
   const resolvedFlags = resolveFlags(entry.flags, featureFlags)
-  let data: Record<string, unknown>
-
-  if (regions && Object.keys(regions).length > 0) {
-    // Region-based path
-    data = assembleRegionData(regions, regionStates, regionListCounts)
-  } else {
-    // Legacy scenario path
-    const scenarios = entry.scenarios
-    const scenarioKeys = Object.keys(scenarios)
-    const activeScenario =
-      activeState && scenarios[activeState]
-        ? scenarios[activeState]
-        : scenarioKeys.length > 0
-          ? scenarios[scenarioKeys[0]]
-          : null
-    data = (activeScenario?.data as Record<string, unknown>) ?? {}
-  }
+  const data = regions
+    ? assembleRegionData(regions, regionStates, regionListCounts)
+    : {}
 
   return (
     <NetworkSimulationLayer key={route}>

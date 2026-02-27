@@ -11,11 +11,10 @@ interface DevToolsState {
   responsiveHeight: number
   osMode: OsMode
   selectedRoute: string | null
-  selectedState: string | null
   catalogCollapsed: boolean
   inspectorCollapsed: boolean
   playMode: boolean
-  flowHistory: Array<{ route: string; state: string | null }>
+  flowHistory: Array<{ route: string }>
   networkMode: NetworkMode
   fontScale: number
   language: string
@@ -29,15 +28,14 @@ interface DevToolsActions {
   setOsMode: (mode: OsMode) => void
   toggleOsMode: () => void
   setSelectedRoute: (route: string | null) => void
-  setSelectedState: (state: string | null) => void
   setResponsiveSize: (width: number, height: number) => void
   toggleCatalogCollapsed: () => void
   toggleInspectorCollapsed: () => void
   setPlayMode: (enabled: boolean) => void
   togglePlayMode: () => void
-  pushFlowHistory: (route: string, state: string | null) => void
+  pushFlowHistory: (route: string) => void
   resetFlowHistory: () => void
-  navigateFlow: (route: string, state: string | null) => void
+  navigateFlow: (route: string) => void
   setNetworkMode: (mode: NetworkMode) => void
   setFontScale: (scale: number) => void
   setLanguage: (lang: string) => void
@@ -56,7 +54,6 @@ const DEFAULT_STATE: DevToolsState = {
   responsiveHeight: 844,
   osMode: 'light',
   selectedRoute: null,
-  selectedState: null,
   catalogCollapsed: false,
   inspectorCollapsed: false,
   playMode: false,
@@ -90,14 +87,10 @@ export const useDevToolsStore = create<DevToolsStore>()(
           if (route === prev.selectedRoute) return {}
           return {
             selectedRoute: route,
-            selectedState: null,
             regionStates: {},
             regionListCounts: {},
           }
         }),
-
-      setSelectedState: (state) =>
-        set({ selectedState: state }),
 
       setResponsiveSize: (width, height) =>
         set({ responsiveWidth: width, responsiveHeight: height }),
@@ -117,16 +110,16 @@ export const useDevToolsStore = create<DevToolsStore>()(
           flowHistory: !state.playMode ? [] : state.flowHistory,
         })),
 
-      pushFlowHistory: (route, state) =>
+      pushFlowHistory: (route) =>
         set((prev) => ({
-          flowHistory: [...prev.flowHistory.slice(-49), { route, state }],
+          flowHistory: [...prev.flowHistory.slice(-49), { route }],
         })),
 
       resetFlowHistory: () =>
         set({ flowHistory: [] }),
 
-      navigateFlow: (route, state) =>
-        set({ selectedRoute: route, selectedState: state, regionStates: {}, regionListCounts: {} }),
+      navigateFlow: (route) =>
+        set({ selectedRoute: route, regionStates: {}, regionListCounts: {} }),
 
       setNetworkMode: (mode) =>
         set({ networkMode: mode }),

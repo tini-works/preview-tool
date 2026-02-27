@@ -22,8 +22,6 @@ export function InspectorPanel() {
   const osMode = useDevToolsStore((s) => s.osMode)
   const toggleOsMode = useDevToolsStore((s) => s.toggleOsMode)
   const selectedRoute = useDevToolsStore((s) => s.selectedRoute)
-  const selectedState = useDevToolsStore((s) => s.selectedState)
-  const setSelectedState = useDevToolsStore((s) => s.setSelectedState)
   const responsiveWidth = useDevToolsStore((s) => s.responsiveWidth)
   const responsiveHeight = useDevToolsStore((s) => s.responsiveHeight)
   const inspectorCollapsed = useDevToolsStore((s) => s.inspectorCollapsed)
@@ -47,11 +45,8 @@ export function InspectorPanel() {
 
   const modules = useScreenModules()
   const currentModule = modules.find((m) => m.route === selectedRoute)
-  const scenarios = currentModule?.scenarios
-  const stateKeys = scenarios ? Object.keys(scenarios) : []
   const currentFlags = currentModule?.flags
   const regions = currentModule?.regions
-  const hasRegions = regions && Object.keys(regions).length > 0
 
   // Sync persisted language with i18n on mount
   useEffect(() => {
@@ -145,8 +140,8 @@ export function InspectorPanel() {
           </div>
         </Section>
 
-        {/* Region-based controls (when screen exports regions) */}
-        {hasRegions && (
+        {/* Region-based controls */}
+        {regions && Object.keys(regions).length > 0 && (
           <Section title="Regions">
             <div className="flex flex-col gap-3">
               {Object.entries(regions!).map(([key, region]) => (
@@ -164,27 +159,6 @@ export function InspectorPanel() {
                   onStateChange={(state) => setRegionState(key, state)}
                   onListCountChange={(count) => setRegionListCount(key, count)}
                 />
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* Legacy state section (only when no regions and screen has scenarios) */}
-        {!hasRegions && stateKeys.length > 0 && (
-          <Section title="States">
-            <div className="flex flex-col gap-1">
-              {stateKeys.map((key) => (
-                <button
-                  key={key}
-                  onClick={() => setSelectedState(key)}
-                  className={
-                    selectedState === key
-                      ? 'rounded-md bg-neutral-900/5 px-2 py-1 text-left text-sm font-medium text-neutral-900'
-                      : 'rounded-md px-2 py-1 text-left text-sm text-neutral-600 hover:bg-neutral-50'
-                  }
-                >
-                  {key}
-                </button>
               ))}
             </div>
           </Section>

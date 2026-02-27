@@ -27,7 +27,6 @@ export function FlowProvider({ children }: FlowProviderProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
   const selectedRoute = useDevToolsStore((s) => s.selectedRoute)
-  const setSelectedState = useDevToolsStore((s) => s.setSelectedState)
   const pushFlowHistory = useDevToolsStore((s) => s.pushFlowHistory)
   const navigateFlow = useDevToolsStore((s) => s.navigateFlow)
   const setRegionState = useDevToolsStore((s) => s.setRegionState)
@@ -49,42 +48,37 @@ export function FlowProvider({ children }: FlowProviderProps) {
       e.preventDefault()
       e.stopPropagation()
 
-      const currentState = useDevToolsStore.getState().selectedState
-
       // setState (no navigation) — change state on current screen
       if (action.setState && !action.navigate) {
-        pushFlowHistory(selectedRoute, currentState)
+        pushFlowHistory(selectedRoute)
 
-        // Check if current screen uses regions
         const currentEntry = modules.find((m) => m.route === selectedRoute)
         const regions = currentEntry?.regions
-        if (regions && Object.keys(regions).length > 0) {
+        if (regions) {
           const regionKey = findRegionForState(regions, action.setState)
           if (regionKey) {
             setRegionState(regionKey, action.setState)
           }
-        } else {
-          setSelectedState(action.setState)
         }
       }
 
       // setRegionState (explicit region targeting, no navigation)
       if (action.setRegionState && !action.navigate) {
-        pushFlowHistory(selectedRoute, currentState)
+        pushFlowHistory(selectedRoute)
         setRegionState(action.setRegionState.region, action.setRegionState.state)
       }
 
       // navigate — go to another screen
       if (action.navigate) {
-        pushFlowHistory(selectedRoute, currentState)
-        navigateFlow(action.navigate, action.navigateState ?? null)
+        pushFlowHistory(selectedRoute)
+        navigateFlow(action.navigate)
 
         // If target screen uses regions and navigateState is set,
         // resolve which region contains the state and set it
         if (action.navigateState) {
           const targetEntry = modules.find((m) => m.route === action.navigate)
           const targetRegions = targetEntry?.regions
-          if (targetRegions && Object.keys(targetRegions).length > 0) {
+          if (targetRegions) {
             const regionKey = findRegionForState(targetRegions, action.navigateState)
             if (regionKey) {
               setRegionState(regionKey, action.navigateState)
@@ -93,7 +87,7 @@ export function FlowProvider({ children }: FlowProviderProps) {
         }
       }
     },
-    [actions, selectedRoute, modules, setSelectedState, pushFlowHistory, navigateFlow, setRegionState]
+    [actions, selectedRoute, modules, pushFlowHistory, navigateFlow, setRegionState]
   )
 
   return (

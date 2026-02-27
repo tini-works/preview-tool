@@ -5,12 +5,10 @@ export function PlayModeOverlay() {
   const togglePlayMode = useDevToolsStore((s) => s.togglePlayMode)
   const resetRegions = useDevToolsStore((s) => s.resetRegions)
   const resetFlowHistory = useDevToolsStore((s) => s.resetFlowHistory)
-  const setSelectedState = useDevToolsStore((s) => s.setSelectedState)
 
   const handleReset = () => {
     resetRegions()
     resetFlowHistory()
-    setSelectedState(null)
   }
 
   return (
