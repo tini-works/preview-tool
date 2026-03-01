@@ -26,11 +26,11 @@ export async function readConfig(cwd: string): Promise<PreviewConfig> {
   const configPath = join(cwd, PREVIEW_DIR, 'preview.config.json')
   try {
     const raw = await readFile(configPath, 'utf-8')
-    const parsed = JSON.parse(raw) as Partial<PreviewConfig>
+    const parsed = JSON.parse(raw) as Partial<PreviewConfig> & { llm?: Partial<LLMConfig> }
     return {
       ...DEFAULT_CONFIG,
       ...parsed,
-      llm: { ...DEFAULT_CONFIG.llm, ...((parsed as Record<string, unknown>).llm as Partial<LLMConfig> ?? {}) },
+      llm: { ...DEFAULT_CONFIG.llm, ...(parsed.llm ?? {}) },
     }
   } catch {
     return { ...DEFAULT_CONFIG }

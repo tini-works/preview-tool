@@ -1,4 +1,6 @@
 import type { LLMProvider, LLMOptions } from '../types.js'
+import { DEFAULT_LLM_TIMEOUT_MS } from '../types.js'
+import { extractJson } from '../utils.js'
 
 export function createOpenAIProvider(): LLMProvider {
   return {
@@ -14,6 +16,15 @@ export function createOpenAIProvider(): LLMProvider {
         throw new Error('OPENAI_API_KEY not set')
       }
 
+      const timeout = options.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS
+
+      // Build messages with native system role when available
+      const messages: { role: string; content: string }[] = []
+      if (options.systemPrompt) {
+        messages.push({ role: 'system', content: options.systemPrompt })
+      }
+      messages.push({ role: 'user', content: prompt })
+
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -25,8 +36,9 @@ export function createOpenAIProvider(): LLMProvider {
           max_tokens: options.maxTokens ?? 4096,
           temperature: options.temperature ?? 0.2,
           response_format: options.jsonMode ? { type: 'json_object' } : undefined,
-          messages: [{ role: 'user', content: prompt }],
+          messages,
         }),
+        signal: AbortSignal.timeout(timeout),
       })
 
       if (!response.ok) {
@@ -45,12 +57,4 @@ export function createOpenAIProvider(): LLMProvider {
       return JSON.parse(extractJson(content)) as unknown
     },
   }
-}
-
-function extractJson(text: string): string {
-  const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/)
-  if (codeBlockMatch) {
-    return codeBlockMatch[1].trim()
-  }
-  return text.trim()
 }

@@ -23,6 +23,10 @@ export function resolveTrigger(
  * DOM-based trigger matching for CLI-generated screens.
  * Matches clicks against ComponentTrigger definitions using CSS selectors
  * and text content — no data attributes required in production code.
+ *
+ * Supports `nth` field for disambiguating multiple matches of the same selector.
+ * For example, `{ selector: "button", text: "Save", nth: 1 }` matches the 2nd
+ * button containing "Save" (0-indexed).
  */
 export function matchComponentTrigger(
   target: EventTarget | null,
@@ -32,6 +36,14 @@ export function matchComponentTrigger(
   if (triggers.length === 0) return null
 
   for (const trigger of triggers) {
+    // When nth is specified, find all matching elements and check if target is the nth one
+    if (trigger.nth != null) {
+      const matches = findAllMatching(boundary, trigger)
+      const nthMatch = matches[trigger.nth]
+      if (nthMatch && isOrContains(nthMatch, target)) return trigger
+      continue
+    }
+
     let el = target instanceof HTMLElement ? target : null
 
     while (el && el !== boundary) {
@@ -51,4 +63,27 @@ export function matchComponentTrigger(
   }
 
   return null
+}
+
+function findAllMatching(
+  boundary: HTMLElement,
+  trigger: ComponentTrigger
+): HTMLElement[] {
+  const candidates = Array.from(boundary.querySelectorAll<HTMLElement>(trigger.selector))
+
+  return candidates.filter((el) => {
+    if (trigger.text) {
+      const text = el.textContent?.trim()
+      return text != null && text.includes(trigger.text)
+    }
+    if (trigger.ariaLabel) {
+      return el.getAttribute('aria-label') === trigger.ariaLabel
+    }
+    return true
+  })
+}
+
+function isOrContains(parent: HTMLElement, target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return parent === target || parent.contains(target)
 }

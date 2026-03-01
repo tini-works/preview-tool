@@ -9,12 +9,12 @@ import { generateViewFileContent } from './generate-view.js'
 import { generateModelFileContent } from './generate-model.js'
 import { generateControllerFileContent } from './generate-controller.js'
 import { callLLM } from '../llm/index.js'
-import { SYSTEM_PROMPT } from '../llm/prompts/system.js'
 import { buildGenerateMCPrompt } from '../llm/prompts/generate-mc.js'
 import { ModelOutputSchema } from '../llm/schemas/model.js'
 import { ControllerOutputSchema } from '../llm/schemas/controller.js'
 import type { PreviewConfig } from '../lib/config.js'
 import { PREVIEW_DIR } from '../lib/config.js'
+import { formatLabel } from '../lib/format-label.js'
 import type {
   DiscoveredScreen,
   ViewTree,
@@ -120,9 +120,17 @@ export async function generateAll(
       overridesSkipped++
     }
 
+    // Single LLM call per screen — shared by model and controller
+    const needsModel = !hasModelOverride
+    const needsController = !hasControllerOverride
+    let llmResult: LLMResult = { model: null, controller: null }
+    if ((needsModel || needsController) && viewTree && config.llm.provider !== 'none') {
+      llmResult = await tryLLMGeneration(screen, viewTree, cwd, config)
+    }
+
     // Generate model if no override
-    if (!hasModelOverride) {
-      const model = await buildModel(screen, viewTree, cwd, config)
+    if (needsModel) {
+      const model = llmResult.model ?? buildHeuristicModel(screen, viewTree)
       const modelMeta = {
         route: screen.route,
         pattern: screen.pattern,
@@ -134,8 +142,8 @@ export async function generateAll(
     }
 
     // Generate controller if no override
-    if (!hasControllerOverride) {
-      const controller = await buildController(screen, viewTree, cwd, config)
+    if (needsController) {
+      const controller = llmResult.controller ?? buildHeuristicController(screen, viewTree)
       const controllerContent = generateControllerFileContent(controller)
       await writeFile(join(screenOutDir, 'controller.ts'), controllerContent, 'utf-8')
       controllersGenerated++
@@ -158,52 +166,13 @@ export async function generateAll(
 }
 
 // ---------------------------------------------------------------------------
-// Build M+C via LLM with heuristic fallback
+// Build M+C via single LLM call per screen
 // ---------------------------------------------------------------------------
-
-async function buildModel(
-  screen: DiscoveredScreen,
-  viewTree: ViewTree | null,
-  cwd: string,
-  config: PreviewConfig,
-): Promise<ModelOutput> {
-  // Try LLM generation first
-  if (viewTree && config.llm.provider !== 'none') {
-    const llmResult = await tryLLMGeneration(screen, viewTree, cwd, config)
-    if (llmResult?.model) {
-      return llmResult.model
-    }
-  }
-
-  // Heuristic fallback
-  return buildHeuristicModel(screen, viewTree)
-}
-
-async function buildController(
-  screen: DiscoveredScreen,
-  viewTree: ViewTree | null,
-  cwd: string,
-  config: PreviewConfig,
-): Promise<ControllerOutput> {
-  // Try LLM generation first
-  if (viewTree && config.llm.provider !== 'none') {
-    const llmResult = await tryLLMGeneration(screen, viewTree, cwd, config)
-    if (llmResult?.controller) {
-      return llmResult.controller
-    }
-  }
-
-  // Heuristic fallback
-  return buildHeuristicController(screen, viewTree)
-}
 
 interface LLMResult {
   model: ModelOutput | null
   controller: ControllerOutput | null
 }
-
-// Cache LLM results per screen to avoid calling twice (once for model, once for controller)
-const llmResultCache = new Map<string, LLMResult>()
 
 async function tryLLMGeneration(
   screen: DiscoveredScreen,
@@ -211,23 +180,15 @@ async function tryLLMGeneration(
   cwd: string,
   config: PreviewConfig,
 ): Promise<LLMResult> {
-  const cacheKey = screen.filePath
-
-  const cached = llmResultCache.get(cacheKey)
-  if (cached) {
-    return cached
-  }
-
   const result: LLMResult = { model: null, controller: null }
 
   try {
     const sourceCode = await readFile(screen.filePath, 'utf-8')
     const userPrompt = buildGenerateMCPrompt(viewTree, sourceCode)
-    const fullPrompt = `${SYSTEM_PROMPT}\n\n${userPrompt}`
 
-    const raw = await callLLM(fullPrompt, config.llm, {
+    const raw = await callLLM(userPrompt, config.llm, {
       temperature: 0.2,
-      maxTokens: 4096,
+      maxTokens: 8192,
       jsonMode: true,
     })
 
@@ -240,7 +201,14 @@ async function tryLLMGeneration(
         if (parsed.success) {
           result.model = parsed.data
         } else {
-          console.log(chalk.dim('    LLM model output failed validation, using heuristic'))
+          console.log(chalk.dim('    LLM model output failed validation, retrying...'))
+          // Retry once with correction prompt
+          const retryResult = await retryWithCorrection(obj, config, 'model', parsed.error)
+          if (retryResult?.model) {
+            result.model = retryResult.model
+          } else {
+            console.log(chalk.dim('    Retry failed, using heuristic for model'))
+          }
         }
       }
 
@@ -250,7 +218,13 @@ async function tryLLMGeneration(
         if (parsed.success) {
           result.controller = parsed.data
         } else {
-          console.log(chalk.dim('    LLM controller output failed validation, using heuristic'))
+          console.log(chalk.dim('    LLM controller output failed validation, retrying...'))
+          const retryResult = await retryWithCorrection(obj, config, 'controller', parsed.error)
+          if (retryResult?.controller) {
+            result.controller = retryResult.controller
+          } else {
+            console.log(chalk.dim('    Retry failed, using heuristic for controller'))
+          }
         }
       }
     }
@@ -259,8 +233,52 @@ async function tryLLMGeneration(
     console.log(chalk.dim(`    LLM generation failed: ${message}`))
   }
 
-  llmResultCache.set(cacheKey, result)
   return result
+}
+
+async function retryWithCorrection(
+  originalOutput: Record<string, unknown>,
+  config: PreviewConfig,
+  target: 'model' | 'controller',
+  error: { message?: string; issues?: unknown[] },
+): Promise<LLMResult | null> {
+  try {
+    const errorMessage = error.message ?? JSON.stringify(error.issues ?? [])
+    const correctionPrompt = `Your previous output had a validation error in the "${target}" section.
+
+Error: ${errorMessage}
+
+Previous output:
+${JSON.stringify(originalOutput[target], null, 2)}
+
+Please fix the "${target}" section and return the corrected JSON. Return ONLY the top-level object with both "model" and "controller" keys.`
+
+    const raw = await callLLM(correctionPrompt, config.llm, {
+      temperature: 0.1,
+      maxTokens: 8192,
+      jsonMode: true,
+    })
+
+    if (raw && typeof raw === 'object') {
+      const obj = raw as Record<string, unknown>
+      const result: LLMResult = { model: null, controller: null }
+
+      if (obj.model) {
+        const parsed = ModelOutputSchema.safeParse(obj.model)
+        if (parsed.success) result.model = parsed.data
+      }
+      if (obj.controller) {
+        const parsed = ControllerOutputSchema.safeParse(obj.controller)
+        if (parsed.success) result.controller = parsed.data
+      }
+
+      return result
+    }
+  } catch {
+    // Retry failed silently — caller will use heuristic
+  }
+
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -414,13 +432,6 @@ function dataPropsToRegion(prop: PropDefinition): HeuristicRegion | null {
   }
 
   return null
-}
-
-function formatLabel(name: string): string {
-  return name
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (s) => s.toUpperCase())
-    .trim()
 }
 
 // ---------------------------------------------------------------------------

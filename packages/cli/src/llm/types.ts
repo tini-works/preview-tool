@@ -8,6 +8,8 @@ export interface LLMOptions {
   temperature?: number
   maxTokens?: number
   jsonMode?: boolean
+  systemPrompt?: string
+  timeoutMs?: number
 }
 
 export interface LLMConfig {
@@ -21,3 +23,6 @@ export const DEFAULT_LLM_CONFIG: LLMConfig = {
   ollamaModel: 'llama3.2',
   ollamaUrl: 'http://localhost:11434',
 }
+
+/** Default timeout for LLM generate() calls: 60 seconds */
+export const DEFAULT_LLM_TIMEOUT_MS = 60_000

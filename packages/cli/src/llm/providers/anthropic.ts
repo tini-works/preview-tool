@@ -1,4 +1,6 @@
 import type { LLMProvider, LLMOptions } from '../types.js'
+import { DEFAULT_LLM_TIMEOUT_MS } from '../types.js'
+import { extractJson } from '../utils.js'
 
 export function createAnthropicProvider(): LLMProvider {
   return {
@@ -14,6 +16,20 @@ export function createAnthropicProvider(): LLMProvider {
         throw new Error('ANTHROPIC_API_KEY not set')
       }
 
+      const timeout = options.timeoutMs ?? DEFAULT_LLM_TIMEOUT_MS
+
+      const body: Record<string, unknown> = {
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: options.maxTokens ?? 4096,
+        temperature: options.temperature ?? 0.2,
+        messages: [{ role: 'user', content: prompt }],
+      }
+
+      // Use native system parameter when available
+      if (options.systemPrompt) {
+        body.system = options.systemPrompt
+      }
+
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
@@ -21,12 +37,8 @@ export function createAnthropicProvider(): LLMProvider {
           'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
         },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: options.maxTokens ?? 4096,
-          temperature: options.temperature ?? 0.2,
-          messages: [{ role: 'user', content: prompt }],
-        }),
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(timeout),
       })
 
       if (!response.ok) {
@@ -45,12 +57,4 @@ export function createAnthropicProvider(): LLMProvider {
       return JSON.parse(extractJson(textBlock.text)) as unknown
     },
   }
-}
-
-function extractJson(text: string): string {
-  const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/)
-  if (codeBlockMatch) {
-    return codeBlockMatch[1].trim()
-  }
-  return text.trim()
 }

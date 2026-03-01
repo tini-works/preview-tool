@@ -1,6 +1,13 @@
 import type { ViewTree } from '../../analyzer/types.js'
 
+/** Maximum source code characters to include in the LLM prompt */
+const MAX_SOURCE_CHARS = 10_000
+
 export function buildGenerateMCPrompt(viewTree: ViewTree, sourceCode: string): string {
+  const truncatedSource = sourceCode.length > MAX_SOURCE_CHARS
+    ? sourceCode.slice(0, MAX_SOURCE_CHARS) + '\n// ... truncated for length'
+    : sourceCode
+
   return `Analyze this React screen component and generate preview metadata.
 
 ## Screen Info
@@ -16,7 +23,7 @@ ${JSON.stringify(viewTree.dataProps, null, 2)}
 
 ## Source Code
 \`\`\`tsx
-${sourceCode}
+${truncatedSource}
 \`\`\`
 
 ## Required Output

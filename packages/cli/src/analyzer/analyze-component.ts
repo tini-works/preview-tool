@@ -1,5 +1,6 @@
 import { Project, SyntaxKind, type SourceFile, type PropertySignature } from 'ts-morph'
 import { generateMockValue, generateMockArray } from './mock-generator.js'
+import { formatLabel } from '../lib/format-label.js'
 import type {
   DiscoveredScreen,
   ScreenAnalysis,
@@ -487,9 +488,3 @@ function inferTypeFromValue(value: string): string {
   return 'unknown'
 }
 
-function formatLabel(name: string): string {
-  return name
-    .replace(/([A-Z])/g, ' $1')
-    .replace(/^./, (s) => s.toUpperCase())
-    .trim()
-}

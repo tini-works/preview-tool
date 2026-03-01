@@ -3,6 +3,7 @@ import type { LLMProvider, LLMConfig, LLMOptions } from './types.js'
 import { createOllamaProvider } from './providers/ollama.js'
 import { createAnthropicProvider } from './providers/anthropic.js'
 import { createOpenAIProvider } from './providers/openai.js'
+import { SYSTEM_PROMPT } from './prompts/system.js'
 
 export async function callLLM(
   prompt: string,
@@ -10,6 +11,12 @@ export async function callLLM(
   options: LLMOptions = {},
 ): Promise<unknown | null> {
   const providers = buildProviderChain(config)
+
+  // Inject system prompt unless caller provides one
+  const opts: LLMOptions = {
+    ...options,
+    systemPrompt: options.systemPrompt ?? SYSTEM_PROMPT,
+  }
 
   for (const provider of providers) {
     try {
@@ -20,7 +27,7 @@ export async function callLLM(
       }
 
       console.log(chalk.dim(`  LLM: Using ${provider.name}...`))
-      const result = await provider.generate(prompt, { ...options, jsonMode: true })
+      const result = await provider.generate(prompt, { ...opts, jsonMode: true })
       return result
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)

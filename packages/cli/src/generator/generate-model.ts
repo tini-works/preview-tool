@@ -1,4 +1,5 @@
 import type { ModelOutput } from '../analyzer/types.js'
+import { formatValue } from './format-utils.js'
 
 export function generateModelFileContent(
   model: ModelOutput,
@@ -16,13 +17,4 @@ export function generateModelFileContent(
   lines.push(`export const regions = ${formatValue(model.regions, 0)} as const`)
   lines.push('')
   return lines.join('\n')
-}
-
-function formatValue(value: unknown, indent: number): string {
-  const json = JSON.stringify(value, null, 2)
-  const padding = ' '.repeat(indent)
-  return json
-    .split('\n')
-    .map((line, i) => (i === 0 ? line : padding + line))
-    .join('\n')
 }
