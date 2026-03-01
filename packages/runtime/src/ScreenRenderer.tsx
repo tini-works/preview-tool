@@ -1,6 +1,7 @@
 import { useEffect, useState, type ComponentType } from 'react'
 import { FlowProvider } from './flow/FlowProvider.tsx'
 import { NetworkSimulationLayer } from './devtools/NetworkSimulationLayer.tsx'
+import { ScreenErrorBoundary } from './ErrorBoundary.tsx'
 import { useDevToolsStore } from './store/useDevToolsStore.ts'
 import { getScreenEntries } from './ScreenRegistry.ts'
 import type { ScreenModule, RegionsMap, FlagDefinition } from './types.ts'
@@ -113,9 +114,11 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
   return (
     <NetworkSimulationLayer key={route}>
       <div style={{ zoom: fontScale }} className="h-full">
-        <FlowProvider>
-          <Component data={data} flags={resolvedFlags} />
-        </FlowProvider>
+        <ScreenErrorBoundary key={route}>
+          <FlowProvider>
+            <Component data={data} flags={resolvedFlags} />
+          </FlowProvider>
+        </ScreenErrorBoundary>
       </div>
     </NetworkSimulationLayer>
   )

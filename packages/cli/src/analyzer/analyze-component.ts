@@ -60,6 +60,14 @@ function analyzeMonolithicScreen(
     Object.assign(regions, dataTypeRegions)
   }
 
+  // Strategy 1b: If no default export, try named export component's data prop
+  if (Object.keys(regions).length === 0 && screen.exportName) {
+    const namedRegions = analyzeNamedExportDataProp(project, sourceFile, screen)
+    if (Object.keys(namedRegions).length > 0) {
+      Object.assign(regions, namedRegions)
+    }
+  }
+
   // Strategy 2: Find useState calls (for screens that manage their own state)
   if (Object.keys(regions).length === 0) {
     const useStateCalls = findUseStateCalls(sourceFile)
@@ -125,6 +133,50 @@ function analyzeDataPropType(
     const region = inferRegionFromProperty(name, typeText)
     if (region) {
       regions[region.key] = region
+    }
+  }
+
+  return regions
+}
+
+/**
+ * Analyzes a named export component's `data` prop type.
+ * E.g.: `export function BookingPage({ data }: { data: BookingData })`
+ */
+function analyzeNamedExportDataProp(
+  project: Project,
+  sourceFile: SourceFile,
+  screen: DiscoveredScreen
+): Record<string, AnalyzedRegion> {
+  const regions: Record<string, AnalyzedRegion> = {}
+  if (!screen.exportName) return regions
+
+  // Find the named function declaration
+  const funcDecl = sourceFile.getFunction(screen.exportName)
+  if (funcDecl) {
+    const parameterTypes = extractDataPropPropertiesFromParams(funcDecl.getParameters(), sourceFile)
+    for (const { name, typeText } of parameterTypes) {
+      const region = inferRegionFromProperty(name, typeText)
+      if (region) {
+        regions[region.key] = region
+      }
+    }
+    return regions
+  }
+
+  // Try variable declaration (arrow function)
+  const varDecl = sourceFile.getVariableDeclaration(screen.exportName)
+  if (varDecl) {
+    const init = varDecl.getInitializer()
+    const arrowFunc = init?.asKind(SyntaxKind.ArrowFunction)
+    if (arrowFunc) {
+      const parameterTypes = extractDataPropPropertiesFromParams(arrowFunc.getParameters(), sourceFile)
+      for (const { name, typeText } of parameterTypes) {
+        const region = inferRegionFromProperty(name, typeText)
+        if (region) {
+          regions[region.key] = region
+        }
+      }
     }
   }
 

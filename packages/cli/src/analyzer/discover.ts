@@ -1,5 +1,5 @@
 import { glob } from 'glob'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 import type { DiscoveredScreen } from './types.js'
 
@@ -61,6 +61,12 @@ export async function discoverScreens(
       screen.controllerFile = pattern.controllerFile
     }
 
+    // Detect named vs default export
+    const exportName = detectExportName(absolutePath)
+    if (exportName) {
+      screen.exportName = exportName
+    }
+
     screens.push(screen)
   }
 
@@ -96,6 +102,37 @@ interface DetectedPattern {
   viewFile?: string
   modelFile?: string
   controllerFile?: string
+}
+
+/**
+ * Reads a source file and detects whether it uses named or default export.
+ * Returns the named export identifier (e.g. 'BookingPage') or undefined for default exports.
+ */
+function detectExportName(filePath: string): string | undefined {
+  try {
+    const source = readFileSync(filePath, 'utf-8')
+
+    // Check for default export first — if present, no named import needed
+    if (/export\s+default\s+/.test(source)) {
+      return undefined
+    }
+
+    // Match named function export: export function FooPage()
+    const funcMatch = source.match(/export\s+function\s+(\w+)\s*\(/)
+    if (funcMatch) {
+      return funcMatch[1]
+    }
+
+    // Match named const export: export const FooPage =
+    const constMatch = source.match(/export\s+const\s+(\w+)\s*=/)
+    if (constMatch) {
+      return constMatch[1]
+    }
+
+    return undefined
+  } catch {
+    return undefined
+  }
 }
 
 function detectPattern(screenDir: string): DetectedPattern {

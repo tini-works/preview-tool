@@ -61,6 +61,13 @@ export async function createViteConfig(
     ...(reactPlugin ? [reactPlugin] : []),
   ]
 
+  // Deduplicate React — force all imports to resolve to the host project's copy.
+  // Without this, the runtime and host app load separate React instances,
+  // causing "Cannot read properties of null (reading 'useMemo')" errors.
+  const hostRequire = createRequire(join(cwd, 'package.json'))
+  const reactPath = dirname(hostRequire.resolve('react/package.json'))
+  const reactDomPath = dirname(hostRequire.resolve('react-dom/package.json'))
+
   return {
     root: previewDir,
     server: {
@@ -72,12 +79,15 @@ export async function createViteConfig(
     },
     resolve: {
       alias: {
+        'react': reactPath,
+        'react-dom': reactDomPath,
         '@preview-tool/runtime': join(runtimeRoot, 'src', 'index.ts'),
         '@host': join(cwd, 'src'),
         '@preview': previewDir,
         '@/': join(cwd, 'src') + '/',
         '@': join(cwd, 'src'),
       },
+      dedupe: ['react', 'react-dom'],
     },
     plugins,
     optimizeDeps: {
