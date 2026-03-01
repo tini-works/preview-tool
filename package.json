@@ -4,10 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "pnpm --filter @preview-tool/demo dev",
-    "build": "pnpm --filter @preview-tool/demo build",
-    "test:e2e": "pnpm --filter @preview-tool/demo test:e2e",
-    "cli:build": "pnpm --filter @preview-tool/cli build",
-    "cli:test": "pnpm -w run cli:build && node packages/cli/dist/index.js generate --cwd packages/cli/test-fixtures/sample-app"
+    "build": "pnpm --filter @preview-tool/cli build",
+    "test": "pnpm -w run build && node packages/cli/dist/index.js generate --cwd packages/cli/test-fixtures/sample-app"
   }
 }
