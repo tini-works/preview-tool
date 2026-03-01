@@ -116,6 +116,9 @@ importers:
       ts-morph:
         specifier: ^25.0.0
         version: 25.0.1
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
