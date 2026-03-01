@@ -42,3 +42,26 @@ export interface FlowAction {
   navigate?: string
   navigateState?: string
 }
+
+// === Component-level regions (from CLI MVC generation) ===
+
+export interface ComponentRegion extends RegionDefinition {
+  component?: string
+  componentPath?: string
+}
+
+// === DOM-based trigger matching (no data-flow-target required) ===
+
+export interface ComponentTrigger {
+  selector: string
+  text?: string
+  ariaLabel?: string
+  nth?: number
+}
+
+export interface FlowActionV2 {
+  trigger: ComponentTrigger
+  navigate?: string
+  navigateState?: string
+  setRegionState?: { region: string; state: string }
+}
