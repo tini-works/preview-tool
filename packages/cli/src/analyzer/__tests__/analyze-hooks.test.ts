@@ -116,6 +116,43 @@ export default function Page() {
     expect(result.hooks[0].sectionId).toBe('my-section')
   })
 
+  it('ignores type-only specifiers in named imports', () => {
+    const source = `
+import { useAuthStore, type AuthState } from '@/stores/auth'
+
+export default function Page() {
+  const user = useAuthStore((s) => s.user)
+  return <div>{user?.name}</div>
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    const authImport = result.imports.find(i => i.path === '@/stores/auth')
+    expect(authImport).toBeDefined()
+    expect(authImport!.namedExports).toEqual(['useAuthStore'])
+    // 'type AuthState' must not appear
+    expect(authImport!.namedExports).not.toContainEqual(expect.stringContaining('type'))
+  })
+
+  it('does not emit a hook entry when hook is imported but never called', () => {
+    const source = `
+import { useAppLiveQuery } from '@/hooks/use-app-live-query'
+
+export default function Page() {
+  return <div>Static content</div>
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.hooks).toHaveLength(0)
+    // But the import should still be tracked for mocking
+    expect(result.imports).toContainEqual(
+      expect.objectContaining({
+        path: '@/hooks/use-app-live-query',
+        needsMocking: true,
+        reason: 'data-hook',
+      })
+    )
+  })
+
   it('returns empty results for screens with no data hooks', () => {
     const source = `
 import React from 'react'

@@ -36,6 +36,8 @@ export function analyzeHooks(source: string, _filePath: string): HookAnalysisRes
 
     for (const spec of specifiers.split(',')) {
       const trimmed = spec.trim()
+      // Skip type-only imports (e.g., 'type AuthState')
+      if (/^type\s+/.test(trimmed)) continue
       const aliasMatch = /(\w+)\s+as\s+(\w+)/.exec(trimmed)
       if (aliasMatch) {
         importMap.set(aliasMatch[2], { originalName: aliasMatch[1], importPath })
@@ -51,6 +53,8 @@ export function analyzeHooks(source: string, _filePath: string): HookAnalysisRes
           .split(',')
           .map((s) => {
             const t = s.trim()
+            // Skip type-only imports
+            if (/^type\s+/.test(t)) return ''
             const a = /(\w+)\s+as\s+(\w+)/.exec(t)
             return a ? a[1] : t
           })
