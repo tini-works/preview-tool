@@ -24,20 +24,21 @@ export async function discoverScreens(
       continue
     }
 
-    // Only process index.tsx files as screens
+    // For non-index files, check if they look like pages
     if (!match.endsWith('/index.tsx') && !match.endsWith('index.tsx')) {
-      // For non-index files, treat them as standalone screens
-      // but skip files that look like sub-components (PascalCase in deeper dirs)
       const fileName = parts[parts.length - 1]
       if (!fileName) continue
-
-      // Skip non-tsx files
       if (!fileName.endsWith('.tsx')) continue
 
-      // Skip files that start with uppercase (likely sub-components)
-      if (fileName[0] === fileName[0]?.toUpperCase() && fileName[0] !== fileName[0]?.toLowerCase()) {
-        continue
-      }
+      // Skip known non-page files
+      const baseName = fileName.replace('.tsx', '')
+      const skipFiles = ['App', 'main', 'layout', 'routes', 'router']
+      if (skipFiles.includes(baseName)) continue
+
+      // Skip files in component directories (not page directories)
+      const parentDir = parts[parts.length - 2] ?? ''
+      const componentDirs = ['components', 'ui', 'hooks', 'lib', 'utils', 'stores', 'types']
+      if (componentDirs.includes(parentDir)) continue
     }
 
     const absolutePath = join(cwd, match)
@@ -88,6 +89,11 @@ function deriveRoute(cwd: string, filePath: string): string {
 
   // Remove /index.tsx or .tsx suffix
   route = route.replace(/\/index\.tsx$/, '').replace(/\.tsx$/, '')
+
+  // Map 'home' to root
+  if (route === 'home' || route === '/home') {
+    route = '/'
+  }
 
   // Ensure leading slash
   if (!route.startsWith('/')) {
