@@ -116,3 +116,34 @@ export interface LLMGenerationOutput {
   model: ModelOutput
   controller: ControllerOutput
 }
+
+// === Hook Analysis (for module aliasing) ===
+
+export interface HookAnalysis {
+  /** Hook function name as used in the component (e.g., 'useAppLiveQuery') */
+  hookName: string
+  /** Full import path (e.g., '@/hooks/use-app-live-query') */
+  importPath: string
+  /** Section/region ID if detectable from call arguments (e.g., 'service-grid') */
+  sectionId?: string
+  /** React Query key if detectable (e.g., ['services']) */
+  queryKey?: string
+  /** Return shape: what the hook returns */
+  returnShape: 'data-loading-error' | 'state-setter' | 'unknown'
+}
+
+export interface ImportAnalysis {
+  /** Import path (e.g., '@/stores/auth') */
+  path: string
+  /** Named exports used (e.g., ['useAuthStore']) */
+  namedExports: string[]
+  /** Whether this import needs mocking */
+  needsMocking: boolean
+  /** Why it needs mocking */
+  reason: 'data-hook' | 'auth-store' | 'devtool-store' | 'api-client' | 'collection'
+}
+
+export interface HookAnalysisResult {
+  hooks: HookAnalysis[]
+  imports: ImportAnalysis[]
+}
