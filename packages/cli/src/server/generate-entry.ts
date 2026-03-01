@@ -110,53 +110,53 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { PreviewShell } from '@preview-tool/runtime'
 import type { ScreenEntry } from '@preview-tool/runtime'
+import { Wrapper } from './wrapper'
 import './preview.css'
 
-// Auto-discover adapters and mocks via import.meta.glob
-const adapterModules = import.meta.glob('./adapters/*.adapter.ts')
-const mockModules = import.meta.glob('./mocks/*.mock.ts', { eager: true }) as Record<
+// Auto-discover from per-screen folders
+const screenModules = import.meta.glob('./screens/*/adapter.ts')
+const modelModules = import.meta.glob('./screens/*/model.ts', { eager: true }) as Record<
   string,
-  { meta: { route: string }; regions: Record<string, unknown>; flows: readonly unknown[] }
+  { meta: { route: string }; regions: Record<string, unknown> }
 >
 
-// Auto-discover user overrides (eager, so they're available at build time)
-const overrideModules = import.meta.glob('./overrides/*.ts', { eager: true }) as Record<
+// Auto-discover user overrides
+const overrideModelModules = import.meta.glob('./overrides/*/model.ts', { eager: true }) as Record<
   string,
-  { regions?: Record<string, unknown>; flows?: readonly unknown[] }
+  { regions?: Record<string, unknown> }
 >
 
 /**
- * Merge override regions/flows into the base mock data.
- * Override regions are shallow-merged by key; override flows replace entirely.
+ * Merge override regions into the base model data.
+ * Override regions are shallow-merged by key.
  */
 function mergeOverrides(
-  base: { regions: Record<string, unknown>; flows: readonly unknown[] },
-  override: { regions?: Record<string, unknown>; flows?: readonly unknown[] } | undefined
-): { regions: Record<string, unknown>; flows: readonly unknown[] } {
+  base: { regions: Record<string, unknown> },
+  override: { regions?: Record<string, unknown> } | undefined
+): { regions: Record<string, unknown> } {
   if (!override) return base
   return {
     regions: { ...base.regions, ...(override.regions ?? {}) },
-    flows: override.flows ?? base.flows,
   }
 }
 
-// Build screen entries from discovered adapters + mocks + overrides
+// Build screen entries by matching adapter path to model path via folder name
 const entries: ScreenEntry[] = []
 
-for (const [adapterPath, importFn] of Object.entries(adapterModules)) {
-  // Derive mock path and override path from adapter path
-  const fileName = adapterPath.split('/').pop()?.replace('.adapter.ts', '') ?? ''
-  const mockPath = \`./mocks/\${fileName}.mock.ts\`
-  const overridePath = \`./overrides/\${fileName}.ts\`
-  const mock = mockModules[mockPath]
+for (const [adapterPath, importFn] of Object.entries(screenModules)) {
+  const parts = adapterPath.split('/')
+  const folderName = parts[parts.length - 2] ?? ''
+  const modelPath = \`./screens/\${folderName}/model.ts\`
+  const overrideModelPath = \`./overrides/\${folderName}/model.ts\`
 
-  if (!mock) continue
+  const model = modelModules[modelPath]
+  if (!model) continue
 
-  const override = overrideModules[overridePath]
-  const merged = mergeOverrides(mock, override)
+  const override = overrideModelModules[overrideModelPath]
+  const merged = mergeOverrides(model, override)
 
   entries.push({
-    route: mock.meta.route,
+    route: model.meta.route,
     module: importFn as () => Promise<{ default: React.ComponentType<{ data: unknown; flags?: Record<string, boolean> }> }>,
     regions: merged.regions as ScreenEntry['regions'],
   })
@@ -167,7 +167,9 @@ const root = document.getElementById('root')
 if (root) {
   createRoot(root).render(
     <React.StrictMode>
-      <PreviewShell screens={entries} />
+      <Wrapper>
+        <PreviewShell screens={entries} />
+      </Wrapper>
     </React.StrictMode>
   )
 }
