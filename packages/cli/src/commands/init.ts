@@ -87,6 +87,36 @@ export const initCommand = new Command('init')
     console.log(chalk.green('\nDone! Run `preview generate` to discover screens.\n'))
   })
 
+/**
+ * Reusable init logic — called by both `init` and `preview` commands.
+ * Creates .preview/ directory structure, writes config, wrapper, and .gitignore entries.
+ */
+export async function initPreview(
+  cwd: string,
+  config: PreviewConfig,
+  wrapperCode?: string
+): Promise<void> {
+  const previewDir = join(cwd, PREVIEW_DIR)
+
+  for (const sub of PREVIEW_SUBDIRS) {
+    const subDir = join(previewDir, sub)
+    await mkdir(subDir, { recursive: true })
+    const gitkeep = join(subDir, '.gitkeep')
+    if (!existsSync(gitkeep)) {
+      await writeFile(gitkeep, '', 'utf-8')
+    }
+  }
+
+  await writeConfig(cwd, config)
+
+  const wrapperPath = join(previewDir, 'wrapper.tsx')
+  if (!existsSync(wrapperPath)) {
+    await writeFile(wrapperPath, wrapperCode ?? generateWrapperTemplate(), 'utf-8')
+  }
+
+  await ensureGitignore(cwd)
+}
+
 function generateWrapperTemplate(): string {
   return `// Preview wrapper — add your app's providers here.
 // This file is user-maintained and never overwritten by \`preview generate\`.
