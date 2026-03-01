@@ -1,4 +1,5 @@
 import { join, dirname } from 'node:path'
+import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import type { PreviewConfig } from '../lib/config.js'
@@ -68,6 +69,19 @@ export async function createViteConfig(
   const reactPath = dirname(hostRequire.resolve('react/package.json'))
   const reactDomPath = dirname(hostRequire.resolve('react-dom/package.json'))
 
+  // Load alias manifest for mock hook redirection
+  let mockAliases: Record<string, string> = {}
+  try {
+    const aliasManifestPath = join(previewDir, 'alias-manifest.json')
+    const raw = readFileSync(aliasManifestPath, 'utf-8')
+    const manifest = JSON.parse(raw) as Record<string, string>
+    for (const [importPath, mockPath] of Object.entries(manifest)) {
+      mockAliases[importPath] = join(previewDir, mockPath)
+    }
+  } catch {
+    // No alias manifest — no mock hooks
+  }
+
   return {
     root: previewDir,
     server: {
@@ -79,8 +93,12 @@ export async function createViteConfig(
     },
     resolve: {
       alias: {
+        // Mock hook aliases (must come before general @ alias)
+        ...mockAliases,
+        // React deduplication
         'react': reactPath,
         'react-dom': reactDomPath,
+        // Runtime and host aliases
         '@preview-tool/runtime': join(runtimeRoot, 'src', 'index.ts'),
         '@host': join(cwd, 'src'),
         '@preview': previewDir,
