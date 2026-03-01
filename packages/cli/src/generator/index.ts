@@ -10,17 +10,24 @@ import { generateModelFileContent } from './generate-model.js'
 import { generateControllerFileContent } from './generate-controller.js'
 import { callLLM } from '../llm/index.js'
 import { buildGenerateMCPrompt } from '../llm/prompts/generate-mc.js'
+import { analyzeHooks } from '../analyzer/analyze-hooks.js'
+import { generateMockHook } from './generate-mock-hooks.js'
+import { generateMockAuthStore, generateMockDevToolStore } from './generate-mock-stores.js'
 import { ModelOutputSchema } from '../llm/schemas/model.js'
 import { ControllerOutputSchema } from '../llm/schemas/controller.js'
 import type { PreviewConfig } from '../lib/config.js'
 import { PREVIEW_DIR } from '../lib/config.js'
 import { formatLabel } from '../lib/format-label.js'
+import type { DevToolConfig } from '../resolver/detect-framework.js'
 import type {
   DiscoveredScreen,
   ViewTree,
   ModelOutput,
   ControllerOutput,
   PropDefinition,
+  HookAnalysis,
+  HookAnalysisResult,
+  ImportAnalysis,
 } from '../analyzer/types.js'
 
 export interface GenerateResult {
@@ -30,6 +37,7 @@ export interface GenerateResult {
   controllersGenerated: number
   adaptersGenerated: number
   overridesSkipped: number
+  mocksGenerated: number
 }
 
 /**
@@ -45,7 +53,8 @@ export interface GenerateResult {
  */
 export async function generateAll(
   cwd: string,
-  config: PreviewConfig
+  config: PreviewConfig,
+  devToolConfig?: DevToolConfig | null,
 ): Promise<GenerateResult> {
   const previewDir = join(cwd, PREVIEW_DIR)
   const screensDir = join(previewDir, 'screens')
@@ -68,6 +77,7 @@ export async function generateAll(
       controllersGenerated: 0,
       adaptersGenerated: 0,
       overridesSkipped: 0,
+      mocksGenerated: 0,
     }
   }
 
@@ -130,7 +140,7 @@ export async function generateAll(
 
     // Generate model if no override
     if (needsModel) {
-      const model = llmResult.model ?? buildHeuristicModel(screen, viewTree)
+      const model = llmResult.model ?? await buildHeuristicModel(screen, viewTree, devToolConfig)
       const modelMeta = {
         route: screen.route,
         pattern: screen.pattern,
@@ -155,6 +165,91 @@ export async function generateAll(
     adaptersGenerated++
   }
 
+  // Step 5: Generate mock modules for all detected hooks
+  console.log(chalk.dim('\nGenerating mock modules...'))
+  const mocksDir = join(previewDir, 'mocks')
+  await mkdir(mocksDir, { recursive: true })
+
+  // Collect all hook analyses across screens
+  const allHookResults: HookAnalysisResult[] = []
+  for (const screen of screens) {
+    try {
+      const source = await readFile(screen.filePath, 'utf-8')
+      const hookResult = analyzeHooks(source, screen.filePath)
+      allHookResults.push(hookResult)
+    } catch {
+      // Skip screens that can't be read
+    }
+  }
+
+  // Group hooks by import path
+  const hooksByImport = new Map<string, HookAnalysis[]>()
+  const importsToMock = new Map<string, ImportAnalysis>()
+
+  for (const result of allHookResults) {
+    for (const hook of result.hooks) {
+      const existing = hooksByImport.get(hook.importPath) ?? []
+      existing.push(hook)
+      hooksByImport.set(hook.importPath, existing)
+    }
+    for (const imp of result.imports) {
+      if (imp.needsMocking && !importsToMock.has(imp.path)) {
+        importsToMock.set(imp.path, imp)
+      }
+    }
+  }
+
+  // Generate mock hook files
+  for (const [importPath, hooks] of hooksByImport) {
+    const safeName = importPath
+      .replace(/^@\//, '')
+      .replace(/\//g, '--')
+      .replace(/[^a-zA-Z0-9\-_]/g, '_')
+    const mockCode = generateMockHook(hooks, importPath)
+    await writeFile(join(mocksDir, `${safeName}.ts`), mockCode, 'utf-8')
+    console.log(chalk.dim(`  Mock: ${importPath} → mocks/${safeName}.ts`))
+  }
+
+  // Generate mock stores
+  const authImport = [...importsToMock.values()].find((i) => i.reason === 'auth-store')
+  if (authImport) {
+    await writeFile(join(mocksDir, 'auth-store.ts'), generateMockAuthStore(), 'utf-8')
+    console.log(chalk.dim('  Mock: auth store'))
+  }
+
+  const devtoolImport = [...importsToMock.values()].find((i) => i.reason === 'devtool-store')
+  if (devtoolImport) {
+    await writeFile(join(mocksDir, 'devtool-store.ts'), generateMockDevToolStore(), 'utf-8')
+    console.log(chalk.dim('  Mock: devtool store'))
+  }
+
+  // Write alias manifest for Vite config
+  const aliasManifest: Record<string, string> = {}
+
+  for (const [importPath] of hooksByImport) {
+    const safeName = importPath
+      .replace(/^@\//, '')
+      .replace(/\//g, '--')
+      .replace(/[^a-zA-Z0-9\-_]/g, '_')
+    aliasManifest[importPath] = `./mocks/${safeName}.ts`
+  }
+
+  if (authImport) {
+    aliasManifest[authImport.path] = './mocks/auth-store.ts'
+  }
+  if (devtoolImport) {
+    aliasManifest[devtoolImport.path] = './mocks/devtool-store.ts'
+  }
+
+  await writeFile(
+    join(previewDir, 'alias-manifest.json'),
+    JSON.stringify(aliasManifest, null, 2),
+    'utf-8'
+  )
+
+  const mocksGenerated = hooksByImport.size + (authImport ? 1 : 0) + (devtoolImport ? 1 : 0)
+  console.log(chalk.dim(`  ${mocksGenerated} mock module(s) generated`))
+
   return {
     screensFound: screens.length,
     viewsGenerated,
@@ -162,6 +257,7 @@ export async function generateAll(
     controllersGenerated,
     adaptersGenerated,
     overridesSkipped,
+    mocksGenerated,
   }
 }
 
@@ -285,12 +381,55 @@ Please fix the "${target}" section and return the corrected JSON. Return ONLY th
 // Heuristic fallback: convert ViewTree dataProps to basic regions
 // ---------------------------------------------------------------------------
 
-function buildHeuristicModel(
+async function buildHeuristicModel(
   screen: DiscoveredScreen,
   viewTree: ViewTree | null,
-): ModelOutput {
+  devToolConfig?: DevToolConfig | null,
+): Promise<ModelOutput> {
   const regions: ModelOutput['regions'] = {}
 
+  // Priority 1: Use devtool config's route→section mapping (most reliable)
+  if (devToolConfig) {
+    const pageDef = devToolConfig.pages.find((p) => p.route === screen.route)
+    if (pageDef && pageDef.sections.length > 0) {
+      for (const section of pageDef.sections) {
+        const stateEntries: Record<string, Record<string, unknown>> = {}
+        for (const state of section.states) {
+          stateEntries[state] = {}
+        }
+        regions[section.id] = {
+          label: section.label,
+          component: 'Screen',
+          componentPath: '',
+          states: stateEntries,
+          defaultState: section.states[0] ?? 'populated',
+        }
+      }
+      return { regions }
+    }
+  }
+
+  // Priority 2: Extract section IDs from source code (regex fallback)
+  const sectionIds = await extractSectionIds(screen.filePath)
+  if (sectionIds.length > 0) {
+    for (const sectionId of sectionIds) {
+      regions[sectionId] = {
+        label: formatLabel(sectionId),
+        component: 'Screen',
+        componentPath: '',
+        states: {
+          populated: {},
+          loading: {},
+          empty: {},
+          error: {},
+        },
+        defaultState: 'populated',
+      }
+    }
+    return { regions }
+  }
+
+  // Priority 3: Use ViewTree data props
   if (viewTree && viewTree.dataProps.length > 0) {
     for (const prop of viewTree.dataProps) {
       const region = dataPropsToRegion(prop)
@@ -359,6 +498,50 @@ function buildHeuristicController(
     flows: [],
     componentStates: {},
     journeys: [],
+  }
+}
+
+/**
+ * Extract section IDs from source code by matching DevToolStore patterns.
+ * Handles aliased imports (e.g., `useAppLiveQuery as useLiveQuery`) and
+ * multi-line function calls where the section ID is the last string arg.
+ */
+async function extractSectionIds(filePath: string): Promise<string[]> {
+  try {
+    const source = await readFile(filePath, 'utf-8')
+    const ids = new Set<string>()
+
+    // Step 1: Detect if useAppLiveQuery is imported (possibly aliased)
+    const importAliasRe = /useAppLiveQuery(?:\s+as\s+(\w+))?/
+    const aliasMatch = importAliasRe.exec(source)
+    const fnNames = ['useAppLiveQuery']
+    if (aliasMatch?.[1]) {
+      fnNames.push(aliasMatch[1])
+    }
+
+    // Step 2: Match function calls with string literal as last argument before closing paren.
+    // Handles multi-line calls by using [\s\S] to span lines.
+    for (const fnName of fnNames) {
+      const re = new RegExp(
+        fnName + String.raw`\s*\([\s\S]*?['"]([a-z][a-z0-9-]+)['"]\s*\)`,
+        'g',
+      )
+      let match: RegExpExecArray | null
+      while ((match = re.exec(source)) !== null) {
+        ids.add(match[1])
+      }
+    }
+
+    // Step 3: Match sectionStates['sectionId'] or sectionStates["sectionId"]
+    const stateAccessRe = /sectionStates\s*\[\s*['"]([^'"]+)['"]\s*\]/g
+    let stateMatch: RegExpExecArray | null
+    while ((stateMatch = stateAccessRe.exec(source)) !== null) {
+      ids.add(stateMatch[1])
+    }
+
+    return [...ids]
+  } catch {
+    return []
   }
 }
 

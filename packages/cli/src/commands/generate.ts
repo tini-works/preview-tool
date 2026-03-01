@@ -33,6 +33,7 @@ export const generateCommand = new Command('generate')
       console.log(`  Models generated:     ${result.modelsGenerated}`)
       console.log(`  Controllers generated: ${result.controllersGenerated}`)
       console.log(`  Adapters generated:   ${result.adaptersGenerated}`)
+      console.log(`  Mocks generated:      ${result.mocksGenerated}`)
       if (result.overridesSkipped > 0) {
         console.log(`  Overrides skipped:    ${result.overridesSkipped}`)
       }
