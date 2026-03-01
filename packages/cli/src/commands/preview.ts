@@ -1,7 +1,6 @@
 import { Command } from 'commander'
 import chalk from 'chalk'
-import { existsSync } from 'node:fs'
-import { rm } from 'node:fs/promises'
+import { existsSync, rmSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { resolveSource } from '../resolver/resolve-source.js'
@@ -36,6 +35,18 @@ export const previewCommand = new Command('preview')
       keep: options.keep,
     })
     console.log(chalk.dim(`  Working directory: ${resolved.cwd}`))
+
+    // Register cleanup immediately for remote sources
+    if (resolved.tempDir) {
+      const cleanup = () => {
+        try {
+          rmSync(resolved.tempDir!, { recursive: true, force: true })
+        } catch { /* best-effort */ }
+      }
+      process.on('SIGINT', () => { cleanup(); process.exit(0) })
+      process.on('SIGTERM', () => { cleanup(); process.exit(0) })
+      process.on('exit', cleanup)
+    }
 
     // Step 2: Detect framework
     console.log(chalk.dim('\nDetecting framework...'))
@@ -76,7 +87,12 @@ export const previewCommand = new Command('preview')
 
     // Step 6: Start dev server
     if (options.port) {
-      config.port = parseInt(options.port, 10)
+      const port = parseInt(options.port, 10)
+      if (isNaN(port) || port < 1 || port > 65535) {
+        console.error(chalk.red(`Invalid port: ${options.port}`))
+        process.exit(1)
+      }
+      config.port = port
     }
     await generateEntryFiles(resolved.cwd, config)
     const viteConfig = await createViteConfig(resolved.cwd, config)
@@ -105,15 +121,5 @@ export const previewCommand = new Command('preview')
       console.error(chalk.dim('\nMake sure Vite is installed in the target project:'))
       console.error(chalk.dim('  npm install -D vite @vitejs/plugin-react'))
       process.exit(1)
-    }
-
-    // Cleanup temp directory on exit
-    if (resolved.tempDir) {
-      const cleanup = async () => {
-        console.log(chalk.dim('\nCleaning up temp directory...'))
-        await rm(resolved.tempDir!, { recursive: true, force: true })
-      }
-      process.on('SIGINT', async () => { await cleanup(); process.exit(0) })
-      process.on('SIGTERM', async () => { await cleanup(); process.exit(0) })
     }
   })
