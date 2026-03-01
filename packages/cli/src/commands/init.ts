@@ -7,7 +7,7 @@ import { existsSync } from 'node:fs'
 import { DEFAULT_CONFIG, PREVIEW_DIR, writeConfig } from '../lib/config.js'
 import type { PreviewConfig } from '../lib/config.js'
 
-const PREVIEW_SUBDIRS = ['adapters', 'mocks', 'interceptors', 'overrides'] as const
+const PREVIEW_SUBDIRS = ['screens', 'overrides'] as const
 
 export const initCommand = new Command('init')
   .description('Initialize preview tool in current project')
@@ -49,6 +49,7 @@ export const initCommand = new Command('init')
         screenGlob: response.screenGlob as string,
         port: (response.port as number) ?? DEFAULT_CONFIG.port,
         title: DEFAULT_CONFIG.title,
+        llm: { ...DEFAULT_CONFIG.llm },
       }
     }
 
@@ -67,10 +68,17 @@ export const initCommand = new Command('init')
     // Write config
     await writeConfig(cwd, config)
 
+    // Create wrapper.tsx template (user-maintained, never overwritten)
+    const wrapperPath = join(previewDir, 'wrapper.tsx')
+    if (!existsSync(wrapperPath)) {
+      await writeFile(wrapperPath, generateWrapperTemplate(), 'utf-8')
+    }
+
     console.log(chalk.green('\nCreated .preview/ directory structure:'))
     for (const sub of PREVIEW_SUBDIRS) {
       console.log(`  ${chalk.dim('├──')} ${sub}/`)
     }
+    console.log(`  ${chalk.dim('├──')} wrapper.tsx`)
     console.log(`  ${chalk.dim('└──')} preview.config.json`)
 
     // Ensure .gitignore has preview entries
@@ -79,12 +87,44 @@ export const initCommand = new Command('init')
     console.log(chalk.green('\nDone! Run `preview generate` to discover screens.\n'))
   })
 
+function generateWrapperTemplate(): string {
+  return `// Preview wrapper — add your app's providers here.
+// This file is user-maintained and never overwritten by \`preview generate\`.
+//
+// Example: if your app needs React Router, i18n, or a query client,
+// import and wrap them here:
+//
+//   import { BrowserRouter } from 'react-router-dom'
+//   import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+//   import '../src/i18n'
+//
+//   const queryClient = new QueryClient()
+//
+//   export function Wrapper({ children }: { children: React.ReactNode }) {
+//     return (
+//       <QueryClientProvider client={queryClient}>
+//         <BrowserRouter>
+//           {children}
+//         </BrowserRouter>
+//       </QueryClientProvider>
+//     )
+//   }
+
+import type { ReactNode } from 'react'
+
+export function Wrapper({ children }: { children: ReactNode }) {
+  return <>{children}</>
+}
+`
+}
+
 async function ensureGitignore(cwd: string): Promise<void> {
   const gitignorePath = join(cwd, '.gitignore')
   const entriesToAdd = [
-    '.preview/adapters',
-    '.preview/mocks',
-    '.preview/interceptors',
+    '.preview/screens',
+    '.preview/*.html',
+    '.preview/*.tsx',
+    '.preview/*.css',
   ]
 
   let content = ''

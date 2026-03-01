@@ -1,16 +1,23 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
+import type { LLMConfig } from '../llm/types.js'
 
 export interface PreviewConfig {
   screenGlob: string
   port: number
   title: string
+  llm: LLMConfig
 }
 
 export const DEFAULT_CONFIG: PreviewConfig = {
   screenGlob: 'src/**/*.tsx',
   port: 6100,
   title: 'Preview Tool',
+  llm: {
+    provider: 'auto' as const,
+    ollamaModel: 'llama3.2',
+    ollamaUrl: 'http://localhost:11434',
+  },
 }
 
 export const PREVIEW_DIR = '.preview'
@@ -20,7 +27,11 @@ export async function readConfig(cwd: string): Promise<PreviewConfig> {
   try {
     const raw = await readFile(configPath, 'utf-8')
     const parsed = JSON.parse(raw) as Partial<PreviewConfig>
-    return { ...DEFAULT_CONFIG, ...parsed }
+    return {
+      ...DEFAULT_CONFIG,
+      ...parsed,
+      llm: { ...DEFAULT_CONFIG.llm, ...((parsed as Record<string, unknown>).llm as Partial<LLMConfig> ?? {}) },
+    }
   } catch {
     return { ...DEFAULT_CONFIG }
   }
