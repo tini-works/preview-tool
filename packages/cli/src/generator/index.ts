@@ -395,7 +395,7 @@ async function buildHeuristicModel(
       for (const section of pageDef.sections) {
         const stateEntries: Record<string, Record<string, unknown>> = {}
         for (const state of section.states) {
-          stateEntries[state] = {}
+          stateEntries[state] = buildStateData(state, section.label)
         }
         regions[section.id] = {
           label: section.label,
@@ -413,15 +413,16 @@ async function buildHeuristicModel(
   const sectionIds = await extractSectionIds(screen.filePath)
   if (sectionIds.length > 0) {
     for (const sectionId of sectionIds) {
+      const label = formatLabel(sectionId)
       regions[sectionId] = {
-        label: formatLabel(sectionId),
+        label,
         component: 'Screen',
         componentPath: '',
         states: {
-          populated: {},
-          loading: {},
-          empty: {},
-          error: {},
+          populated: buildStateData('populated', label),
+          loading: buildStateData('loading', label),
+          empty: buildStateData('empty', label),
+          error: buildStateData('error', label),
         },
         defaultState: 'populated',
       }
@@ -542,6 +543,30 @@ async function extractSectionIds(filePath: string): Promise<string[]> {
     return [...ids]
   } catch {
     return []
+  }
+}
+
+/**
+ * Build mock data for a given state name.
+ * Instead of empty {}, each state gets structured data that the mock hook can serve.
+ */
+function buildStateData(state: string, label: string): Record<string, unknown> {
+  switch (state) {
+    case 'loading':
+      return { _loading: true }
+    case 'error':
+      return { _error: true, message: `Failed to load ${label}` }
+    case 'empty':
+      return { data: [] }
+    case 'populated':
+    default:
+      return {
+        data: [
+          { id: 'mock-1', name: `${label} Item 1` },
+          { id: 'mock-2', name: `${label} Item 2` },
+          { id: 'mock-3', name: `${label} Item 3` },
+        ],
+      }
   }
 }
 

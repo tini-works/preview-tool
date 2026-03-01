@@ -77,6 +77,17 @@ Rules:
 - Skip trivial elements (individual buttons, icons, labels) unless they have distinct states
 - For list regions: mockItems must have at least 10 items, defaultCount = 3
 - For triggers: use { selector: "button", text: "..." } format — NO data attributes
-- Mock data must be realistic and domain-appropriate
-- Return ONLY the JSON object, no markdown wrapping`
+- Return ONLY the JSON object, no markdown wrapping
+
+CRITICAL — State data format:
+- Each state MUST contain actual mock data that the component would receive, wrapped in a "data" key
+- "populated" state: { "data": [realistic items array] } or { "data": { realistic object } }
+- "loading" state: { "_loading": true }
+- "empty" state: { "data": [] }
+- "error" state: { "_error": true, "message": "descriptive error message" }
+- Mock data must be realistic and domain-appropriate with proper field types
+
+Section ID Detection (for apps with DevToolStore integration):
+- Look for patterns like \`useAppLiveQuery(query, 'sectionId')\` or \`useDevToolStore(s => s.sectionStates['sectionId'])\` in the source code
+- If section IDs are found, use them as region keys (e.g., 'service-grid', 'login-form', 'time-slots') instead of generic names`
 }
