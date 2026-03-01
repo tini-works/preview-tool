@@ -42,4 +42,11 @@ describe('generateWrapperCode', () => {
     expect(code).toContain('export function Wrapper')
     expect(code).not.toContain('zustand')
   })
+
+  it('does not include state bridge (removed in favor of module aliasing)', () => {
+    const code = generateWrapperCode(['react-router-dom'])
+    expect(code).not.toContain('useStateBridge')
+    expect(code).not.toContain('useDevToolsStore')
+    expect(code).toContain('MemoryRouter')
+  })
 })

@@ -57,6 +57,9 @@ export const previewCommand = new Command('preview')
     if (framework.providers.length > 0) {
       console.log(`  Providers:  ${chalk.cyan(framework.providers.join(', '))}`)
     }
+    if (framework.devToolStorePath) {
+      console.log(`  DevTools:   ${chalk.cyan(framework.devToolStorePath)}`)
+    }
 
     // Step 3: Install dependencies if needed
     if (resolved.isRemote || !ensureNodeModules(resolved.cwd)) {
@@ -82,7 +85,7 @@ export const previewCommand = new Command('preview')
     if (!options.llm) {
       config.llm = { ...config.llm, provider: 'none' }
     }
-    const result = await generateAll(resolved.cwd, config)
+    const result = await generateAll(resolved.cwd, config, framework.devToolConfig)
     console.log(chalk.green(`  ${result.screensFound} screens found, ${result.adaptersGenerated} adapters generated`))
 
     // Step 6: Start dev server
