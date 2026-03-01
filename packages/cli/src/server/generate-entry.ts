@@ -126,6 +126,12 @@ const overrideModelModules = import.meta.glob('./overrides/*/model.ts', { eager:
   { regions?: Record<string, unknown> }
 >
 
+// Auto-discover mock hook modules with registerModels
+const mockModules = import.meta.glob('./mocks/*.ts', { eager: true }) as Record<
+  string,
+  { registerModels?: (models: Record<string, Record<string, unknown>>) => void }
+>
+
 /**
  * Merge override regions into the base model data.
  * Override regions are shallow-merged by key.
@@ -142,6 +148,7 @@ function mergeOverrides(
 
 // Build screen entries by matching adapter path to model path via folder name
 const entries: ScreenEntry[] = []
+const allRegions: Record<string, Record<string, unknown>> = {}
 
 for (const [adapterPath, importFn] of Object.entries(screenModules)) {
   const parts = adapterPath.split('/')
@@ -160,6 +167,21 @@ for (const [adapterPath, importFn] of Object.entries(screenModules)) {
     module: importFn as () => Promise<{ default: React.ComponentType<{ data: unknown; flags?: Record<string, boolean> }> }>,
     regions: merged.regions as ScreenEntry['regions'],
   })
+
+  // Collect all region states for mock hook registration
+  const regions = merged.regions as Record<string, { states?: Record<string, unknown> }>
+  for (const [regionId, region] of Object.entries(regions)) {
+    if (region.states) {
+      allRegions[regionId] = region.states as Record<string, unknown>
+    }
+  }
+}
+
+// Register all region data with mock hooks so they can serve the right mock data
+for (const mod of Object.values(mockModules)) {
+  if (typeof mod.registerModels === 'function') {
+    mod.registerModels(allRegions)
+  }
 }
 
 // Render
