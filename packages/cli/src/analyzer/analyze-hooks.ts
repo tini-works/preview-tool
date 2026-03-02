@@ -1,4 +1,4 @@
-import type { HookAnalysis, ImportAnalysis, HookAnalysisResult } from './types.js'
+import type { HookAnalysis, ImportAnalysis, HookAnalysisResult, HookMappingType } from './types.js'
 
 /** Import paths known to be data-fetching hooks */
 const DATA_HOOK_PATTERNS: Record<string, 'data-loading-error'> = {
@@ -16,6 +16,13 @@ const MOCK_IMPORT_PATTERNS: Array<{ pattern: RegExp; reason: ImportAnalysis['rea
   { pattern: /lib\/api|services\/api|api\/client/i, reason: 'api-client' },
   { pattern: /lib\/collections|collections/i, reason: 'collection' },
 ]
+
+/** Determine the hookMappingType for a given hook name */
+function getHookMappingType(hookName: string): HookMappingType {
+  if (hookName === 'useAppLiveQuery' || hookName === 'useLiveQuery') return 'custom-hook'
+  if (hookName === 'useQuery' || hookName === 'useSWR' || hookName === 'useFetch') return 'query-hook'
+  return 'unknown'
+}
 
 /**
  * Analyze a React component's source code to detect data-fetching hooks
@@ -74,6 +81,19 @@ export function analyzeHooks(source: string, _filePath: string): HookAnalysisRes
     }
   }
 
+  // Step 1b: Parse default imports (e.g., `import useSWR from 'swr'`)
+  const defaultImportRe = /import\s+(\w+)\s+from\s+['"]([^'"]+)['"]/g
+  let defaultMatch: RegExpExecArray | null
+  while ((defaultMatch = defaultImportRe.exec(source)) !== null) {
+    const localName = defaultMatch[1]
+    const importPath = defaultMatch[2]
+
+    // Only add if not already in the map (named imports take priority)
+    if (!importMap.has(localName)) {
+      importMap.set(localName, { originalName: localName, importPath })
+    }
+  }
+
   // Step 2: Find data-fetching hook calls
   for (const [localName, info] of importMap) {
     const returnShape = DATA_HOOK_PATTERNS[info.originalName]
@@ -97,6 +117,7 @@ export function analyzeHooks(source: string, _filePath: string): HookAnalysisRes
         importPath: info.importPath,
         sectionId,
         returnShape,
+        hookMappingType: getHookMappingType(info.originalName),
       })
     }
 
@@ -109,6 +130,7 @@ export function analyzeHooks(source: string, _filePath: string): HookAnalysisRes
           hookName: info.originalName,
           importPath: info.importPath,
           returnShape,
+          hookMappingType: getHookMappingType(info.originalName),
         })
       }
     }

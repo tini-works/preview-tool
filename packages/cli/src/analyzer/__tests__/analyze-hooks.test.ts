@@ -165,4 +165,46 @@ export default function StaticPage() {
     expect(result.hooks).toHaveLength(0)
     expect(result.imports).toHaveLength(0)
   })
+
+  it('detects hookMappingType for useQuery as query-hook', () => {
+    const source = `
+import { useQuery } from '@tanstack/react-query'
+
+export default function Page() {
+  const { data } = useQuery({
+    queryKey: ['services'],
+    queryFn: () => fetch('/api/services'),
+  })
+  return <div>{data}</div>
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.hooks[0].hookMappingType).toBe('query-hook')
+  })
+
+  it('detects hookMappingType for useAppLiveQuery as custom-hook', () => {
+    const source = `
+import { useAppLiveQuery } from '@/hooks/use-app-live-query'
+
+export default function Page() {
+  const { data } = useAppLiveQuery(q => q.from(services), 'service-grid')
+  return <div>{data}</div>
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.hooks[0].hookMappingType).toBe('custom-hook')
+  })
+
+  it('detects hookMappingType for useSWR as query-hook', () => {
+    const source = `
+import useSWR from 'swr'
+
+export default function Page() {
+  const { data } = useSWR('/api/users')
+  return <div>{data}</div>
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.hooks[0].hookMappingType).toBe('query-hook')
+  })
 })
