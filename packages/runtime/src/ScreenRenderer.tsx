@@ -4,7 +4,7 @@ import { NetworkSimulationLayer } from './devtools/NetworkSimulationLayer.tsx'
 import { ScreenErrorBoundary } from './ErrorBoundary.tsx'
 import { useDevToolsStore } from './store/useDevToolsStore.ts'
 import { getScreenEntries } from './ScreenRegistry.ts'
-import type { ScreenModule, RegionsMap, FlagDefinition } from './types.ts'
+import type { ScreenModule, RegionsMap, FlagDefinition, RegionDataMap } from './types.ts'
 
 export function resolveFlags(
   definitions: Record<string, FlagDefinition> | undefined,
@@ -44,13 +44,38 @@ export function assembleRegionData(
   return data
 }
 
+export function computeRegionData(
+  regions: RegionsMap,
+  regionStates: Record<string, string>,
+  regionListCounts: Record<string, number>
+): RegionDataMap {
+  const result: RegionDataMap = {}
+
+  for (const [key, region] of Object.entries(regions)) {
+    const activeState = regionStates[key] ?? region.defaultState
+    let stateData = { ...(region.states[activeState] ?? region.states[region.defaultState] ?? {}) }
+
+    if (region.isList && region.mockItems) {
+      const listField = Object.keys(stateData).find((k) => Array.isArray(stateData[k]))
+      if (listField) {
+        const count = regionListCounts[key] ?? region.defaultCount ?? region.mockItems.length
+        stateData = { ...stateData, [listField]: region.mockItems.slice(0, count) }
+      }
+    }
+
+    result[key] = { activeState, stateData }
+  }
+
+  return result
+}
+
 interface ScreenRendererProps {
   route: string | null
 }
 
 interface LoadedScreen {
   route: string
-  Component: ComponentType<{ data: unknown; flags?: Record<string, boolean> }>
+  Component: ComponentType<{ regionData?: RegionDataMap; flags?: Record<string, boolean> }>
 }
 
 export function ScreenRenderer({ route }: ScreenRendererProps) {
@@ -107,8 +132,8 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
   const { Component } = loaded
   const regions = entry.regions
   const resolvedFlags = resolveFlags(entry.flags, featureFlags)
-  const data = regions
-    ? assembleRegionData(regions, regionStates, regionListCounts)
+  const regionData = regions
+    ? computeRegionData(regions, regionStates, regionListCounts)
     : {}
 
   return (
@@ -116,7 +141,7 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
       <div style={{ zoom: fontScale }} className="h-full">
         <ScreenErrorBoundary key={route}>
           <FlowProvider>
-            <Component data={data} flags={resolvedFlags} />
+            <Component regionData={regionData} flags={resolvedFlags} />
           </FlowProvider>
         </ScreenErrorBoundary>
       </div>
