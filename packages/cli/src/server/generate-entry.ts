@@ -164,7 +164,7 @@ for (const [adapterPath, importFn] of Object.entries(screenModules)) {
 
   entries.push({
     route: model.meta.route,
-    module: importFn as () => Promise<{ default: React.ComponentType<{ data: unknown; flags?: Record<string, boolean> }> }>,
+    module: importFn as () => Promise<{ default: React.ComponentType<{ regionData?: Record<string, { activeState: string; stateData: unknown }>; flags?: Record<string, boolean> }> }>,
     regions: merged.regions as ScreenEntry['regions'],
   })
 
