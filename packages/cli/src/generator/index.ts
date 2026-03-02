@@ -8,8 +8,10 @@ import { analyzeViewTree } from '../analyzer/analyze-view.js'
 import { generateViewFileContent } from './generate-view.js'
 import { generateModelFileContent } from './generate-model.js'
 import { generateControllerFileContent } from './generate-controller.js'
-import { callLLM } from '../llm/index.js'
+import { callLLM, callLLMBatch } from '../llm/index.js'
 import { buildGenerateMCPrompt } from '../llm/prompts/generate-mc.js'
+import { buildBatchGenerateMCPrompt } from '../llm/prompts/generate-mc-batch.js'
+import type { BatchScreenInput } from '../llm/prompts/generate-mc-batch.js'
 import { analyzeHooks } from '../analyzer/analyze-hooks.js'
 import { generateMockHook } from './generate-mock-hooks.js'
 import { generateMockAuthStore, generateMockDevToolStore } from './generate-mock-stores.js'
@@ -87,6 +89,15 @@ export async function generateAll(
   let adaptersGenerated = 0
   let overridesSkipped = 0
 
+  // Phase 1: Analyze all screens (ViewTree)
+  const screenData: Array<{
+    screen: DiscoveredScreen
+    safeName: string
+    screenOutDir: string
+    overrideScreenDir: string
+    viewTree: ViewTree | null
+  }> = []
+
   for (const screen of screens) {
     const safeName = routeToFolderName(screen.route)
     const screenOutDir = join(screensDir, safeName)
@@ -96,7 +107,6 @@ export async function generateAll(
 
     console.log(chalk.dim(`  Processing: ${screen.route} (${screen.pattern})`))
 
-    // Step 2: Build V — ViewTree via static AST analysis
     let viewTree: ViewTree | null = null
     try {
       viewTree = analyzeViewTree(screen)
@@ -105,19 +115,59 @@ export async function generateAll(
       console.log(chalk.yellow(`    View analysis failed, using legacy fallback: ${message}`))
     }
 
+    screenData.push({ screen, safeName, screenOutDir, overrideScreenDir, viewTree })
+  }
+
+  // Phase 2: Attempt batch controller generation via claude-code
+  const batchControllers = new Map<string, ControllerOutput>()
+
+  if (config.llm.provider !== 'none') {
+    const batchInputs: BatchScreenInput[] = screenData
+      .filter((d) => !existsSync(join(d.overrideScreenDir, 'controller.ts')))
+      .map((d) => ({
+        id: d.safeName,
+        screen: d.screen,
+        viewTree: d.viewTree,
+      }))
+
+    if (batchInputs.length > 0) {
+      console.log(chalk.dim('\nAttempting batch controller generation via claude-code...'))
+      const batchPrompt = buildBatchGenerateMCPrompt(batchInputs, cwd)
+      const batchRaw = await callLLMBatch(batchPrompt, config.llm, {
+        temperature: 0.2,
+        maxTokens: 16384,
+        jsonMode: true,
+      })
+
+      if (batchRaw && typeof batchRaw === 'object') {
+        const batchObj = batchRaw as Record<string, unknown>
+        for (const [screenId, controllerData] of Object.entries(batchObj)) {
+          const parsed = ControllerOutputSchema.safeParse(controllerData)
+          if (parsed.success) {
+            batchControllers.set(screenId, parsed.data)
+            console.log(chalk.dim(`    Batch: ${screenId} controller validated`))
+          } else {
+            console.log(chalk.dim(`    Batch: ${screenId} controller failed validation, will retry per-screen`))
+          }
+        }
+      }
+    }
+  }
+
+  // Phase 3: Generate files per screen (using batch results where available)
+  for (const { screen, safeName, screenOutDir, overrideScreenDir, viewTree } of screenData) {
     // Write view.ts
     if (viewTree) {
       const viewContent = generateViewFileContent(viewTree)
       await writeFile(join(screenOutDir, 'view.ts'), viewContent, 'utf-8')
       viewsGenerated++
     } else {
-      // Write a minimal view.ts placeholder
       const placeholderView = buildPlaceholderView(screen)
       await writeFile(join(screenOutDir, 'view.ts'), placeholderView, 'utf-8')
       viewsGenerated++
     }
 
-    // Step 3: Build M+C — LLM with heuristic fallback
+    // Check overrides
     const hasModelOverride = existsSync(join(overrideScreenDir, 'model.ts'))
     const hasControllerOverride = existsSync(join(overrideScreenDir, 'controller.ts'))
 
@@ -130,15 +180,18 @@ export async function generateAll(
       overridesSkipped++
     }
 
-    // Single LLM call per screen — shared by model and controller
+    // Model + Controller generation
     const needsModel = !hasModelOverride
     const needsController = !hasControllerOverride
+
+    // Try per-screen LLM only if batch didn't cover this screen
     let llmResult: LLMResult = { model: null, controller: null }
-    if ((needsModel || needsController) && viewTree && config.llm.provider !== 'none') {
+    const hasBatchController = batchControllers.has(safeName)
+
+    if ((needsModel || (needsController && !hasBatchController)) && viewTree && config.llm.provider !== 'none') {
       llmResult = await tryLLMGeneration(screen, viewTree, cwd, config)
     }
 
-    // Generate model if no override
     if (needsModel) {
       const model = llmResult.model ?? await buildHeuristicModel(screen, viewTree, devToolConfig)
       const modelMeta = {
@@ -151,15 +204,16 @@ export async function generateAll(
       modelsGenerated++
     }
 
-    // Generate controller if no override
     if (needsController) {
-      const controller = llmResult.controller ?? buildHeuristicController(screen, viewTree)
+      const controller = batchControllers.get(safeName)
+        ?? llmResult.controller
+        ?? buildHeuristicController(screen, viewTree)
       const controllerContent = generateControllerFileContent(controller)
       await writeFile(join(screenOutDir, 'controller.ts'), controllerContent, 'utf-8')
       controllersGenerated++
     }
 
-    // Step 4: Write adapter.ts — always regenerated
+    // Adapter — always regenerated
     const adapterContent = buildAdapterContent(screen, screenOutDir)
     await writeFile(join(screenOutDir, 'adapter.ts'), adapterContent, 'utf-8')
     adaptersGenerated++
