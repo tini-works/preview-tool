@@ -1,5 +1,14 @@
 import type { ScreenManifestEntry } from '../analyzer/types.js'
 
+function resolveScreenImport(filePath: string): string {
+  // The .preview/ directory uses @host alias → cwd/src
+  // Convert "src/pages/home.tsx" → "@host/pages/home.tsx"
+  if (filePath.startsWith('src/')) {
+    return '@host/' + filePath.slice(4)
+  }
+  return '../' + filePath
+}
+
 function formatRegions(entry: ScreenManifestEntry): string {
   if (entry.regions.length === 0) {
     return '[]'
@@ -31,7 +40,7 @@ export function generateScreenRegistry(
     return `  {
     name: ${JSON.stringify(screen.name)},
     route: ${JSON.stringify(screen.path)},
-    module: () => import(${JSON.stringify(screen.file)}),
+    module: () => import(${JSON.stringify(resolveScreenImport(screen.file))}),
     regions: ${regions},
   }`
   })

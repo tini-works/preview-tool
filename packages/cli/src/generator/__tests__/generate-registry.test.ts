@@ -31,7 +31,7 @@ describe('generateScreenRegistry', () => {
     const code = generateScreenRegistry(screens)
 
     expect(code).toContain('() => import(')
-    expect(code).toContain('src/screens/Home.tsx')
+    expect(code).toContain('@host/screens/Home.tsx')
   })
 
   it('includes route, module, and regions for each screen entry', () => {
