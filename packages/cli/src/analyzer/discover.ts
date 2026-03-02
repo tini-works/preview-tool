@@ -1,21 +1,32 @@
 import { glob } from 'glob'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
-import type { DiscoveredScreen } from './types.js'
+
+// TODO: Rework discover.ts for v2 DiscoveredScreen shape (Phase 2)
+// Using a local legacy type until this module is rewritten.
+interface LegacyDiscoveredScreen {
+  filePath: string
+  route: string
+  pattern: 'mvc' | 'props' | 'hooks' | 'monolithic'
+  viewFile?: string
+  modelFile?: string
+  controllerFile?: string
+  exportName?: string
+}
 
 const EXCLUDED_DIRS = ['_shared', '_test-helpers', 'node_modules', '__tests__']
 
 export async function discoverScreens(
   cwd: string,
   screenGlob: string
-): Promise<DiscoveredScreen[]> {
+): Promise<LegacyDiscoveredScreen[]> {
   const matches = await glob(screenGlob, {
     cwd,
     absolute: false,
     posix: true,
   })
 
-  const screens: DiscoveredScreen[] = []
+  const screens: LegacyDiscoveredScreen[] = []
 
   for (const match of matches) {
     // Filter out excluded directories
@@ -46,7 +57,7 @@ export async function discoverScreens(
     const route = deriveRoute(cwd, match)
     const pattern = detectPattern(screenDir)
 
-    const screen: DiscoveredScreen = {
+    const screen: LegacyDiscoveredScreen = {
       filePath: absolutePath,
       route,
       pattern: pattern.type,

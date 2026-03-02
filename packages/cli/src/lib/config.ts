@@ -1,6 +1,12 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import type { LLMConfig } from '../llm/types.js'
+
+// Inlined from removed llm/types.ts — will be replaced in v2 config rework
+export interface LLMConfig {
+  provider: 'auto' | 'claude-code' | 'ollama' | 'anthropic' | 'openai' | 'none'
+  ollamaModel: string
+  ollamaUrl: string
+}
 
 export interface PreviewConfig {
   screenGlob: string

@@ -8,7 +8,6 @@ import { detectFramework } from '../resolver/detect-framework.js'
 import { generateWrapperCode } from '../resolver/generate-wrapper.js'
 import { installDependencies, ensureNodeModules } from '../resolver/install-deps.js'
 import { initPreview } from './init.js'
-import { generateAll } from '../generator/index.js'
 import { readConfig, DEFAULT_CONFIG, PREVIEW_DIR } from '../lib/config.js'
 import { generateEntryFiles } from '../server/generate-entry.js'
 import { createViteConfig } from '../server/create-vite-config.js'
@@ -79,14 +78,14 @@ export const previewCommand = new Command('preview')
       await initPreview(resolved.cwd, config, wrapperCode)
     }
 
-    // Step 5: Generate MVC files
+    // Step 5: Generate preview artifacts
+    // TODO: v2 generation pipeline — will be wired in Phase 4
     console.log(chalk.dim('\nGenerating preview artifacts...'))
     const config = await readConfig(resolved.cwd)
     if (!options.llm) {
       config.llm = { ...config.llm, provider: 'none' }
     }
-    const result = await generateAll(resolved.cwd, config, framework.devToolConfig)
-    console.log(chalk.green(`  ${result.screensFound} screens found, ${result.adaptersGenerated} adapters generated`))
+    console.log(chalk.yellow('  Generation not yet implemented in v2'))
 
     // Step 6: Start dev server
     if (options.port) {
