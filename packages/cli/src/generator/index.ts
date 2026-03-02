@@ -96,6 +96,7 @@ export async function generateAll(
     screenOutDir: string
     overrideScreenDir: string
     viewTree: ViewTree | null
+    hookResult: HookAnalysisResult | null
   }> = []
 
   for (const screen of screens) {
@@ -115,7 +116,15 @@ export async function generateAll(
       console.log(chalk.yellow(`    View analysis failed, using legacy fallback: ${message}`))
     }
 
-    screenData.push({ screen, safeName, screenOutDir, overrideScreenDir, viewTree })
+    let hookResult: HookAnalysisResult | null = null
+    try {
+      const source = await readFile(screen.filePath, 'utf-8')
+      hookResult = analyzeHooks(source, screen.filePath)
+    } catch {
+      // Skip screens that can't be read
+    }
+
+    screenData.push({ screen, safeName, screenOutDir, overrideScreenDir, viewTree, hookResult })
   }
 
   // Phase 2: Attempt batch controller generation via claude-code
@@ -155,7 +164,7 @@ export async function generateAll(
   }
 
   // Phase 3: Generate files per screen (using batch results where available)
-  for (const { screen, safeName, screenOutDir, overrideScreenDir, viewTree } of screenData) {
+  for (const { screen, safeName, screenOutDir, overrideScreenDir, viewTree, hookResult } of screenData) {
     // Write view.ts
     if (viewTree) {
       const viewContent = generateViewFileContent(viewTree)
@@ -193,7 +202,7 @@ export async function generateAll(
     }
 
     if (needsModel) {
-      const model = llmResult.model ?? await buildHeuristicModel(screen, viewTree, devToolConfig)
+      const model = llmResult.model ?? await buildHeuristicModel(screen, viewTree, devToolConfig, hookResult)
       const modelMeta = {
         route: screen.route,
         pattern: screen.pattern,
@@ -224,17 +233,10 @@ export async function generateAll(
   const mocksDir = join(previewDir, 'mocks')
   await mkdir(mocksDir, { recursive: true })
 
-  // Collect all hook analyses across screens
-  const allHookResults: HookAnalysisResult[] = []
-  for (const screen of screens) {
-    try {
-      const source = await readFile(screen.filePath, 'utf-8')
-      const hookResult = analyzeHooks(source, screen.filePath)
-      allHookResults.push(hookResult)
-    } catch {
-      // Skip screens that can't be read
-    }
-  }
+  // Collect all hook analyses across screens (reuse Phase 1 results)
+  const allHookResults: HookAnalysisResult[] = screenData
+    .map((d) => d.hookResult)
+    .filter((r): r is HookAnalysisResult => r !== null)
 
   // Group hooks by import path
   const hooksByImport = new Map<string, HookAnalysis[]>()
@@ -439,6 +441,7 @@ async function buildHeuristicModel(
   screen: DiscoveredScreen,
   viewTree: ViewTree | null,
   devToolConfig?: DevToolConfig | null,
+  hookResults?: HookAnalysisResult | null,
 ): Promise<ModelOutput> {
   const regions: ModelOutput['regions'] = {}
 
@@ -519,6 +522,23 @@ async function buildHeuristicModel(
       }
     } catch {
       // Empty regions as last resort
+    }
+  }
+
+  // Enrich regions with hookMapping from hook analysis
+  if (hookResults) {
+    for (const hook of hookResults.hooks) {
+      if (hook.sectionId && regions[hook.sectionId]) {
+        regions[hook.sectionId] = {
+          ...regions[hook.sectionId],
+          hookMapping: {
+            type: hook.hookMappingType ?? 'unknown',
+            hookName: hook.hookName,
+            identifier: hook.sectionId,
+            importPath: hook.importPath,
+          },
+        }
+      }
     }
   }
 
