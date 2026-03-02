@@ -1,7 +1,7 @@
 export * from './types.ts'
 export { PreviewShell } from './PreviewShell.tsx'
 export { ScreenErrorBoundary } from './ErrorBoundary.tsx'
-export { ScreenRenderer, assembleRegionData, computeRegionData, resolveFlags } from './ScreenRenderer.tsx'
+export { ScreenRenderer } from './ScreenRenderer.tsx'
 export { RegionDataProvider, useRegionDataForHook } from './RegionDataContext.tsx'
 export { registerScreens, getScreenEntries, getScreenEntry } from './ScreenRegistry.ts'
 export { registerFlows, getFlowActions, clearFlowRegistry } from './flow/index.ts'
