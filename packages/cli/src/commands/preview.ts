@@ -11,18 +11,18 @@ import { initPreview } from './init.js'
 import { readConfig, DEFAULT_CONFIG, PREVIEW_DIR } from '../lib/config.js'
 import { generateEntryFiles } from '../server/generate-entry.js'
 import { createViteConfig } from '../server/create-vite-config.js'
+import { generateAll } from '../generator/index.js'
+import { createWatcher } from '../server/watcher.js'
 
 export const previewCommand = new Command('preview')
   .description('Preview an external app (init + generate + dev in one command)')
   .argument('<source>', 'Local path or GitHub URL to the frontend project')
   .option('--path <subdir>', 'Subdirectory within the repo (for monorepos)')
   .option('--keep', 'Keep cloned temp directory on exit')
-  .option('--no-llm', 'Skip LLM generation, use heuristic fallback only')
   .option('-p, --port <port>', 'Dev server port')
   .action(async (source: string, options: {
     path?: string
     keep?: boolean
-    llm: boolean
     port?: string
   }) => {
     console.log(chalk.bold('\nPreview Tool\n'))
@@ -79,13 +79,19 @@ export const previewCommand = new Command('preview')
     }
 
     // Step 5: Generate preview artifacts
-    // TODO: v2 generation pipeline — will be wired in Phase 4
     console.log(chalk.dim('\nGenerating preview artifacts...'))
     const config = await readConfig(resolved.cwd)
-    if (!options.llm) {
-      config.llm = { ...config.llm, provider: 'none' }
+
+    try {
+      const result = await generateAll(resolved.cwd, config)
+      console.log(chalk.green(`  Screens found:    ${result.screensFound}`))
+      console.log(chalk.green(`  Regions inferred: ${result.regionsInferred}`))
+      console.log(chalk.green(`  Mocks generated:  ${result.mocksGenerated}`))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(chalk.red(`Generation failed: ${message}`))
+      process.exit(1)
     }
-    console.log(chalk.yellow('  Generation not yet implemented in v2'))
 
     // Step 6: Start dev server
     if (options.port) {
@@ -117,6 +123,17 @@ export const previewCommand = new Command('preview')
       console.log(chalk.cyan(`  http://localhost:${actualPort}`))
       console.log('')
       console.log(chalk.dim('  Press Ctrl+C to stop'))
+
+      // Step 7: Start file watcher for incremental re-analysis
+      const watcher = createWatcher(resolved.cwd, config, () => {
+        console.log(chalk.dim('  Files changed — re-analyzed'))
+      })
+
+      const cleanupWatcher = () => {
+        watcher.close()
+      }
+      process.on('SIGINT', () => { cleanupWatcher(); process.exit(0) })
+      process.on('SIGTERM', () => { cleanupWatcher(); process.exit(0) })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.error(chalk.red(`Failed to start dev server: ${message}`))
