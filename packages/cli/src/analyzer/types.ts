@@ -158,7 +158,7 @@ export interface ImportAnalysis {
   /** Whether this import needs mocking */
   needsMocking: boolean
   /** Why it needs mocking */
-  reason: 'data-hook' | 'auth-store' | 'devtool-store' | 'api-client' | 'collection'
+  reason: 'data-hook' | 'auth-store' | 'devtool-store' | 'api-client' | 'collection' | 'query-client' | 'db-library' | 'mock-data'
 }
 
 export interface HookAnalysisResult {

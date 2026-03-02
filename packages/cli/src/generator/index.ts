@@ -14,7 +14,15 @@ import { buildBatchGenerateMCPrompt } from '../llm/prompts/generate-mc-batch.js'
 import type { BatchScreenInput } from '../llm/prompts/generate-mc-batch.js'
 import { analyzeHooks } from '../analyzer/analyze-hooks.js'
 import { generateMockHook } from './generate-mock-hooks.js'
-import { generateMockAuthStore, generateMockDevToolStore } from './generate-mock-stores.js'
+import {
+  generateMockAuthStore,
+  generateMockDevToolStore,
+  generateMockApiClient,
+  generateMockCollection,
+  generateMockQueryClient,
+  generateMockDbLibrary,
+  generateMockDataModule,
+} from './generate-mock-stores.js'
 import { ModelOutputSchema } from '../llm/schemas/model.js'
 import { ControllerOutputSchema } from '../llm/schemas/controller.js'
 import type { PreviewConfig } from '../lib/config.js'
@@ -202,7 +210,8 @@ export async function generateAll(
     }
 
     if (needsModel) {
-      const model = llmResult.model ?? await buildHeuristicModel(screen, viewTree, devToolConfig, hookResult)
+      const rawModel = llmResult.model ?? await buildHeuristicModel(screen, viewTree, devToolConfig, hookResult)
+      const model = enrichModelWithHookMapping(rawModel, hookResult)
       const modelMeta = {
         route: screen.route,
         pattern: screen.pattern,
@@ -249,18 +258,20 @@ export async function generateAll(
       hooksByImport.set(hook.importPath, existing)
     }
     for (const imp of result.imports) {
-      if (imp.needsMocking && !importsToMock.has(imp.path)) {
-        importsToMock.set(imp.path, imp)
+      if (!imp.needsMocking) continue
+      const existing = importsToMock.get(imp.path)
+      if (existing) {
+        const merged = [...new Set([...existing.namedExports, ...imp.namedExports])]
+        importsToMock.set(imp.path, { ...existing, namedExports: merged })
+      } else {
+        importsToMock.set(imp.path, { ...imp, namedExports: [...imp.namedExports] })
       }
     }
   }
 
   // Generate mock hook files
   for (const [importPath, hooks] of hooksByImport) {
-    const safeName = importPath
-      .replace(/^@\//, '')
-      .replace(/\//g, '--')
-      .replace(/[^a-zA-Z0-9\-_]/g, '_')
+    const safeName = toSafeMockName(importPath)
     const mockCode = generateMockHook(hooks, importPath)
     await writeFile(join(mocksDir, `${safeName}.ts`), mockCode, 'utf-8')
     console.log(chalk.dim(`  Mock: ${importPath} → mocks/${safeName}.ts`))
@@ -279,15 +290,51 @@ export async function generateAll(
     console.log(chalk.dim('  Mock: devtool store'))
   }
 
+  // Generate mock API clients
+  const apiImports = [...importsToMock.values()].filter((i) => i.reason === 'api-client')
+  for (const imp of apiImports) {
+    const safeName = toSafeMockName(imp.path)
+    await writeFile(join(mocksDir, `${safeName}.ts`), generateMockApiClient(imp.namedExports), 'utf-8')
+    console.log(chalk.dim(`  Mock: api-client → mocks/${safeName}.ts`))
+  }
+
+  // Generate mock collections
+  const collectionImports = [...importsToMock.values()].filter((i) => i.reason === 'collection')
+  for (const imp of collectionImports) {
+    const safeName = toSafeMockName(imp.path)
+    await writeFile(join(mocksDir, `${safeName}.ts`), generateMockCollection(imp.namedExports), 'utf-8')
+    console.log(chalk.dim(`  Mock: collection → mocks/${safeName}.ts`))
+  }
+
+  // Generate mock query client
+  const queryClientImports = [...importsToMock.values()].filter((i) => i.reason === 'query-client')
+  for (const imp of queryClientImports) {
+    const safeName = toSafeMockName(imp.path)
+    await writeFile(join(mocksDir, `${safeName}.ts`), generateMockQueryClient(), 'utf-8')
+    console.log(chalk.dim(`  Mock: query-client → mocks/${safeName}.ts`))
+  }
+
+  // Generate mock DB library
+  const dbLibraryImports = [...importsToMock.values()].filter((i) => i.reason === 'db-library')
+  for (const imp of dbLibraryImports) {
+    const safeName = toSafeMockName(imp.path)
+    await writeFile(join(mocksDir, `${safeName}.ts`), generateMockDbLibrary(), 'utf-8')
+    console.log(chalk.dim(`  Mock: db-library → mocks/${safeName}.ts`))
+  }
+
+  // Generate mock data modules
+  const mockDataImports = [...importsToMock.values()].filter((i) => i.reason === 'mock-data')
+  for (const imp of mockDataImports) {
+    const safeName = toSafeMockName(imp.path)
+    await writeFile(join(mocksDir, `${safeName}.ts`), generateMockDataModule(imp.namedExports), 'utf-8')
+    console.log(chalk.dim(`  Mock: mock-data → mocks/${safeName}.ts`))
+  }
+
   // Write alias manifest for Vite config
   const aliasManifest: Record<string, string> = {}
 
   for (const [importPath] of hooksByImport) {
-    const safeName = importPath
-      .replace(/^@\//, '')
-      .replace(/\//g, '--')
-      .replace(/[^a-zA-Z0-9\-_]/g, '_')
-    aliasManifest[importPath] = `./mocks/${safeName}.ts`
+    aliasManifest[importPath] = `./mocks/${toSafeMockName(importPath)}.ts`
   }
 
   if (authImport) {
@@ -297,13 +344,33 @@ export async function generateAll(
     aliasManifest[devtoolImport.path] = './mocks/devtool-store.ts'
   }
 
+  // Add alias entries for all new mock categories
+  const extraMockImports = [
+    ...apiImports,
+    ...collectionImports,
+    ...queryClientImports,
+    ...dbLibraryImports,
+    ...mockDataImports,
+  ]
+  for (const imp of extraMockImports) {
+    const safeName = toSafeMockName(imp.path)
+    aliasManifest[imp.path] = `./mocks/${safeName}.ts`
+  }
+
   await writeFile(
     join(previewDir, 'alias-manifest.json'),
     JSON.stringify(aliasManifest, null, 2),
     'utf-8'
   )
 
-  const mocksGenerated = hooksByImport.size + (authImport ? 1 : 0) + (devtoolImport ? 1 : 0)
+  const mocksGenerated = hooksByImport.size
+    + (authImport ? 1 : 0)
+    + (devtoolImport ? 1 : 0)
+    + apiImports.length
+    + collectionImports.length
+    + queryClientImports.length
+    + dbLibraryImports.length
+    + mockDataImports.length
   console.log(chalk.dim(`  ${mocksGenerated} mock module(s) generated`))
 
   return {
@@ -525,24 +592,98 @@ async function buildHeuristicModel(
     }
   }
 
-  // Enrich regions with hookMapping from hook analysis
-  if (hookResults) {
-    for (const hook of hookResults.hooks) {
-      if (hook.sectionId && regions[hook.sectionId]) {
-        regions[hook.sectionId] = {
-          ...regions[hook.sectionId],
+  return { regions }
+}
+
+/**
+ * Enrich model regions with hookMapping from hook analysis.
+ * Works for both LLM-generated and heuristic models.
+ *
+ * Strategy:
+ * 1. Exact match: hook.sectionId === regionKey → assign directly
+ * 2. Unmatched hooks get their own regions created (so inspector can control them)
+ *
+ * This ensures every data-fetching hook is controllable from the inspector panel.
+ */
+export function enrichModelWithHookMapping(
+  model: ModelOutput,
+  hookResults: HookAnalysisResult | null | undefined,
+): ModelOutput {
+  if (!hookResults || hookResults.hooks.length === 0) return model
+
+  let regions = { ...model.regions }
+  const assignedRegions = new Set<string>()
+
+  for (const hook of hookResults.hooks) {
+    if (!hook.sectionId) continue
+
+    // 1. Exact match: sectionId === regionKey
+    if (regions[hook.sectionId]) {
+      if (!regions[hook.sectionId].hookMapping) {
+        regions = {
+          ...regions,
+          [hook.sectionId]: {
+            ...regions[hook.sectionId],
+            hookMapping: {
+              type: hook.hookMappingType ?? 'unknown',
+              hookName: hook.hookName,
+              identifier: hook.sectionId,
+              importPath: hook.importPath,
+            },
+          },
+        }
+      }
+      assignedRegions.add(hook.sectionId)
+      continue
+    }
+
+    // 2. No matching region — find an unassigned region to attach to,
+    //    or create a new region keyed by the sectionId
+    const unassigned = Object.keys(regions).find(
+      (k) => !assignedRegions.has(k) && !regions[k].hookMapping
+    )
+    if (unassigned) {
+      regions = {
+        ...regions,
+        [unassigned]: {
+          ...regions[unassigned],
           hookMapping: {
             type: hook.hookMappingType ?? 'unknown',
             hookName: hook.hookName,
             identifier: hook.sectionId,
             importPath: hook.importPath,
           },
-        }
+        },
       }
+      assignedRegions.add(unassigned)
+    } else {
+      // Create a new region for this hook
+      const label = formatLabel(hook.sectionId)
+      regions = {
+        ...regions,
+        [hook.sectionId]: {
+          label,
+          component: 'Screen',
+          componentPath: '',
+          states: {
+            populated: buildStateData('populated', label),
+            loading: buildStateData('loading', label),
+            empty: buildStateData('empty', label),
+          },
+          defaultState: 'populated',
+          hookMapping: {
+            type: hook.hookMappingType ?? 'unknown',
+            hookName: hook.hookName,
+            identifier: hook.sectionId,
+            importPath: hook.importPath,
+          },
+        },
+      }
+      assignedRegions.add(hook.sectionId)
     }
   }
 
-  return { regions }
+  return { ...model, regions }
 }
 
 function buildHeuristicController(
@@ -806,6 +947,16 @@ function deriveScreenName(route: string): string {
 /**
  * Converts a route like "/booking/time-slots" to a safe folder name "booking--time-slots"
  */
+/**
+ * Converts an import path like "@/lib/api" to a safe filename "lib--api"
+ */
+function toSafeMockName(importPath: string): string {
+  return importPath
+    .replace(/^@\//, '')
+    .replace(/\//g, '--')
+    .replace(/[^a-zA-Z0-9\-_]/g, '_')
+}
+
 function routeToFolderName(route: string): string {
   return route
     .replace(/^\//, '')

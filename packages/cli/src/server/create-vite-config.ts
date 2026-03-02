@@ -70,17 +70,35 @@ export async function createViteConfig(
   const reactDomPath = dirname(hostRequire.resolve('react-dom/package.json'))
 
   // Load alias manifest for mock hook redirection
-  let mockAliases: Record<string, string> = {}
+  const mockAliasEntries: Array<{ find: string; replacement: string }> = []
   try {
     const aliasManifestPath = join(previewDir, 'alias-manifest.json')
     const raw = readFileSync(aliasManifestPath, 'utf-8')
     const manifest = JSON.parse(raw) as Record<string, string>
     for (const [importPath, mockPath] of Object.entries(manifest)) {
-      mockAliases[importPath] = join(previewDir, mockPath)
+      mockAliasEntries.push({ find: importPath, replacement: join(previewDir, mockPath) })
     }
   } catch {
     // No alias manifest — no mock hooks
   }
+
+  // Use array format to guarantee ordering: specific mock aliases first,
+  // then React deduplication, then general @/ alias last.
+  // With object format, @/ can match @/lib/api before the specific mock alias.
+  const aliasArray = [
+    // 1. Mock aliases (most specific — must come first)
+    ...mockAliasEntries,
+    // 2. React deduplication
+    { find: 'react', replacement: reactPath },
+    { find: 'react-dom', replacement: reactDomPath },
+    // 3. Runtime and host aliases
+    { find: '@preview-tool/runtime', replacement: join(runtimeRoot, 'src', 'index.ts') },
+    { find: '@host', replacement: join(cwd, 'src') },
+    { find: '@preview', replacement: previewDir },
+    // 4. General @/ alias (must be last — catches anything not matched above)
+    { find: '@/', replacement: join(cwd, 'src') + '/' },
+    { find: '@', replacement: join(cwd, 'src') },
+  ]
 
   return {
     root: previewDir,
@@ -92,19 +110,7 @@ export async function createViteConfig(
       },
     },
     resolve: {
-      alias: {
-        // Mock hook aliases (must come before general @ alias)
-        ...mockAliases,
-        // React deduplication
-        'react': reactPath,
-        'react-dom': reactDomPath,
-        // Runtime and host aliases
-        '@preview-tool/runtime': join(runtimeRoot, 'src', 'index.ts'),
-        '@host': join(cwd, 'src'),
-        '@preview': previewDir,
-        '@/': join(cwd, 'src') + '/',
-        '@': join(cwd, 'src'),
-      },
+      alias: aliasArray,
       dedupe: ['react', 'react-dom'],
     },
     plugins,

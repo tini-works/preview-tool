@@ -15,6 +15,9 @@ const MOCK_IMPORT_PATTERNS: Array<{ pattern: RegExp; reason: ImportAnalysis['rea
   { pattern: /stores?\/auth/i, reason: 'auth-store' },
   { pattern: /lib\/api|services\/api|api\/client/i, reason: 'api-client' },
   { pattern: /lib\/collections|collections/i, reason: 'collection' },
+  { pattern: /lib\/query-client|query-client/i, reason: 'query-client' },
+  { pattern: /@tanstack\/react-db/i, reason: 'db-library' },
+  { pattern: /devtool\/mocks|devtools?\/mock/i, reason: 'mock-data' },
 ]
 
 /** Determine the hookMappingType for a given hook name */
@@ -67,8 +70,13 @@ export function analyzeHooks(source: string, _filePath: string): HookAnalysisRes
           })
           .filter(Boolean)
 
-        // Don't add duplicates
-        if (!imports.some((i) => i.path === importPath)) {
+        // Merge into existing entry or add new one (immutable)
+        const existingIdx = imports.findIndex((i) => i.path === importPath)
+        if (existingIdx !== -1) {
+          const prev = imports[existingIdx]
+          const merged = [...new Set([...prev.namedExports, ...namedExports])]
+          imports[existingIdx] = { ...prev, namedExports: merged }
+        } else {
           imports.push({
             path: importPath,
             namedExports,
@@ -91,6 +99,27 @@ export function analyzeHooks(source: string, _filePath: string): HookAnalysisRes
     // Only add if not already in the map (named imports take priority)
     if (!importMap.has(localName)) {
       importMap.set(localName, { originalName: localName, importPath })
+    }
+
+    // Check if this default import path needs mocking
+    for (const { pattern, reason } of MOCK_IMPORT_PATTERNS) {
+      if (pattern.test(importPath)) {
+        const existingIdx = imports.findIndex((i) => i.path === importPath)
+        if (existingIdx !== -1) {
+          const prev = imports[existingIdx]
+          if (!prev.namedExports.includes('default')) {
+            imports[existingIdx] = { ...prev, namedExports: [...prev.namedExports, 'default'] }
+          }
+        } else {
+          imports.push({
+            path: importPath,
+            namedExports: ['default'],
+            needsMocking: true,
+            reason,
+          })
+        }
+        break
+      }
     }
   }
 

@@ -207,4 +207,80 @@ export default function Page() {
     const result = analyzeHooks(source, 'src/pages/page.tsx')
     expect(result.hooks[0].hookMappingType).toBe('query-hook')
   })
+
+  it('detects query-client imports', () => {
+    const source = `
+import { queryClient } from '@/lib/query-client'
+
+export default function App() {
+  return <div />
+}
+`
+    const result = analyzeHooks(source, 'src/app.tsx')
+    expect(result.imports).toContainEqual(
+      expect.objectContaining({
+        path: '@/lib/query-client',
+        needsMocking: true,
+        reason: 'query-client',
+      })
+    )
+  })
+
+  it('detects @tanstack/react-db as db-library', () => {
+    const source = `
+import { eq, createCollection, useLiveQuery } from '@tanstack/react-db'
+
+export default function Page() {
+  const { data } = useLiveQuery(() => [])
+  return <div />
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.imports).toContainEqual(
+      expect.objectContaining({
+        path: '@tanstack/react-db',
+        needsMocking: true,
+        reason: 'db-library',
+        namedExports: expect.arrayContaining(['eq', 'createCollection', 'useLiveQuery']),
+      })
+    )
+  })
+
+  it('detects devtool mock data imports', () => {
+    const source = `
+import { mockAvailableTimes, mockAvailability } from '@/devtool/mocks/availability'
+
+export default function Page() {
+  return <div>{mockAvailableTimes.length}</div>
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.imports).toContainEqual(
+      expect.objectContaining({
+        path: '@/devtool/mocks/availability',
+        needsMocking: true,
+        reason: 'mock-data',
+        namedExports: expect.arrayContaining(['mockAvailableTimes', 'mockAvailability']),
+      })
+    )
+  })
+
+  it('detects default imports that match mock patterns', () => {
+    const source = `
+import api from '@/lib/api'
+
+export default function Page() {
+  return <div />
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.imports).toContainEqual(
+      expect.objectContaining({
+        path: '@/lib/api',
+        needsMocking: true,
+        reason: 'api-client',
+        namedExports: expect.arrayContaining(['default']),
+      })
+    )
+  })
 })
