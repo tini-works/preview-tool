@@ -5,6 +5,8 @@ import { join, resolve } from 'node:path'
 import { readConfig } from '../lib/config.js'
 import { createViteConfig } from '../server/create-vite-config.js'
 import { generateEntryFiles } from '../server/generate-entry.js'
+import { generateAll } from '../generator/index.js'
+import { createWatcher } from '../server/watcher.js'
 
 export const devCommand = new Command('dev')
   .description('Start preview dev server')
@@ -20,6 +22,20 @@ export const devCommand = new Command('dev')
     // Override port from CLI flag if provided
     if (options.port) {
       config.port = parseInt(options.port, 10)
+    }
+
+    // Run v2 generation pipeline
+    console.log(chalk.dim('Analyzing screens and generating mocks...'))
+    try {
+      const result = await generateAll(cwd, config)
+      console.log(chalk.green(`  Screens found:    ${result.screensFound}`))
+      console.log(chalk.green(`  Regions inferred: ${result.regionsInferred}`))
+      console.log(chalk.green(`  Mocks generated:  ${result.mocksGenerated}`))
+      console.log('')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(chalk.red(`Generation failed: ${message}`))
+      process.exit(1)
     }
 
     // Generate entry files (index.html + main.tsx)
@@ -50,6 +66,17 @@ export const devCommand = new Command('dev')
       console.log('')
       console.log(chalk.dim('  Press Ctrl+C to stop'))
       console.log('')
+
+      // Start file watcher for incremental re-analysis
+      const watcher = createWatcher(cwd, config, () => {
+        console.log(chalk.dim('  Files changed — re-analyzed'))
+      })
+
+      const cleanupWatcher = () => {
+        watcher.close()
+      }
+      process.on('SIGINT', () => { cleanupWatcher(); process.exit(0) })
+      process.on('SIGTERM', () => { cleanupWatcher(); process.exit(0) })
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.error(chalk.red(`Failed to start dev server: ${message}`))
