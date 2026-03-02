@@ -109,89 +109,14 @@ function generateMainTsx(): string {
 import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { PreviewShell } from '@preview-tool/runtime'
-import type { ScreenEntry } from '@preview-tool/runtime'
-import { Wrapper } from './wrapper'
+import { screens } from './screens.ts'
 import './preview.css'
 
-// Auto-discover from per-screen folders
-const screenModules = import.meta.glob('./screens/*/adapter.ts')
-const modelModules = import.meta.glob('./screens/*/model.ts', { eager: true }) as Record<
-  string,
-  { meta: { route: string }; regions: Record<string, unknown> }
->
-
-// Auto-discover user overrides
-const overrideModelModules = import.meta.glob('./overrides/*/model.ts', { eager: true }) as Record<
-  string,
-  { regions?: Record<string, unknown> }
->
-
-// Auto-discover mock hook modules with registerModels
-const mockModules = import.meta.glob('./mocks/*.ts', { eager: true }) as Record<
-  string,
-  { registerModels?: (models: Record<string, Record<string, unknown>>) => void }
->
-
-/**
- * Merge override regions into the base model data.
- * Override regions are shallow-merged by key.
- */
-function mergeOverrides(
-  base: { regions: Record<string, unknown> },
-  override: { regions?: Record<string, unknown> } | undefined
-): { regions: Record<string, unknown> } {
-  if (!override) return base
-  return {
-    regions: { ...base.regions, ...(override.regions ?? {}) },
-  }
-}
-
-// Build screen entries by matching adapter path to model path via folder name
-const entries: ScreenEntry[] = []
-const allRegions: Record<string, Record<string, unknown>> = {}
-
-for (const [adapterPath, importFn] of Object.entries(screenModules)) {
-  const parts = adapterPath.split('/')
-  const folderName = parts[parts.length - 2] ?? ''
-  const modelPath = \`./screens/\${folderName}/model.ts\`
-  const overrideModelPath = \`./overrides/\${folderName}/model.ts\`
-
-  const model = modelModules[modelPath]
-  if (!model) continue
-
-  const override = overrideModelModules[overrideModelPath]
-  const merged = mergeOverrides(model, override)
-
-  entries.push({
-    route: model.meta.route,
-    module: importFn as () => Promise<{ default: React.ComponentType<{ data: unknown; flags?: Record<string, boolean> }> }>,
-    regions: merged.regions as ScreenEntry['regions'],
-  })
-
-  // Collect all region states for mock hook registration
-  const regions = merged.regions as Record<string, { states?: Record<string, unknown> }>
-  for (const [regionId, region] of Object.entries(regions)) {
-    if (region.states) {
-      allRegions[regionId] = region.states as Record<string, unknown>
-    }
-  }
-}
-
-// Register all region data with mock hooks so they can serve the right mock data
-for (const mod of Object.values(mockModules)) {
-  if (typeof mod.registerModels === 'function') {
-    mod.registerModels(allRegions)
-  }
-}
-
-// Render
 const root = document.getElementById('root')
 if (root) {
   createRoot(root).render(
     <React.StrictMode>
-      <Wrapper>
-        <PreviewShell screens={entries} />
-      </Wrapper>
+      <PreviewShell screens={screens} title="Preview Tool" />
     </React.StrictMode>
   )
 }
