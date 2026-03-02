@@ -17,6 +17,12 @@ export interface AnalyzedRegion {
   isList?: boolean
   defaultCount?: number
   mockItems?: unknown[]
+  hookMapping?: {
+    type: HookMappingType
+    hookName: string
+    identifier: string
+    importPath: string
+  }
 }
 
 export interface AnalyzedFlow {
@@ -70,6 +76,12 @@ export interface ComponentRegion {
   isList?: boolean
   mockItems?: unknown[]
   defaultCount?: number
+  hookMapping?: {
+    type: HookMappingType
+    hookName: string
+    identifier: string
+    importPath: string
+  }
 }
 
 export interface ModelOutput {
@@ -117,6 +129,10 @@ export interface LLMGenerationOutput {
   controller: ControllerOutput
 }
 
+// === Hook Mapping Types ===
+
+export type HookMappingType = 'query-hook' | 'custom-hook' | 'store' | 'context' | 'prop' | 'local-state' | 'unknown'
+
 // === Hook Analysis (for module aliasing) ===
 
 export interface HookAnalysis {
@@ -130,6 +146,8 @@ export interface HookAnalysis {
   queryKey?: string
   /** Return shape: what the hook returns */
   returnShape: 'data-loading-error' | 'state-setter' | 'unknown'
+  /** Mapping type for the region data context */
+  hookMappingType?: HookMappingType
 }
 
 export interface ImportAnalysis {
