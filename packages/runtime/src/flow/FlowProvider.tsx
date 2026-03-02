@@ -1,4 +1,4 @@
-import { useCallback, useRef, type ReactNode } from 'react'
+import { useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { useDevToolsStore } from '../store/useDevToolsStore.ts'
 import { getFlowActions } from './FlowRegistry.ts'
 import { resolveTrigger } from './trigger-matcher.ts'
@@ -33,6 +33,18 @@ export function FlowProvider({ children }: FlowProviderProps) {
 
   const actions = selectedRoute ? getFlowActions(selectedRoute) : null
   const modules = getScreenEntries()
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const customEvent = e as CustomEvent
+      const to = customEvent.detail?.to
+      if (typeof to === 'string') {
+        navigateFlow(to)
+      }
+    }
+    window.addEventListener('preview-navigate', handler)
+    return () => window.removeEventListener('preview-navigate', handler)
+  }, [navigateFlow])
 
   const handleClick = useCallback(
     (e: React.MouseEvent<HTMLDivElement>) => {
