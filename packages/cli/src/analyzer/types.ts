@@ -30,7 +30,7 @@ export type HookCategory =
 export interface ExtractedHook {
   readonly hookName: string
   readonly importPath: string
-  readonly callArgs: string[]
+  readonly callArgs: readonly string[]
   readonly isProjectLocal: boolean
 }
 
@@ -62,7 +62,7 @@ export interface ScreenRegion {
   readonly states: readonly string[]
   readonly defaultState: string
   readonly isList: boolean
-  readonly mockData: Record<string, Record<string, unknown>>
+  readonly mockData: Readonly<Record<string, Readonly<Record<string, unknown>>>>
 }
 
 // --- Screen Analysis Result ---

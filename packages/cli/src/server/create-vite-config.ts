@@ -1,29 +1,9 @@
 import { join, dirname } from 'node:path'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { fileURLToPath } from 'node:url'
 import type { PreviewConfig } from '../lib/config.js'
 import { PREVIEW_DIR } from '../lib/config.js'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
-
-/**
- * Resolve the @preview-tool/runtime package root.
- */
-function resolveRuntimePath(): string {
-  const require = createRequire(import.meta.url)
-  const runtimeEntry = require.resolve('@preview-tool/runtime')
-  let dir = dirname(runtimeEntry)
-  for (let i = 0; i < 5; i++) {
-    try {
-      require.resolve(join(dir, 'package.json'))
-      return dir
-    } catch {
-      dir = dirname(dir)
-    }
-  }
-  return dirname(runtimeEntry)
-}
+import { resolveRuntimePath } from '../lib/resolve-runtime.js'
 
 /**
  * Creates a Vite InlineConfig for the preview dev server.
@@ -42,8 +22,9 @@ export async function createViteConfig(
     const reactPluginFactory = require('@vitejs/plugin-react')
     const factory = reactPluginFactory.default ?? reactPluginFactory
     reactPlugin = factory()
-  } catch {
-    console.warn('Warning: @vitejs/plugin-react not found. Install it in your project.')
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    console.warn(`Warning: Failed to load @vitejs/plugin-react: ${detail}`)
   }
 
   // Try to load host project's Tailwind CSS v4 vite plugin

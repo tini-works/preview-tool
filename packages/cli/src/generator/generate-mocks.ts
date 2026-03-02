@@ -1,5 +1,13 @@
 import type { ClassifiedHook, ScreenRegion } from '../analyzer/types.js'
 
+const VALID_IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/
+
+function assertValidIdentifier(name: string): void {
+  if (!VALID_IDENTIFIER.test(name)) {
+    throw new Error(`Invalid identifier in mock generation: "${name}"`)
+  }
+}
+
 function buildMockDataLiteral(regions: readonly ScreenRegion[], regionName: string): string {
   const region = regions.find((r) => r.name === regionName)
   if (!region) {
@@ -164,6 +172,8 @@ export function generateMockModule(
   hook: ClassifiedHook,
   regions: readonly ScreenRegion[],
 ): string {
+  assertValidIdentifier(hook.hookName)
+
   switch (hook.category) {
     case 'data-fetching':
       return generateDataFetchingMock(hook, regions)

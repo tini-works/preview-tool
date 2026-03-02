@@ -17,11 +17,17 @@ export const devCommand = new Command('dev')
 
     console.log(chalk.bold('\nPreview Tool — Dev Server\n'))
 
-    const config = await readConfig(cwd)
+    const baseConfig = await readConfig(cwd)
 
-    // Override port from CLI flag if provided
+    // Override port from CLI flag if provided (immutable)
+    let config = baseConfig
     if (options.port) {
-      config.port = parseInt(options.port, 10)
+      const port = parseInt(options.port, 10)
+      if (isNaN(port) || port < 1 || port > 65535) {
+        console.error(chalk.red(`Invalid port: ${options.port}`))
+        process.exit(1)
+      }
+      config = { ...baseConfig, port }
     }
 
     // Run v2 generation pipeline

@@ -1,27 +1,9 @@
 import { writeFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
-import { join, dirname, relative } from 'node:path'
-import { createRequire } from 'node:module'
+import { join, relative } from 'node:path'
 import { PREVIEW_DIR } from '../lib/config.js'
 import type { PreviewConfig } from '../lib/config.js'
-
-/**
- * Resolve the @preview-tool/runtime package root.
- */
-function resolveRuntimePath(): string {
-  const require = createRequire(import.meta.url)
-  const runtimeEntry = require.resolve('@preview-tool/runtime')
-  let dir = dirname(runtimeEntry)
-  for (let i = 0; i < 5; i++) {
-    try {
-      require.resolve(join(dir, 'package.json'))
-      return dir
-    } catch {
-      dir = dirname(dir)
-    }
-  }
-  return dirname(runtimeEntry)
-}
+import { resolveRuntimePath } from '../lib/resolve-runtime.js'
 
 /**
  * Generates the index.html, main.tsx, and preview.css entry files.

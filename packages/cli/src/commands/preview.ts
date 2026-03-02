@@ -93,17 +93,20 @@ export const previewCommand = new Command('preview')
       process.exit(1)
     }
 
-    // Step 6: Start dev server
-    if (options.port) {
-      const port = parseInt(options.port, 10)
-      if (isNaN(port) || port < 1 || port > 65535) {
-        console.error(chalk.red(`Invalid port: ${options.port}`))
-        process.exit(1)
-      }
-      config.port = port
-    }
-    await generateEntryFiles(resolved.cwd, config)
-    const viteConfig = await createViteConfig(resolved.cwd, config)
+    // Step 6: Start dev server (immutable config override)
+    const effectiveConfig = options.port
+      ? (() => {
+          const port = parseInt(options.port!, 10)
+          if (isNaN(port) || port < 1 || port > 65535) {
+            console.error(chalk.red(`Invalid port: ${options.port}`))
+            process.exit(1)
+          }
+          return { ...config, port }
+        })()
+      : config
+
+    await generateEntryFiles(resolved.cwd, effectiveConfig)
+    const viteConfig = await createViteConfig(resolved.cwd, effectiveConfig)
 
     try {
       const require = createRequire(join(resolved.cwd, 'package.json'))
@@ -117,7 +120,7 @@ export const previewCommand = new Command('preview')
       const server = await vite.createServer(viteConfig)
       await server.listen()
 
-      const actualPort = server.config.server.port ?? config.port
+      const actualPort = server.config.server.port ?? effectiveConfig.port
       console.log('')
       console.log(chalk.green('  Preview ready at:'))
       console.log(chalk.cyan(`  http://localhost:${actualPort}`))
@@ -125,15 +128,22 @@ export const previewCommand = new Command('preview')
       console.log(chalk.dim('  Press Ctrl+C to stop'))
 
       // Step 7: Start file watcher for incremental re-analysis
-      const watcher = createWatcher(resolved.cwd, config, () => {
+      const watcher = createWatcher(resolved.cwd, effectiveConfig, () => {
         console.log(chalk.dim('  Files changed — re-analyzed'))
       })
 
-      const cleanupWatcher = () => {
+      // Consolidate all cleanup handlers
+      const cleanupAll = () => {
         watcher.close()
+        if (resolved.tempDir) {
+          try { rmSync(resolved.tempDir, { recursive: true, force: true }) } catch { /* best-effort */ }
+        }
+        process.exit(0)
       }
-      process.on('SIGINT', () => { cleanupWatcher(); process.exit(0) })
-      process.on('SIGTERM', () => { cleanupWatcher(); process.exit(0) })
+      process.removeAllListeners('SIGINT')
+      process.removeAllListeners('SIGTERM')
+      process.on('SIGINT', cleanupAll)
+      process.on('SIGTERM', cleanupAll)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.error(chalk.red(`Failed to start dev server: ${message}`))
