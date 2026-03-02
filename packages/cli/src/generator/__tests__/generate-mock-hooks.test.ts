@@ -65,3 +65,49 @@ describe('generateMockHook', () => {
     expect(code).toContain('sectionId')
   })
 })
+
+describe('generateMockHook — useRegionDataForHook integration', () => {
+  it('generates mock that imports useRegionDataForHook from runtime', () => {
+    const hooks: HookAnalysis[] = [
+      {
+        hookName: 'useQuery',
+        importPath: '@tanstack/react-query',
+        returnShape: 'data-loading-error',
+        hookMappingType: 'query-hook',
+      },
+    ]
+
+    const code = generateMockHook(hooks, '@tanstack/react-query')
+    expect(code).toContain('useRegionDataForHook')
+    expect(code).toContain("from '@preview-tool/runtime'")
+  })
+
+  it('generates useQuery mock that calls useRegionDataForHook with query-hook type', () => {
+    const hooks: HookAnalysis[] = [
+      {
+        hookName: 'useQuery',
+        importPath: '@tanstack/react-query',
+        returnShape: 'data-loading-error',
+        hookMappingType: 'query-hook',
+      },
+    ]
+
+    const code = generateMockHook(hooks, '@tanstack/react-query')
+    expect(code).toContain("useRegionDataForHook('query-hook'")
+  })
+
+  it('generates useAppLiveQuery mock that calls useRegionDataForHook with custom-hook type', () => {
+    const hooks: HookAnalysis[] = [
+      {
+        hookName: 'useAppLiveQuery',
+        importPath: '@/hooks/use-app-live-query',
+        sectionId: 'service-grid',
+        returnShape: 'data-loading-error',
+        hookMappingType: 'custom-hook',
+      },
+    ]
+
+    const code = generateMockHook(hooks, '@/hooks/use-app-live-query')
+    expect(code).toContain("useRegionDataForHook('custom-hook'")
+  })
+})
