@@ -16,12 +16,27 @@ export interface RegionDefinition {
   isList?: boolean
   mockItems?: unknown[]
   defaultCount?: number
+  hookMapping?: HookMapping
 }
+
+export interface HookMapping {
+  type: 'query-hook' | 'custom-hook' | 'store' | 'context' | 'prop' | 'local-state' | 'unknown'
+  hookName: string
+  identifier: string
+  importPath: string
+}
+
+export interface RegionDataEntry {
+  activeState: string
+  stateData: Record<string, unknown>
+}
+
+export type RegionDataMap = Record<string, RegionDataEntry>
 
 export type RegionsMap = Record<string, RegionDefinition>
 
 export interface ScreenModule {
-  default: ComponentType<{ data: unknown; flags?: Record<string, boolean> }>
+  default: ComponentType<{ regionData?: RegionDataMap; flags?: Record<string, boolean> }>
 }
 
 export interface RegionsModule {
