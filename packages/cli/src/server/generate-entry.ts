@@ -114,7 +114,7 @@ import { Wrapper } from './wrapper'
 import './preview.css'
 
 // Auto-discover from per-screen folders
-const screenModules = import.meta.glob('./screens/*/adapter.ts')
+const screenModules = import.meta.glob('./screens/*/adapter.tsx')
 const modelModules = import.meta.glob('./screens/*/model.ts', { eager: true }) as Record<
   string,
   { meta: { route: string }; regions: Record<string, unknown> }
