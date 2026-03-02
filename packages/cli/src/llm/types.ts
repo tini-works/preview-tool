@@ -13,7 +13,7 @@ export interface LLMOptions {
 }
 
 export interface LLMConfig {
-  provider: 'auto' | 'ollama' | 'anthropic' | 'openai' | 'none'
+  provider: 'auto' | 'claude-code' | 'ollama' | 'anthropic' | 'openai' | 'none'
   ollamaModel: string
   ollamaUrl: string
 }
@@ -26,3 +26,6 @@ export const DEFAULT_LLM_CONFIG: LLMConfig = {
 
 /** Default timeout for LLM generate() calls: 60 seconds */
 export const DEFAULT_LLM_TIMEOUT_MS = 60_000
+
+/** Timeout for batch claude-code generation: 180 seconds */
+export const CLAUDE_CODE_BATCH_TIMEOUT_MS = 180_000
