@@ -76,7 +76,7 @@ export async function createViteConfig(
     const raw = readFileSync(aliasManifestPath, 'utf-8')
     const manifest = JSON.parse(raw) as Record<string, string>
     for (const [importPath, mockPath] of Object.entries(manifest)) {
-      mockAliases[importPath] = join(previewDir, mockPath)
+      mockAliases[importPath] = join(cwd, mockPath)
     }
   } catch {
     // No alias manifest — no mock hooks
