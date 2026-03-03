@@ -165,3 +165,54 @@ export interface HookAnalysisResult {
   hooks: HookAnalysis[]
   imports: ImportAnalysis[]
 }
+
+// === Stage 2: AST Fact Collection ===
+
+export interface HookFact {
+  /** Hook function name as called: 'useQuery', 'useAuth' */
+  name: string
+  /** Full import path: '@tanstack/react-query', '../hooks/useAuth' */
+  importPath: string
+  /** Raw argument source text: ["{ queryKey: ['users'] }", "options"] */
+  arguments: string[]
+  /** Destructured return: 'const { data, isLoading }' or undefined */
+  returnVariable?: string
+}
+
+export interface ComponentFact {
+  /** Component name: 'DataTable', 'Button' */
+  name: string
+  /** Import path: '@/components/DataTable' */
+  importPath: string
+  /** Raw prop names passed: ['data', 'onSubmit', 'loading'] */
+  props: string[]
+  /** Child component names */
+  children: string[]
+}
+
+export interface ConditionalFact {
+  /** Raw condition text: 'isLoading', 'data.length > 0' */
+  condition: string
+  /** Component names in true branch */
+  trueBranch: string[]
+  /** Component names in false branch */
+  falseBranch: string[]
+}
+
+export interface NavigationFact {
+  /** Target route or expression: '/booking', '`/details/${id}`' */
+  target: string
+  /** Description of trigger: 'onClick on Button "Book Now"', '<Link to=...>' */
+  trigger: string
+}
+
+export interface ScreenFacts {
+  route: string
+  filePath: string
+  exportName?: string
+  sourceCode: string
+  hooks: HookFact[]
+  components: ComponentFact[]
+  conditionals: ConditionalFact[]
+  navigation: NavigationFact[]
+}
