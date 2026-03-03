@@ -393,4 +393,22 @@ export default function Page() {
     })
   })
 
+  it('generates fallback sectionId when hook is called without identifiable section', () => {
+    const source = `
+import { useQuery } from '@tanstack/react-query'
+
+export default function Page() {
+  const { data } = useQuery({
+    queryKey: [getKey()],
+    queryFn: fetchData,
+  })
+  return <div>{data}</div>
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.hooks).toHaveLength(1)
+    expect(result.hooks[0].sectionId).toBeDefined()
+    expect(result.hooks[0].sectionId).toContain('query')
+  })
+
 })

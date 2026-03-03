@@ -28,6 +28,22 @@ function getHookMappingType(hookName: string): HookMappingType {
   return 'unknown'
 }
 
+/** Derive a deterministic sectionId from hook name + import path when none is extractable */
+function deriveFallbackSectionId(hookName: string, importPath: string): string {
+  const normalizedHook = hookName
+    .replace(/^use/, '')
+    .replace(/([a-z])([A-Z])/g, '$1-$2')
+    .toLowerCase()
+
+  const normalizedPath = importPath
+    .replace(/^@\//, '')
+    .replace(/^@/, '')
+    .replace(/\//g, '--')
+    .replace(/[^a-z0-9-]/g, '')
+
+  return `${normalizedHook}--${normalizedPath}`
+}
+
 /**
  * Analyze a React component's source code to detect data-fetching hooks
  * and imports that need mocking for the preview tool.
@@ -195,13 +211,14 @@ export function analyzeHooks(source: string, _filePath: string): HookAnalysisRes
       }
     }
 
-    // If hook was imported but no section ID detected, still record it
+    // If hook was imported but no section ID detected, generate a fallback
     if (foundSections.size === 0) {
       const simpleCallRe = new RegExp(localName + String.raw`\s*\(`)
       if (simpleCallRe.test(source)) {
         hooks.push({
           hookName: info.originalName,
           importPath: info.importPath,
+          sectionId: deriveFallbackSectionId(info.originalName, info.importPath),
           returnShape,
           hookMappingType: getHookMappingType(info.originalName),
         })
