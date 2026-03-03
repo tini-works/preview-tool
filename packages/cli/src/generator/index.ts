@@ -615,25 +615,25 @@ export function enrichModelWithHookMapping(
   const assignedRegions = new Set<string>()
 
   for (const hook of hookResults.hooks) {
-    if (!hook.sectionId) continue
+    const regionKey = hook.sectionId ?? hook.hookName
 
     // 1. Exact match: sectionId === regionKey
-    if (regions[hook.sectionId]) {
-      if (!regions[hook.sectionId].hookMapping) {
+    if (regions[regionKey]) {
+      if (!regions[regionKey].hookMapping) {
         regions = {
           ...regions,
-          [hook.sectionId]: {
-            ...regions[hook.sectionId],
+          [regionKey]: {
+            ...regions[regionKey],
             hookMapping: {
               type: hook.hookMappingType ?? 'unknown',
               hookName: hook.hookName,
-              identifier: hook.sectionId,
+              identifier: regionKey,
               importPath: hook.importPath,
             },
           },
         }
       }
-      assignedRegions.add(hook.sectionId)
+      assignedRegions.add(regionKey)
       continue
     }
 
@@ -650,7 +650,7 @@ export function enrichModelWithHookMapping(
           hookMapping: {
             type: hook.hookMappingType ?? 'unknown',
             hookName: hook.hookName,
-            identifier: hook.sectionId,
+            identifier: regionKey,
             importPath: hook.importPath,
           },
         },
@@ -658,10 +658,10 @@ export function enrichModelWithHookMapping(
       assignedRegions.add(unassigned)
     } else {
       // Create a new region for this hook
-      const label = formatLabel(hook.sectionId)
+      const label = formatLabel(regionKey)
       regions = {
         ...regions,
-        [hook.sectionId]: {
+        [regionKey]: {
           label,
           component: 'Screen',
           componentPath: '',
@@ -674,12 +674,12 @@ export function enrichModelWithHookMapping(
           hookMapping: {
             type: hook.hookMappingType ?? 'unknown',
             hookName: hook.hookName,
-            identifier: hook.sectionId,
+            identifier: regionKey,
             importPath: hook.importPath,
           },
         },
       }
-      assignedRegions.add(hook.sectionId)
+      assignedRegions.add(regionKey)
     }
   }
 

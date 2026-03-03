@@ -188,4 +188,26 @@ describe('enrichModelWithHookMapping', () => {
     expect(result.regions['dashboard-stats'].hookMapping?.identifier).toBe('dashboard-stats')
     expect(result.regions['dashboard-upcoming'].hookMapping?.identifier).toBe('dashboard-upcoming')
   })
+
+  it('uses hookName as fallback key when sectionId is undefined', () => {
+    const model: ModelOutput = {
+      regions: {},
+    }
+    const hooks: HookAnalysisResult = {
+      hooks: [{
+        hookName: 'useCustomData',
+        importPath: '@/hooks/custom',
+        returnShape: 'data-loading-error',
+        hookMappingType: 'unknown',
+        // sectionId is undefined — should use hookName as fallback key
+      }],
+      imports: [],
+    }
+
+    const result = enrichModelWithHookMapping(model, hooks)
+    // Should create a region using hookName as the key instead of skipping
+    expect(result.regions['useCustomData']).toBeDefined()
+    expect(result.regions['useCustomData'].hookMapping).toBeDefined()
+    expect(result.regions['useCustomData'].hookMapping?.hookName).toBe('useCustomData')
+  })
 })
