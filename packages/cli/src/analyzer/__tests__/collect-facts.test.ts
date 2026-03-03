@@ -1,6 +1,9 @@
-import { describe, it, expect } from 'vitest'
-import { extractHookFacts, extractComponentFacts, extractConditionalFacts, extractNavigationFacts } from '../collect-facts.js'
+import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { extractHookFacts, extractComponentFacts, extractConditionalFacts, extractNavigationFacts, collectAllFacts } from '../collect-facts.js'
 import { Project } from 'ts-morph'
+import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 
 function createSourceFile(code: string) {
   const project = new Project({
@@ -237,6 +240,51 @@ describe('extractNavigationFacts', () => {
     const nav = extractNavigationFacts(sf)
     expect(nav).toHaveLength(1)
     expect(nav[0].target).toContain('/home')
+  })
+})
+
+describe('collectAllFacts', () => {
+  const testDir = join(tmpdir(), 'collect-facts-test-' + Date.now())
+
+  beforeAll(() => {
+    mkdirSync(testDir, { recursive: true })
+    writeFileSync(join(testDir, 'ScreenA.tsx'), `
+      import { useQuery } from '@tanstack/react-query'
+      export default function ScreenA() {
+        const { data } = useQuery({ queryKey: ['users'] })
+        return <div>{data}</div>
+      }
+    `)
+    writeFileSync(join(testDir, 'ScreenB.tsx'), `
+      import { useAuthStore } from '@/stores/auth'
+      export default function ScreenB() {
+        const user = useAuthStore(s => s.user)
+        return <div>{user.name}</div>
+      }
+    `)
+  })
+
+  afterAll(() => {
+    rmSync(testDir, { recursive: true, force: true })
+  })
+
+  it('collects facts from multiple screens in parallel with shared Project', async () => {
+    const screens = [
+      { filePath: join(testDir, 'ScreenA.tsx'), route: '/screen-a' },
+      { filePath: join(testDir, 'ScreenB.tsx'), route: '/screen-b' },
+    ]
+
+    const facts = await collectAllFacts(screens)
+
+    expect(facts).toHaveLength(2)
+    expect(facts[0].route).toBe('/screen-a')
+    expect(facts[0].hooks).toHaveLength(1)
+    expect(facts[0].hooks[0].name).toBe('useQuery')
+    expect(facts[0].sourceCode).toContain('useQuery')
+
+    expect(facts[1].route).toBe('/screen-b')
+    expect(facts[1].hooks).toHaveLength(1)
+    expect(facts[1].hooks[0].name).toBe('useAuthStore')
   })
 })
 

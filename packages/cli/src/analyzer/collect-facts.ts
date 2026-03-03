@@ -1,9 +1,11 @@
-import { type SourceFile, SyntaxKind, type CallExpression, type Node } from 'ts-morph'
+import { type SourceFile, SyntaxKind, type CallExpression, type Node, Project } from 'ts-morph'
+import { readFile } from 'node:fs/promises'
 import type {
   HookFact,
   ComponentFact,
   ConditionalFact,
   NavigationFact,
+  ScreenFacts,
 } from './types.js'
 
 /**
@@ -323,5 +325,57 @@ function stripQuotes(value: string): string {
     return value.slice(1, -1)
   }
   return value
+}
+
+// --- collectAllFacts orchestrator ---
+
+export interface ScreenInput {
+  filePath: string
+  route: string
+  exportName?: string
+}
+
+/**
+ * Collects all facts from multiple screens using a shared ts-morph Project.
+ * Creates one Project, adds all files, then extracts facts in parallel.
+ */
+export async function collectAllFacts(screens: ScreenInput[]): Promise<ScreenFacts[]> {
+  const project = new Project({
+    useInMemoryFileSystem: false,
+    tsConfigFilePath: undefined,
+    skipAddingFilesFromTsConfig: true,
+    compilerOptions: { strict: true, jsx: 4 },
+  })
+
+  // Add all screen files to the shared project
+  for (const screen of screens) {
+    project.addSourceFileAtPath(screen.filePath)
+  }
+
+  // Extract facts in parallel
+  const results = await Promise.all(
+    screens.map(async (screen) => {
+      const sourceFile = project.getSourceFileOrThrow(screen.filePath)
+      const sourceCode = await readFile(screen.filePath, 'utf-8')
+
+      const hooks = extractHookFacts(sourceFile)
+      const components = extractComponentFacts(sourceFile)
+      const conditionals = extractConditionalFacts(sourceFile)
+      const navigation = extractNavigationFacts(sourceFile)
+
+      return {
+        route: screen.route,
+        filePath: screen.filePath,
+        ...(screen.exportName ? { exportName: screen.exportName } : {}),
+        sourceCode,
+        hooks,
+        components,
+        conditionals,
+        navigation,
+      }
+    }),
+  )
+
+  return results
 }
 
