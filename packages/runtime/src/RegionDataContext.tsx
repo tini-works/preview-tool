@@ -35,10 +35,16 @@ export function RegionDataProvider({ regions, regionData, children }: RegionData
  */
 export function useRegionDataForHook(hookType: string, identifier: unknown): Record<string, unknown> | null {
   const ctx = useContext(RegionDataContext)
-  if (!ctx) return null
+  if (!ctx) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[preview-tool] RegionDataContext is null — RegionDataProvider may not be mounted')
+    }
+    return null
+  }
 
   const { regions, regionData } = ctx
 
+  // Strategy 1: Match by hookMapping (primary)
   for (const [regionKey, region] of Object.entries(regions)) {
     const mapping = region.hookMapping as HookMapping | undefined
     if (!mapping) continue
@@ -48,9 +54,21 @@ export function useRegionDataForHook(hookType: string, identifier: unknown): Rec
     }
   }
 
-  // Fallback: try matching by region key directly (for hooks that pass sectionId = regionKey)
+  // Strategy 2: Match by region key directly (for hooks that pass sectionId = regionKey)
   if (typeof identifier === 'string' && regionData[identifier]) {
     return (regionData[identifier].stateData as Record<string, unknown>) ?? null
+  }
+
+  // Strategy 3: Match queryKey first element against region keys
+  if (Array.isArray(identifier) && identifier.length > 0) {
+    const first = String(identifier[0])
+    if (regionData[first]) {
+      return (regionData[first].stateData as Record<string, unknown>) ?? null
+    }
+  }
+
+  if (process.env.NODE_ENV === 'development') {
+    console.warn(`[preview-tool] No matching region for hook: type=${hookType}, identifier=${JSON.stringify(identifier)}`)
   }
 
   return null
