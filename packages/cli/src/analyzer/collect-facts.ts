@@ -16,13 +16,18 @@ export function extractHookFacts(sourceFile: SourceFile): HookFact[] {
   const hooks: HookFact[] = []
 
   // Build import map: localName → importPath
+  // and export name map: localName → originalExportName
+  // e.g. `import { useAppLiveQuery as useLiveQuery }` → localName="useLiveQuery", originalName="useAppLiveQuery"
   const importMap = new Map<string, string>()
+  const exportNameMap = new Map<string, string>()
   for (const decl of sourceFile.getImportDeclarations()) {
     const modulePath = decl.getModuleSpecifierValue()
     for (const named of decl.getNamedImports()) {
       const alias = named.getAliasNode()
-      const localName = alias ? alias.getText() : named.getName()
+      const originalName = named.getName()
+      const localName = alias ? alias.getText() : originalName
       importMap.set(localName, modulePath)
+      exportNameMap.set(localName, originalName)
     }
     const defaultImport = decl.getDefaultImport()
     if (defaultImport) {
@@ -35,12 +40,15 @@ export function extractHookFacts(sourceFile: SourceFile): HookFact[] {
 
   for (const call of calls) {
     const expr = call.getExpression()
-    const name = expr.getText()
+    const localName = expr.getText()
 
     // Only process hook calls (useXxx pattern)
-    if (!name.startsWith('use') || !importMap.has(name)) continue
+    if (!localName.startsWith('use') || !importMap.has(localName)) continue
 
-    const importPath = importMap.get(name)!
+    const importPath = importMap.get(localName)!
+    // Use the original export name (not the local alias) so generated mocks
+    // export the correct name that other consumers of the module expect.
+    const name = exportNameMap.get(localName) ?? localName
     const args = call.getArguments().map((arg) => arg.getText())
     const returnVariable = extractReturnVariable(call)
 

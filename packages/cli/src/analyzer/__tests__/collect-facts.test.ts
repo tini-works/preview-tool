@@ -87,7 +87,9 @@ describe('extractHookFacts', () => {
     `)
     const hooks = extractHookFacts(sf)
     expect(hooks).toHaveLength(1)
-    expect(hooks[0].name).toBe('useCustomQuery')
+    // Should use the original export name, not the local alias,
+    // so generated mocks export the correct name for other consumers
+    expect(hooks[0].name).toBe('useQuery')
     expect(hooks[0].importPath).toBe('@tanstack/react-query')
   })
 

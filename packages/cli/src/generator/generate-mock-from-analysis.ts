@@ -25,10 +25,18 @@ function toSafeFileName(importPath: string): string {
 }
 
 /**
+ * Returns true if the import path is an npm package (not a relative/alias import).
+ * npm packages need re-exports so non-hook exports (e.g. MemoryRouter, Link) are preserved.
+ */
+function isNpmPackage(importPath: string): boolean {
+  return !importPath.startsWith('.') && !importPath.startsWith('@/') && !importPath.startsWith('~/')
+}
+
+/**
  * Generates a single mock module file for a set of hooks from the same import path.
  *
- * Hooks with region mappings call useRegionDataForHook('region-key') directly.
- * Unmapped hooks return DEFAULT_STATE.
+ * For npm packages: re-exports all original exports via `__real:` prefix, then overrides hooks.
+ * For local imports: only exports the mocked hooks.
  */
 function generateMockFile(
   hooks: Array<{ name: string }>,
@@ -37,10 +45,18 @@ function generateMockFile(
 ): string {
   const uniqueNames = [...new Set(hooks.map((h) => h.name))]
   const hasRegionMappings = uniqueNames.some((name) => hookToRegion.has(`${importPath}::${name}`))
+  const isNpm = isNpmPackage(importPath)
 
   const lines: string[] = [
     '// Auto-generated mock by @preview-tool/cli — do not edit manually',
   ]
+
+  // For npm packages, re-export everything from the real module first.
+  // The `__real:` prefix is resolved by Vite to the actual node_modules path,
+  // avoiding circular alias resolution.
+  if (isNpm) {
+    lines.push(`export * from '__real:${importPath}'`)
+  }
 
   if (hasRegionMappings) {
     lines.push("import { useRegionDataForHook } from '@preview-tool/runtime'")

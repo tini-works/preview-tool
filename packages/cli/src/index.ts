@@ -15,6 +15,6 @@ program
 program.addCommand(initCommand)
 program.addCommand(devCommand)
 program.addCommand(generateCommand)
-program.addCommand(previewCommand)
+program.addCommand(previewCommand, { isDefault: true })
 
 program.parse()

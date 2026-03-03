@@ -70,23 +70,38 @@ export async function createViteConfig(
   const reactDomPath = dirname(hostRequire.resolve('react-dom/package.json'))
 
   // Load alias manifest for mock hook redirection
-  const mockAliasEntries: Array<{ find: string; replacement: string }> = []
+  const mockAliasEntries: Array<{ find: string | RegExp; replacement: string }> = []
+  const realModuleEntries: Array<{ find: string; replacement: string }> = []
   try {
     const aliasManifestPath = join(previewDir, 'alias-manifest.json')
     const raw = readFileSync(aliasManifestPath, 'utf-8')
     const manifest = JSON.parse(raw) as Record<string, string>
     for (const [importPath, mockPath] of Object.entries(manifest)) {
       mockAliasEntries.push({ find: importPath, replacement: join(previewDir, mockPath) })
+
+      // For npm packages, add a __real: alias so mocks can re-export original exports
+      // without triggering circular alias resolution.
+      // Resolve to the package root (not the CJS entry) so Vite picks the ESM entry
+      // via the package.json "module" or "exports" field — same pattern as React dedup above.
+      if (!importPath.startsWith('.') && !importPath.startsWith('@/') && !importPath.startsWith('~/')) {
+        try {
+          const pkgRoot = dirname(hostRequire.resolve(importPath + '/package.json'))
+          realModuleEntries.push({ find: `__real:${importPath}`, replacement: pkgRoot })
+        } catch {
+          // Package not resolvable — mock will work without re-exports
+        }
+      }
     }
   } catch {
     // No alias manifest — no mock hooks
   }
 
-  // Use array format to guarantee ordering: specific mock aliases first,
-  // then React deduplication, then general @/ alias last.
-  // With object format, @/ can match @/lib/api before the specific mock alias.
+  // Use array format to guarantee ordering: __real: aliases first (for mock re-exports),
+  // then mock aliases, then React deduplication, then general @/ alias last.
   const aliasArray = [
-    // 1. Mock aliases (most specific — must come first)
+    // 0. Real module aliases (used by mocks to re-export non-hook exports)
+    ...realModuleEntries,
+    // 1. Mock aliases (redirect imports to mock files)
     ...mockAliasEntries,
     // 2. React deduplication
     { find: 'react', replacement: reactPath },
