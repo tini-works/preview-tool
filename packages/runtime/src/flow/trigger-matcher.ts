@@ -50,10 +50,10 @@ export function matchComponentTrigger(
       if (el.matches(trigger.selector)) {
         if (trigger.text) {
           const text = el.textContent?.trim()
-          if (text && text.includes(trigger.text)) return trigger
+          if (text && text.toLowerCase().includes(trigger.text.toLowerCase())) return trigger
         } else if (trigger.ariaLabel) {
           const label = el.getAttribute('aria-label')
-          if (label === trigger.ariaLabel) return trigger
+          if (label?.trim().toLowerCase() === trigger.ariaLabel?.trim().toLowerCase()) return trigger
         } else {
           return trigger
         }
@@ -74,10 +74,11 @@ function findAllMatching(
   return candidates.filter((el) => {
     if (trigger.text) {
       const text = el.textContent?.trim()
-      return text != null && text.includes(trigger.text)
+      return text != null && text.toLowerCase().includes(trigger.text.toLowerCase())
     }
     if (trigger.ariaLabel) {
-      return el.getAttribute('aria-label') === trigger.ariaLabel
+      const label = el.getAttribute('aria-label')
+      return label?.trim().toLowerCase() === trigger.ariaLabel.trim().toLowerCase()
     }
     return true
   })
