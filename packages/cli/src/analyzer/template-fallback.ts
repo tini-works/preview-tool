@@ -75,6 +75,19 @@ function deriveStoreKey(hookName: string, _args: string[]): string {
 }
 
 // ---------------------------------------------------------------------------
+// React built-in hooks that should never produce regions
+// ---------------------------------------------------------------------------
+
+const REACT_BUILTIN_HOOKS = new Set([
+  'useState', 'useEffect', 'useRef', 'useMemo', 'useCallback',
+  'useReducer', 'useLayoutEffect', 'useId', 'useImperativeHandle',
+  'useInsertionEffect', 'useSyncExternalStore', 'useTransition',
+  'useDeferredValue', 'useDebugValue',
+])
+
+const REACT_IMPORT_PATHS = new Set(['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'])
+
+// ---------------------------------------------------------------------------
 // Template definitions
 // ---------------------------------------------------------------------------
 
@@ -166,6 +179,28 @@ const TEMPLATES: HookTemplate[] = [
       }
       return 'context'
     },
+  },
+
+  // 5. Catch-all: unknown custom hooks (non-React built-ins)
+  {
+    pattern: (name, importPath) =>
+      name.startsWith('use') && !REACT_BUILTIN_HOOKS.has(name) && !REACT_IMPORT_PATHS.has(importPath),
+    regionType: 'custom',
+    states: (label) => ({
+      populated: {
+        label: `${label} loaded`,
+        mockData: { data: {}, isLoading: false, error: null },
+      },
+      loading: {
+        label: `${label} loading`,
+        mockData: { data: null, isLoading: true, error: null },
+      },
+      error: {
+        label: `${label} error`,
+        mockData: { data: null, isLoading: false, error: { message: 'Failed to load' } },
+      },
+    }),
+    deriveKey: deriveStoreKey,
   },
 ]
 

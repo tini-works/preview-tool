@@ -136,13 +136,34 @@ describe('buildFromTemplates', () => {
     )
   })
 
-  it('returns empty regions for unrecognized hooks', () => {
+  it('maps unrecognized custom hooks to custom region type', () => {
     const facts: ScreenFacts = {
       route: '/custom',
       filePath: '/app/custom.tsx',
       sourceCode: '',
       hooks: [
         { name: 'useCustomThing', importPath: './hooks/custom', arguments: [] },
+      ],
+      components: [], conditionals: [], navigation: [],
+    }
+    const result = buildFromTemplates(facts)
+    expect(result.regions).toHaveLength(1)
+    expect(result.regions[0].key).toBe('custom-thing')
+    expect(result.regions[0].type).toBe('custom')
+    expect(Object.keys(result.regions[0].states)).toEqual(
+      expect.arrayContaining(['populated', 'loading', 'error'])
+    )
+  })
+
+  it('skips React built-in hooks (no regions for useState/useEffect)', () => {
+    const facts: ScreenFacts = {
+      route: '/dashboard',
+      filePath: '/app/dashboard.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useState', importPath: 'react', arguments: ['[]'] },
+        { name: 'useEffect', importPath: 'react', arguments: [] },
+        { name: 'useRef', importPath: 'react', arguments: ['null'] },
       ],
       components: [], conditionals: [], navigation: [],
     }

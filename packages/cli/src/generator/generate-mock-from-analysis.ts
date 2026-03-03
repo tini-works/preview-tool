@@ -8,6 +8,9 @@ export interface MockGenerationResult {
   aliasManifest: Record<string, string>
 }
 
+/** Import paths that should never be mocked — they are provided by React itself */
+const SKIP_IMPORT_PATHS = new Set(['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'])
+
 /**
  * Converts an import path to a safe filename for the mock module.
  * e.g. '@tanstack/react-query' -> 'tanstack-react-query'
@@ -153,10 +156,11 @@ export function generateMockModules(
     }
   }
 
-  // Step 2: Group hooks by importPath (deduplicated by name)
+  // Step 2: Group hooks by importPath (deduplicated by name), skipping React built-ins
   const hooksByImport = new Map<string, Array<{ name: string }>>()
   for (const facts of allFacts) {
     for (const hook of facts.hooks) {
+      if (SKIP_IMPORT_PATHS.has(hook.importPath)) continue
       const existing = hooksByImport.get(hook.importPath) ?? []
       // Deduplicate by name
       if (!existing.some((h) => h.name === hook.name)) {
