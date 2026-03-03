@@ -335,4 +335,42 @@ export default function Page() {
     expect(result.hooks[0].sectionId).toBe('service-grid')
   })
 
+
+  it('detects Zustand store hooks and generates sectionId', () => {
+    const source = `
+import { useAuthStore } from '@/stores/auth'
+
+export default function Page() {
+  const user = useAuthStore((s) => s.user)
+  return <div>{user?.name}</div>
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.hooks).toHaveLength(1)
+    expect(result.hooks[0]).toMatchObject({
+      hookName: 'useAuthStore',
+      importPath: '@/stores/auth',
+      hookMappingType: 'store',
+      sectionId: 'auth-store',
+    })
+  })
+
+  it('detects Zustand store hook from path with /store/', () => {
+    const source = `
+import { useCartStore } from '@/store/cart'
+
+export default function Page() {
+  const items = useCartStore((s) => s.items)
+  return <div>{items.length}</div>
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.hooks).toHaveLength(1)
+    expect(result.hooks[0]).toMatchObject({
+      hookName: 'useCartStore',
+      hookMappingType: 'store',
+      sectionId: 'cart-store',
+    })
+  })
+
 })

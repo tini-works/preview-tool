@@ -24,6 +24,7 @@ const MOCK_IMPORT_PATTERNS: Array<{ pattern: RegExp; reason: ImportAnalysis['rea
 function getHookMappingType(hookName: string): HookMappingType {
   if (hookName === 'useAppLiveQuery' || hookName === 'useLiveQuery') return 'custom-hook'
   if (hookName === 'useQuery' || hookName === 'useSWR' || hookName === 'useFetch') return 'query-hook'
+  if (/^use\w+Store$/.test(hookName)) return 'store'
   return 'unknown'
 }
 
@@ -215,6 +216,49 @@ export function analyzeHooks(source: string, _filePath: string): HookAnalysisRes
         namedExports: [info.originalName],
         needsMocking: true,
         reason: 'data-hook',
+      })
+    }
+  }
+
+  // Step 3: Detect Zustand store hooks (useXxxStore from /stores?/ paths)
+  for (const [localName, info] of importMap) {
+    // Already processed as a data hook
+    if (DATA_HOOK_PATTERNS[info.originalName]) continue
+
+    // Skip devtool store hooks — they are tracked as imports, not data hooks
+    if (/devtool.*store|dev-tool.*store/i.test(info.importPath)) continue
+
+    const isStoreHook =
+      /^use\w+Store$/.test(info.originalName) ||
+      /stores?\//.test(info.importPath)
+
+    if (!isStoreHook) continue
+
+    // Check if it's actually called
+    const callRe = new RegExp(localName + String.raw`\s*\(`)
+    if (!callRe.test(source)) continue
+
+    // Derive sectionId from hook name: useAuthStore -> auth-store
+    const sectionId = info.originalName
+      .replace(/^use/, '')
+      .replace(/([a-z])([A-Z])/g, '$1-$2')
+      .toLowerCase()
+
+    hooks.push({
+      hookName: info.originalName,
+      importPath: info.importPath,
+      sectionId,
+      returnShape: 'data-loading-error',
+      hookMappingType: 'store',
+    })
+
+    // Ensure import is tracked for mocking
+    if (!imports.some((i) => i.path === info.importPath)) {
+      imports.push({
+        path: info.importPath,
+        namedExports: [info.originalName],
+        needsMocking: true,
+        reason: 'auth-store',
       })
     }
   }
