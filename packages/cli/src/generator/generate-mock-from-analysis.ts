@@ -1,4 +1,4 @@
-import type { ScreenFacts, HookFact } from '../analyzer/types.js'
+import type { ScreenFacts } from '../analyzer/types.js'
 import type { ScreenAnalysisOutput } from '../llm/schemas/screen-analysis.js'
 
 export interface MockGenerationResult {

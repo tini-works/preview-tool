@@ -24,7 +24,7 @@ function inferHookMappingType(hookName: string): HookMappingType {
     lower === 'usequery' ||
     lower === 'useswr' ||
     lower === 'usefetch' ||
-    lower.includes('query') && !lower.includes('livequery')
+    (lower.includes('query') && !lower.includes('livequery'))
   ) {
     return 'query-hook'
   }
