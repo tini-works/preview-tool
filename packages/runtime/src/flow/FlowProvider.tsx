@@ -1,9 +1,10 @@
 import { useCallback, useRef, type ReactNode } from 'react'
 import { useDevToolsStore } from '../store/useDevToolsStore.ts'
 import { getFlowActions } from './FlowRegistry.ts'
-import { resolveTrigger } from './trigger-matcher.ts'
+import type { AnyFlowAction } from './FlowRegistry.ts'
+import { resolveTrigger, matchComponentTrigger } from './trigger-matcher.ts'
 import { getScreenEntries } from '../ScreenRegistry.ts'
-import type { RegionsMap } from '../types.ts'
+import type { RegionsMap, FlowAction, FlowActionV2 } from '../types.ts'
 
 interface FlowProviderProps {
   children: ReactNode
@@ -23,6 +24,10 @@ function findRegionForState(
   return null
 }
 
+function isV2Action(action: AnyFlowAction): action is FlowActionV2 {
+  return typeof action.trigger === 'object' && action.trigger !== null
+}
+
 export function FlowProvider({ children }: FlowProviderProps) {
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -39,49 +44,67 @@ export function FlowProvider({ children }: FlowProviderProps) {
       if (!actions || !selectedRoute) return
       if (!containerRef.current) return
 
-      const trigger = resolveTrigger(e.target, containerRef.current)
-      if (!trigger) return
+      // Split actions by type
+      const v1Actions = actions.filter((a): a is FlowAction => typeof a.trigger === 'string')
+      const v2Actions = actions.filter(isV2Action)
 
-      const action = actions.find((a) => a.trigger === trigger)
-      if (!action) return
+      // Try V2 (ComponentTrigger) matching first
+      let matchedAction: AnyFlowAction | undefined
+      if (v2Actions.length > 0) {
+        const triggers = v2Actions.map((a) => a.trigger)
+        const matched = matchComponentTrigger(e.target, containerRef.current, triggers)
+        if (matched) {
+          matchedAction = v2Actions.find((a) => a.trigger === matched)
+        }
+      }
+
+      // Fall back to V1 (data-flow-target) matching
+      if (!matchedAction && v1Actions.length > 0) {
+        const triggerStr = resolveTrigger(e.target, containerRef.current)
+        if (triggerStr) {
+          matchedAction = v1Actions.find((a) => a.trigger === triggerStr)
+        }
+      }
+
+      if (!matchedAction) return
 
       e.preventDefault()
       e.stopPropagation()
 
-      // setState (no navigation) -- change state on current screen
-      if (action.setState && !action.navigate) {
+      // V1 setState (no navigation) -- change state on current screen
+      if ('setState' in matchedAction && matchedAction.setState && !matchedAction.navigate) {
         pushFlowHistory(selectedRoute)
 
         const currentEntry = modules.find((m) => m.route === selectedRoute)
         const regions = currentEntry?.regions
         if (regions) {
-          const regionKey = findRegionForState(regions, action.setState)
+          const regionKey = findRegionForState(regions, matchedAction.setState)
           if (regionKey) {
-            setRegionState(regionKey, action.setState)
+            setRegionState(regionKey, matchedAction.setState)
           }
         }
       }
 
       // setRegionState (explicit region targeting, no navigation)
-      if (action.setRegionState && !action.navigate) {
+      if (matchedAction.setRegionState && !matchedAction.navigate) {
         pushFlowHistory(selectedRoute)
-        setRegionState(action.setRegionState.region, action.setRegionState.state)
+        setRegionState(matchedAction.setRegionState.region, matchedAction.setRegionState.state)
       }
 
       // navigate -- go to another screen
-      if (action.navigate) {
+      if (matchedAction.navigate) {
         pushFlowHistory(selectedRoute)
-        navigateFlow(action.navigate)
+        navigateFlow(matchedAction.navigate)
 
         // If target screen uses regions and navigateState is set,
         // resolve which region contains the state and set it
-        if (action.navigateState) {
-          const targetEntry = modules.find((m) => m.route === action.navigate)
+        if (matchedAction.navigateState) {
+          const targetEntry = modules.find((m) => m.route === matchedAction.navigate)
           const targetRegions = targetEntry?.regions
           if (targetRegions) {
-            const regionKey = findRegionForState(targetRegions, action.navigateState)
+            const regionKey = findRegionForState(targetRegions, matchedAction.navigateState)
             if (regionKey) {
-              setRegionState(regionKey, action.navigateState)
+              setRegionState(regionKey, matchedAction.navigateState)
             }
           }
         }
