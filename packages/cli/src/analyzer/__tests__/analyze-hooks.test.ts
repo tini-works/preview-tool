@@ -373,4 +373,24 @@ export default function Page() {
     })
   })
 
+
+  it('detects useContext with named context', () => {
+    const source = `
+import { useContext } from 'react'
+import { AuthContext } from '@/context/auth'
+
+export default function Page() {
+  const { user, loading } = useContext(AuthContext)
+  return <div>{user?.name}</div>
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.hooks).toHaveLength(1)
+    expect(result.hooks[0]).toMatchObject({
+      hookName: 'useContext',
+      sectionId: 'auth-context',
+      hookMappingType: 'context',
+    })
+  })
+
 })

@@ -263,5 +263,25 @@ export function analyzeHooks(source: string, _filePath: string): HookAnalysisRes
     }
   }
 
+
+  // Step 4: Detect useContext calls — useContext(XxxContext)
+  const useContextRe = /useContext\s*\(\s*(\w+)\s*\)/g
+  let ctxMatch: RegExpExecArray | null
+  while ((ctxMatch = useContextRe.exec(source)) !== null) {
+    const contextName = ctxMatch[1]
+    // Derive sectionId: AuthContext -> auth-context
+    const sectionId = contextName
+      .replace(/([a-z])([A-Z])/g, '$1-$2')
+      .toLowerCase()
+
+    hooks.push({
+      hookName: 'useContext',
+      importPath: 'react',
+      sectionId,
+      returnShape: 'data-loading-error',
+      hookMappingType: 'context',
+    })
+  }
+
   return { hooks, imports }
 }
