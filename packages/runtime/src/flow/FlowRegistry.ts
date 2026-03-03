@@ -1,12 +1,14 @@
-import type { FlowAction } from '../types.ts'
+import type { FlowAction, FlowActionV2 } from '../types.ts'
 
-let flowRegistry: Record<string, FlowAction[]> = {}
+export type AnyFlowAction = FlowAction | FlowActionV2
 
-export function registerFlows(route: string, actions: FlowAction[]): void {
+let flowRegistry: Record<string, readonly AnyFlowAction[]> = {}
+
+export function registerFlows(route: string, actions: readonly AnyFlowAction[]): void {
   flowRegistry = { ...flowRegistry, [route]: actions }
 }
 
-export function getFlowActions(route: string): FlowAction[] | null {
+export function getFlowActions(route: string): readonly AnyFlowAction[] | null {
   return flowRegistry[route] ?? null
 }
 
