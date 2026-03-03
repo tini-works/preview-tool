@@ -25,15 +25,19 @@ export function RegionDataProvider({ regions, regionData, children }: RegionData
 /**
  * Resolve region data for a mock hook call.
  *
- * Mock hooks call this with their hook type and identifier (e.g., queryKey).
- * It searches all regions for a matching hookMapping and returns the
- * current state data for that region.
+ * Supports two calling conventions:
  *
- * @param hookType - The type of hook: 'query-hook', 'custom-hook', 'store', etc.
- * @param identifier - Hook-specific identifier: queryKey array, sectionId string, etc.
+ * 1. **New pipeline (fast path):** `useRegionDataForHook('region-key')` — single
+ *    argument, looks up region data directly by key.
+ *
+ * 2. **Legacy pipeline:** `useRegionDataForHook(hookType, identifier)` — two
+ *    arguments, searches regions via hookMapping strategies (backward compat).
+ *
+ * @param hookTypeOrRegionKey - Region key (new pipeline) or hook type (legacy).
+ * @param identifier - Hook-specific identifier (legacy only). Omit for new pipeline.
  * @returns The resolved state data or null if no matching region found.
  */
-export function useRegionDataForHook(hookType: string, identifier: unknown): Record<string, unknown> | null {
+export function useRegionDataForHook(hookTypeOrRegionKey: string, identifier?: unknown): Record<string, unknown> | null {
   const ctx = useContext(RegionDataContext)
   if (!ctx) {
     if (process.env.NODE_ENV === 'development') {
@@ -44,12 +48,19 @@ export function useRegionDataForHook(hookType: string, identifier: unknown): Rec
 
   const { regions, regionData } = ctx
 
+  // Fast path: single-argument call with direct region key (new pipeline)
+  if (identifier === undefined && regionData[hookTypeOrRegionKey]) {
+    return (regionData[hookTypeOrRegionKey].stateData as Record<string, unknown>) ?? null
+  }
+
+  // Legacy path: hookType + identifier (old pipeline, backward compat)
+
   // Strategy 1: Match by hookMapping (primary)
   for (const [regionKey, region] of Object.entries(regions)) {
     const mapping = region.hookMapping as HookMapping | undefined
     if (!mapping) continue
 
-    if (matchesHook(mapping, hookType, identifier)) {
+    if (matchesHook(mapping, hookTypeOrRegionKey, identifier)) {
       return (regionData[regionKey]?.stateData as Record<string, unknown>) ?? null
     }
   }
@@ -68,7 +79,7 @@ export function useRegionDataForHook(hookType: string, identifier: unknown): Rec
   }
 
   if (process.env.NODE_ENV === 'development') {
-    console.warn(`[preview-tool] No matching region for hook: type=${hookType}, identifier=${JSON.stringify(identifier)}`)
+    console.warn(`[preview-tool] No matching region for hook: type=${hookTypeOrRegionKey}, identifier=${JSON.stringify(identifier)}`)
   }
 
   return null
