@@ -8,23 +8,14 @@ import { analyzeViewTree } from '../analyzer/analyze-view.js'
 import { generateViewFileContent } from './generate-view.js'
 import { generateModelFileContent } from './generate-model.js'
 import { generateControllerFileContent } from './generate-controller.js'
-import { callLLM, callLLMBatch } from '../llm/index.js'
+import { callLLM } from '../llm/index.js'
 import { buildGenerateMCPrompt } from '../llm/prompts/generate-mc.js'
-import { buildBatchGenerateMCPrompt } from '../llm/prompts/generate-mc-batch.js'
-import type { BatchScreenInput } from '../llm/prompts/generate-mc-batch.js'
-import { analyzeHooks } from '../analyzer/analyze-hooks.js'
-import { generateMockHook } from './generate-mock-hooks.js'
-import {
-  generateMockAuthStore,
-  generateMockDevToolStore,
-  generateMockApiClient,
-  generateMockCollection,
-  generateMockQueryClient,
-  generateMockDbLibrary,
-  generateMockDataModule,
-} from './generate-mock-stores.js'
 import { ModelOutputSchema } from '../llm/schemas/model.js'
 import { ControllerOutputSchema } from '../llm/schemas/controller.js'
+import { collectAllFacts } from '../analyzer/collect-facts.js'
+import { understandScreens } from '../analyzer/understand-screens.js'
+import { analysisToModel, analysisToController } from './generate-from-analysis.js'
+import { generateMockModules } from './generate-mock-from-analysis.js'
 import type { PreviewConfig } from '../lib/config.js'
 import { PREVIEW_DIR } from '../lib/config.js'
 import { formatLabel } from '../lib/format-label.js'
@@ -51,15 +42,15 @@ export interface GenerateResult {
 }
 
 /**
- * Orchestrates the full MVC generation pipeline:
+ * Orchestrates the full 4-stage generation pipeline:
  *
- * 1. Discover screens via glob
- * 2. Build V (ViewTree) for each screen via static AST analysis
- * 3. Build M+C via LLM with heuristic fallback
- * 4. Write per-screen folder: .preview/screens/{safeName}/view.ts, model.ts, controller.ts, adapter.tsx
+ * Stage 1: Discover screens via glob
+ * Stage 2: Collect facts (parallel, shared ts-morph Project)
+ * Stage 3: LLM understanding (one batch call + template fallback)
+ * Stage 4: Generate files (view, model, controller, adapter, mocks)
  *
  * Override directory: .preview/overrides/{safeName}/ — if model.ts or controller.ts
- * exists there, LLM generation is skipped for that file.
+ * exists there, generation is skipped for that file.
  */
 export async function generateAll(
   cwd: string,
@@ -68,310 +59,117 @@ export async function generateAll(
 ): Promise<GenerateResult> {
   const previewDir = join(cwd, PREVIEW_DIR)
   const screensDir = join(previewDir, 'screens')
+  const mocksDir = join(previewDir, 'mocks')
   const overridesDir = join(previewDir, 'overrides')
 
-  // Ensure output directories
   await mkdir(screensDir, { recursive: true })
+  await mkdir(mocksDir, { recursive: true })
   await mkdir(overridesDir, { recursive: true })
 
-  // Step 1: Discover screens
-  console.log(chalk.dim('Discovering screens...'))
+  // Stage 1: Discover screens
+  console.log(chalk.dim('Stage 1: Discovering screens...'))
   const screens = await discoverScreens(cwd, config.screenGlob)
   console.log(chalk.dim(`  Found ${screens.length} screen(s)`))
 
   if (screens.length === 0) {
-    return {
-      screensFound: 0,
-      viewsGenerated: 0,
-      modelsGenerated: 0,
-      controllersGenerated: 0,
-      adaptersGenerated: 0,
-      overridesSkipped: 0,
-      mocksGenerated: 0,
-    }
+    return { screensFound: 0, viewsGenerated: 0, modelsGenerated: 0, controllersGenerated: 0, adaptersGenerated: 0, overridesSkipped: 0, mocksGenerated: 0 }
   }
 
+  // Stage 2: Collect facts (parallel, shared ts-morph Project)
+  console.log(chalk.dim('Stage 2: Collecting screen facts...'))
+  const screenInputs = screens.map((s) => ({
+    filePath: s.filePath,
+    route: s.route,
+    exportName: s.exportName,
+  }))
+  const allFacts = await collectAllFacts(screenInputs)
+  console.log(chalk.dim(`  Collected facts for ${allFacts.length} screen(s)`))
+
+  // Stage 3: LLM understanding (one batch call + template fallback)
+  console.log(chalk.dim('Stage 3: Analyzing screens...'))
+  const allAnalyses = await understandScreens(allFacts, config.llm)
+  console.log(chalk.dim(`  Analyzed ${allAnalyses.length} screen(s)`))
+
+  // Stage 4: Generate files
+  console.log(chalk.dim('Stage 4: Generating files...'))
   let viewsGenerated = 0
   let modelsGenerated = 0
   let controllersGenerated = 0
   let adaptersGenerated = 0
   let overridesSkipped = 0
 
-  // Phase 1: Analyze all screens (ViewTree)
-  const screenData: Array<{
-    screen: DiscoveredScreen
-    safeName: string
-    screenOutDir: string
-    overrideScreenDir: string
-    viewTree: ViewTree | null
-    hookResult: HookAnalysisResult | null
-  }> = []
+  const analysisMap = new Map(allAnalyses.map((a) => [a.route, a]))
 
   for (const screen of screens) {
     const safeName = routeToFolderName(screen.route)
     const screenOutDir = join(screensDir, safeName)
     const overrideScreenDir = join(overridesDir, safeName)
-
     await mkdir(screenOutDir, { recursive: true })
 
     console.log(chalk.dim(`  Processing: ${screen.route} (${screen.pattern})`))
 
+    const analysis = analysisMap.get(screen.route)
+
+    // View (keep existing ViewTree approach)
     let viewTree: ViewTree | null = null
     try {
       viewTree = analyzeViewTree(screen)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      console.log(chalk.yellow(`    View analysis failed, using legacy fallback: ${message}`))
+      console.log(chalk.yellow(`    View analysis failed: ${message}`))
     }
 
-    let hookResult: HookAnalysisResult | null = null
-    try {
-      const source = await readFile(screen.filePath, 'utf-8')
-      hookResult = analyzeHooks(source, screen.filePath)
-    } catch {
-      // Skip screens that can't be read
-    }
-
-    screenData.push({ screen, safeName, screenOutDir, overrideScreenDir, viewTree, hookResult })
-  }
-
-  // Phase 2: Attempt batch controller generation via claude-code
-  const batchControllers = new Map<string, ControllerOutput>()
-
-  if (config.llm.provider !== 'none') {
-    const batchInputs: BatchScreenInput[] = screenData
-      .filter((d) => !existsSync(join(d.overrideScreenDir, 'controller.ts')))
-      .map((d) => ({
-        id: d.safeName,
-        screen: d.screen,
-        viewTree: d.viewTree,
-      }))
-
-    if (batchInputs.length > 0) {
-      console.log(chalk.dim('\nAttempting batch controller generation via claude-code...'))
-      const batchPrompt = buildBatchGenerateMCPrompt(batchInputs, cwd)
-      const batchRaw = await callLLMBatch(batchPrompt, config.llm, {
-        temperature: 0.2,
-        maxTokens: 16384,
-        jsonMode: true,
-      })
-
-      if (batchRaw && typeof batchRaw === 'object') {
-        const batchObj = batchRaw as Record<string, unknown>
-        for (const [screenId, controllerData] of Object.entries(batchObj)) {
-          const parsed = ControllerOutputSchema.safeParse(controllerData)
-          if (parsed.success) {
-            batchControllers.set(screenId, parsed.data)
-            console.log(chalk.dim(`    Batch: ${screenId} controller validated`))
-          } else {
-            console.log(chalk.dim(`    Batch: ${screenId} controller failed validation, will retry per-screen`))
-          }
-        }
-      }
-    }
-  }
-
-  // Phase 3: Generate files per screen (using batch results where available)
-  for (const { screen, safeName, screenOutDir, overrideScreenDir, viewTree, hookResult } of screenData) {
-    // Write view.ts
     if (viewTree) {
-      const viewContent = generateViewFileContent(viewTree)
-      await writeFile(join(screenOutDir, 'view.ts'), viewContent, 'utf-8')
-      viewsGenerated++
+      await writeFile(join(screenOutDir, 'view.ts'), generateViewFileContent(viewTree), 'utf-8')
     } else {
-      const placeholderView = buildPlaceholderView(screen)
-      await writeFile(join(screenOutDir, 'view.ts'), placeholderView, 'utf-8')
-      viewsGenerated++
+      await writeFile(join(screenOutDir, 'view.ts'), buildPlaceholderView(screen), 'utf-8')
     }
+    viewsGenerated++
 
-    // Check overrides
+    // Model (from LLM analysis or template fallback)
     const hasModelOverride = existsSync(join(overrideScreenDir, 'model.ts'))
-    const hasControllerOverride = existsSync(join(overrideScreenDir, 'controller.ts'))
-
-    if (hasModelOverride) {
-      console.log(chalk.dim(`    Override exists: overrides/${safeName}/model.ts`))
-      overridesSkipped++
-    }
-    if (hasControllerOverride) {
-      console.log(chalk.dim(`    Override exists: overrides/${safeName}/controller.ts`))
-      overridesSkipped++
-    }
-
-    // Model + Controller generation
-    const needsModel = !hasModelOverride
-    const needsController = !hasControllerOverride
-
-    // Try per-screen LLM only if batch didn't cover this screen
-    let llmResult: LLMResult = { model: null, controller: null }
-    const hasBatchController = batchControllers.has(safeName)
-
-    if ((needsModel || (needsController && !hasBatchController)) && viewTree && config.llm.provider !== 'none') {
-      llmResult = await tryLLMGeneration(screen, viewTree, cwd, config)
-    }
-
-    if (needsModel) {
-      const rawModel = llmResult.model ?? await buildHeuristicModel(screen, viewTree, devToolConfig, hookResult)
-      const model = enrichModelWithHookMapping(rawModel, hookResult)
+    if (!hasModelOverride && analysis) {
+      const model = analysisToModel(analysis)
       const modelMeta = {
         route: screen.route,
         pattern: screen.pattern,
         filePath: relative(cwd, screen.filePath).split('\\').join('/'),
       }
-      const modelContent = generateModelFileContent(model, modelMeta)
-      await writeFile(join(screenOutDir, 'model.ts'), modelContent, 'utf-8')
+      await writeFile(join(screenOutDir, 'model.ts'), generateModelFileContent(model, modelMeta), 'utf-8')
       modelsGenerated++
+    } else if (hasModelOverride) {
+      console.log(chalk.dim(`    Override exists: overrides/${safeName}/model.ts`))
+      overridesSkipped++
     }
 
-    if (needsController) {
-      const controller = batchControllers.get(safeName)
-        ?? llmResult.controller
-        ?? buildHeuristicController(screen, viewTree)
-      const controllerContent = generateControllerFileContent(controller)
-      await writeFile(join(screenOutDir, 'controller.ts'), controllerContent, 'utf-8')
+    // Controller (from LLM analysis or template fallback)
+    const hasControllerOverride = existsSync(join(overrideScreenDir, 'controller.ts'))
+    if (!hasControllerOverride && analysis) {
+      const controller = analysisToController(analysis)
+      await writeFile(join(screenOutDir, 'controller.ts'), generateControllerFileContent(controller), 'utf-8')
       controllersGenerated++
+    } else if (hasControllerOverride) {
+      console.log(chalk.dim(`    Override exists: overrides/${safeName}/controller.ts`))
+      overridesSkipped++
     }
 
-    // Adapter — always regenerated
-    const adapterContent = buildAdapterContent(screen, screenOutDir)
-    await writeFile(join(screenOutDir, 'adapter.tsx'), adapterContent, 'utf-8')
+    // Adapter (always regenerated)
+    await writeFile(join(screenOutDir, 'adapter.tsx'), buildAdapterContent(screen, screenOutDir), 'utf-8')
     adaptersGenerated++
   }
 
-  // Step 5: Generate mock modules for all detected hooks
+  // Mock modules (simplified, direct region keys)
   console.log(chalk.dim('\nGenerating mock modules...'))
-  const mocksDir = join(previewDir, 'mocks')
-  await mkdir(mocksDir, { recursive: true })
+  const { mockFiles, aliasManifest } = generateMockModules(allFacts, allAnalyses)
 
-  // Collect all hook analyses across screens (reuse Phase 1 results)
-  const allHookResults: HookAnalysisResult[] = screenData
-    .map((d) => d.hookResult)
-    .filter((r): r is HookAnalysisResult => r !== null)
-
-  // Group hooks by import path
-  const hooksByImport = new Map<string, HookAnalysis[]>()
-  const importsToMock = new Map<string, ImportAnalysis>()
-
-  for (const result of allHookResults) {
-    for (const hook of result.hooks) {
-      const existing = hooksByImport.get(hook.importPath) ?? []
-      existing.push(hook)
-      hooksByImport.set(hook.importPath, existing)
-    }
-    for (const imp of result.imports) {
-      if (!imp.needsMocking) continue
-      const existing = importsToMock.get(imp.path)
-      if (existing) {
-        const merged = [...new Set([...existing.namedExports, ...imp.namedExports])]
-        importsToMock.set(imp.path, { ...existing, namedExports: merged })
-      } else {
-        importsToMock.set(imp.path, { ...imp, namedExports: [...imp.namedExports] })
-      }
-    }
-  }
-
-  // Generate mock hook files
-  for (const [importPath, hooks] of hooksByImport) {
+  for (const [importPath, code] of mockFiles) {
     const safeName = toSafeMockName(importPath)
-    const mockCode = generateMockHook(hooks, importPath)
-    await writeFile(join(mocksDir, `${safeName}.ts`), mockCode, 'utf-8')
+    await writeFile(join(mocksDir, `${safeName}.ts`), code, 'utf-8')
     console.log(chalk.dim(`  Mock: ${importPath} → mocks/${safeName}.ts`))
   }
 
-  // Generate mock stores
-  const authImport = [...importsToMock.values()].find((i) => i.reason === 'auth-store')
-  if (authImport) {
-    await writeFile(join(mocksDir, 'auth-store.ts'), generateMockAuthStore(), 'utf-8')
-    console.log(chalk.dim('  Mock: auth store'))
-  }
-
-  const devtoolImport = [...importsToMock.values()].find((i) => i.reason === 'devtool-store')
-  if (devtoolImport) {
-    await writeFile(join(mocksDir, 'devtool-store.ts'), generateMockDevToolStore(), 'utf-8')
-    console.log(chalk.dim('  Mock: devtool store'))
-  }
-
-  // Generate mock API clients
-  const apiImports = [...importsToMock.values()].filter((i) => i.reason === 'api-client')
-  for (const imp of apiImports) {
-    const safeName = toSafeMockName(imp.path)
-    await writeFile(join(mocksDir, `${safeName}.ts`), generateMockApiClient(imp.namedExports), 'utf-8')
-    console.log(chalk.dim(`  Mock: api-client → mocks/${safeName}.ts`))
-  }
-
-  // Generate mock collections
-  const collectionImports = [...importsToMock.values()].filter((i) => i.reason === 'collection')
-  for (const imp of collectionImports) {
-    const safeName = toSafeMockName(imp.path)
-    await writeFile(join(mocksDir, `${safeName}.ts`), generateMockCollection(imp.namedExports), 'utf-8')
-    console.log(chalk.dim(`  Mock: collection → mocks/${safeName}.ts`))
-  }
-
-  // Generate mock query client
-  const queryClientImports = [...importsToMock.values()].filter((i) => i.reason === 'query-client')
-  for (const imp of queryClientImports) {
-    const safeName = toSafeMockName(imp.path)
-    await writeFile(join(mocksDir, `${safeName}.ts`), generateMockQueryClient(), 'utf-8')
-    console.log(chalk.dim(`  Mock: query-client → mocks/${safeName}.ts`))
-  }
-
-  // Generate mock DB library
-  const dbLibraryImports = [...importsToMock.values()].filter((i) => i.reason === 'db-library')
-  for (const imp of dbLibraryImports) {
-    const safeName = toSafeMockName(imp.path)
-    await writeFile(join(mocksDir, `${safeName}.ts`), generateMockDbLibrary(), 'utf-8')
-    console.log(chalk.dim(`  Mock: db-library → mocks/${safeName}.ts`))
-  }
-
-  // Generate mock data modules
-  const mockDataImports = [...importsToMock.values()].filter((i) => i.reason === 'mock-data')
-  for (const imp of mockDataImports) {
-    const safeName = toSafeMockName(imp.path)
-    await writeFile(join(mocksDir, `${safeName}.ts`), generateMockDataModule(imp.namedExports), 'utf-8')
-    console.log(chalk.dim(`  Mock: mock-data → mocks/${safeName}.ts`))
-  }
-
-  // Write alias manifest for Vite config
-  const aliasManifest: Record<string, string> = {}
-
-  for (const [importPath] of hooksByImport) {
-    aliasManifest[importPath] = `./mocks/${toSafeMockName(importPath)}.ts`
-  }
-
-  if (authImport) {
-    aliasManifest[authImport.path] = './mocks/auth-store.ts'
-  }
-  if (devtoolImport) {
-    aliasManifest[devtoolImport.path] = './mocks/devtool-store.ts'
-  }
-
-  // Add alias entries for all new mock categories
-  const extraMockImports = [
-    ...apiImports,
-    ...collectionImports,
-    ...queryClientImports,
-    ...dbLibraryImports,
-    ...mockDataImports,
-  ]
-  for (const imp of extraMockImports) {
-    const safeName = toSafeMockName(imp.path)
-    aliasManifest[imp.path] = `./mocks/${safeName}.ts`
-  }
-
-  await writeFile(
-    join(previewDir, 'alias-manifest.json'),
-    JSON.stringify(aliasManifest, null, 2),
-    'utf-8'
-  )
-
-  const mocksGenerated = hooksByImport.size
-    + (authImport ? 1 : 0)
-    + (devtoolImport ? 1 : 0)
-    + apiImports.length
-    + collectionImports.length
-    + queryClientImports.length
-    + dbLibraryImports.length
-    + mockDataImports.length
-  console.log(chalk.dim(`  ${mocksGenerated} mock module(s) generated`))
+  await writeFile(join(previewDir, 'alias-manifest.json'), JSON.stringify(aliasManifest, null, 2), 'utf-8')
+  console.log(chalk.dim(`  ${mockFiles.size} mock module(s) generated`))
 
   return {
     screensFound: screens.length,
@@ -380,7 +178,7 @@ export async function generateAll(
     controllersGenerated,
     adaptersGenerated,
     overridesSkipped,
-    mocksGenerated,
+    mocksGenerated: mockFiles.size,
   }
 }
 
