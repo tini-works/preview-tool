@@ -283,4 +283,56 @@ export default function Page() {
       })
     )
   })
+
+  it('extracts sectionId from useQuery queryKey array', () => {
+    const source = `
+import { useQuery } from '@tanstack/react-query'
+
+export default function Page() {
+  const { data } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => fetch('/api/users'),
+  })
+  return <div>{data}</div>
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.hooks).toHaveLength(1)
+    expect(result.hooks[0].sectionId).toBe('users')
+  })
+
+  it('extracts sectionId from useQuery with multi-element queryKey', () => {
+    const source = `
+import { useQuery } from '@tanstack/react-query'
+
+export default function Page() {
+  const { data } = useQuery({
+    queryKey: ['availability', date],
+    queryFn: () => fetch('/api/availability'),
+  })
+  return <div>{data}</div>
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.hooks).toHaveLength(1)
+    expect(result.hooks[0].sectionId).toBe('availability')
+  })
+
+  it('extracts sectionId from object sectionId property', () => {
+    const source = `
+import { useAppLiveQuery } from '@/hooks/use-app-live-query'
+
+export default function Page() {
+  const { data } = useAppLiveQuery({
+    query: (q) => q.from(services),
+    sectionId: 'service-grid',
+  })
+  return <div>{data}</div>
+}
+`
+    const result = analyzeHooks(source, 'src/pages/page.tsx')
+    expect(result.hooks).toHaveLength(1)
+    expect(result.hooks[0].sectionId).toBe('service-grid')
+  })
+
 })

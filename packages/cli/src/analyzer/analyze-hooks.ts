@@ -128,7 +128,7 @@ export function analyzeHooks(source: string, _filePath: string): HookAnalysisRes
     const returnShape = DATA_HOOK_PATTERNS[info.originalName]
     if (!returnShape) continue
 
-    // Find all calls to this hook
+    // Strategy 1: Positional string literal — useHook(query, 'section-id')
     const callRe = new RegExp(
       localName + String.raw`\s*\([\s\S]*?['"]([a-z][a-z0-9-]*)['"]\s*\)`,
       'g',
@@ -150,9 +150,52 @@ export function analyzeHooks(source: string, _filePath: string): HookAnalysisRes
       })
     }
 
+    // Strategy 2: queryKey array — useQuery({ queryKey: ['section-id', ...] })
+    if (foundSections.size === 0) {
+      const queryKeyRe = new RegExp(
+        localName + String.raw`\s*\(\s*\{[\s\S]*?queryKey\s*:\s*\[\s*['"]([a-z][a-z0-9-]*)['"]\s*[\],]`,
+        'g',
+      )
+      let qkMatch: RegExpExecArray | null
+      while ((qkMatch = queryKeyRe.exec(source)) !== null) {
+        const sectionId = qkMatch[1]
+        if (foundSections.has(sectionId)) continue
+        foundSections.add(sectionId)
+
+        hooks.push({
+          hookName: info.originalName,
+          importPath: info.importPath,
+          sectionId,
+          returnShape,
+          hookMappingType: getHookMappingType(info.originalName),
+        })
+      }
+    }
+
+    // Strategy 3: Object sectionId property — useHook({ sectionId: 'my-section' })
+    if (foundSections.size === 0) {
+      const objSectionIdRe = new RegExp(
+        localName + String.raw`\s*\(\s*\{[\s\S]*?sectionId\s*:\s*['"]([a-z][a-z0-9-]*)['"]\s*[\},]`,
+        'g',
+      )
+      let osMatch: RegExpExecArray | null
+      while ((osMatch = objSectionIdRe.exec(source)) !== null) {
+        const sectionId = osMatch[1]
+        if (foundSections.has(sectionId)) continue
+        foundSections.add(sectionId)
+
+        hooks.push({
+          hookName: info.originalName,
+          importPath: info.importPath,
+          sectionId,
+          returnShape,
+          hookMappingType: getHookMappingType(info.originalName),
+        })
+      }
+    }
+
     // If hook was imported but no section ID detected, still record it
     if (foundSections.size === 0) {
-      // Check if it's called at all
       const simpleCallRe = new RegExp(localName + String.raw`\s*\(`)
       if (simpleCallRe.test(source)) {
         hooks.push({
@@ -163,6 +206,7 @@ export function analyzeHooks(source: string, _filePath: string): HookAnalysisRes
         })
       }
     }
+
 
     // Add the hook's import to mock list if not already there
     if (!imports.some((i) => i.path === info.importPath)) {
