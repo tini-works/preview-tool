@@ -6,6 +6,7 @@ import type {
   HookMappingType,
   ComponentRegion,
 } from '../analyzer/types.js'
+import { parseHookBinding } from '../lib/hook-binding.js'
 
 /**
  * Infers a HookMappingType from a hook name string.
@@ -42,23 +43,6 @@ function inferHookMappingType(hookName: string): HookMappingType {
   }
 
   return 'unknown'
-}
-
-/**
- * Parses a hookBinding string in the format "hookName:identifier".
- * Returns { hookName, identifier } or undefined if the format is invalid.
- */
-function parseHookBinding(binding: string): { hookName: string; identifier: string } | undefined {
-  const colonIndex = binding.indexOf(':')
-  if (colonIndex === -1) {
-    return undefined
-  }
-  const hookName = binding.slice(0, colonIndex).trim()
-  const identifier = binding.slice(colonIndex + 1).trim()
-  if (!hookName || !identifier) {
-    return undefined
-  }
-  return { hookName, identifier }
 }
 
 /**

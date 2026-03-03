@@ -1,6 +1,7 @@
 import type { ScreenFacts, HookFact } from './types.js'
 import type { ScreenAnalysisOutput, RegionOutput, FlowOutput } from '../llm/schemas/screen-analysis.js'
 import { formatLabel } from '../lib/format-label.js'
+import { REACT_BUILTIN_HOOKS, REACT_IMPORT_PATHS } from '../lib/hook-binding.js'
 
 // ---------------------------------------------------------------------------
 // Hook Template interface
@@ -73,19 +74,6 @@ function deriveDataKey(hookName: string, args: string[]): string {
 function deriveStoreKey(hookName: string, _args: string[]): string {
   return hookNameToKey(hookName)
 }
-
-// ---------------------------------------------------------------------------
-// React built-in hooks that should never produce regions
-// ---------------------------------------------------------------------------
-
-const REACT_BUILTIN_HOOKS = new Set([
-  'useState', 'useEffect', 'useRef', 'useMemo', 'useCallback',
-  'useReducer', 'useLayoutEffect', 'useId', 'useImperativeHandle',
-  'useInsertionEffect', 'useSyncExternalStore', 'useTransition',
-  'useDeferredValue', 'useDebugValue',
-])
-
-const REACT_IMPORT_PATHS = new Set(['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'])
 
 // ---------------------------------------------------------------------------
 // Template definitions

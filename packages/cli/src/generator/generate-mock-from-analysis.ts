@@ -1,5 +1,6 @@
 import type { ScreenFacts } from '../analyzer/types.js'
 import type { ScreenAnalysisOutput } from '../llm/schemas/screen-analysis.js'
+import { parseHookBinding, REACT_IMPORT_PATHS } from '../lib/hook-binding.js'
 
 export interface MockGenerationResult {
   /** importPath -> generated mock code */
@@ -7,9 +8,6 @@ export interface MockGenerationResult {
   /** importPath -> relative mock file path */
   aliasManifest: Record<string, string>
 }
-
-/** Import paths that should never be mocked — they are provided by React itself */
-const SKIP_IMPORT_PATHS = new Set(['react', 'react-dom', 'react-dom/client', 'react/jsx-runtime'])
 
 /**
  * Converts an import path to a safe filename for the mock module.
@@ -24,22 +22,6 @@ function toSafeFileName(importPath: string): string {
     .replace(/[^a-zA-Z0-9-_]/g, '-')
     .replace(/^-+/, '')
     .replace(/-+/g, '-')
-}
-
-/**
- * Parses a hookBinding string in the format "hookName:identifier".
- */
-function parseHookBinding(binding: string): { hookName: string; identifier: string } | undefined {
-  const colonIndex = binding.indexOf(':')
-  if (colonIndex === -1) {
-    return undefined
-  }
-  const hookName = binding.slice(0, colonIndex).trim()
-  const identifier = binding.slice(colonIndex + 1).trim()
-  if (!hookName || !identifier) {
-    return undefined
-  }
-  return { hookName, identifier }
 }
 
 /**
@@ -160,7 +142,7 @@ export function generateMockModules(
   const hooksByImport = new Map<string, Array<{ name: string }>>()
   for (const facts of allFacts) {
     for (const hook of facts.hooks) {
-      if (SKIP_IMPORT_PATHS.has(hook.importPath)) continue
+      if (REACT_IMPORT_PATHS.has(hook.importPath)) continue
       const existing = hooksByImport.get(hook.importPath) ?? []
       // Deduplicate by name
       if (!existing.some((h) => h.name === hook.name)) {

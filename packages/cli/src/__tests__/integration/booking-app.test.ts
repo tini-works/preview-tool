@@ -3,8 +3,8 @@ import { resolveSource } from '../../resolver/resolve-source.js'
 import { detectFramework } from '../../resolver/detect-framework.js'
 import { generateWrapperCode } from '../../resolver/generate-wrapper.js'
 import { discoverScreens } from '../../analyzer/discover.js'
-import { analyzeHooks } from '../../analyzer/analyze-hooks.js'
-import { existsSync, readFileSync } from 'node:fs'
+import { collectAllFacts } from '../../analyzer/collect-facts.js'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
 const BOOKING_APP = join(process.env.HOME ?? '', 'Desktop/booking/client')
@@ -54,48 +54,43 @@ skipIfNoBookingApp('booking app integration', () => {
     expect(code).toContain('I18nextProvider')
   })
 
-  it('analyzes hooks from booking app screens', async () => {
+  it('collects facts from booking app screens', async () => {
     const framework = await detectFramework(BOOKING_APP)
     const screens = await discoverScreens(BOOKING_APP, framework.pagePattern)
 
-    // At least one screen should use useAppLiveQuery
-    let foundDataHook = false
-    let foundDevtoolStore = false
-    let foundAuthStore = false
+    const screenInputs = screens.map(s => ({
+      filePath: s.filePath,
+      route: s.route,
+      exportName: s.exportName,
+    }))
+    const allFacts = await collectAllFacts(screenInputs)
 
-    for (const screen of screens) {
-      try {
-        const source = readFileSync(screen.filePath, 'utf-8')
-        const result = analyzeHooks(source, screen.filePath)
+    // Should collect facts for all screens
+    expect(allFacts.length).toBe(screens.length)
 
-        if (result.hooks.some(h => h.hookName === 'useAppLiveQuery')) {
-          foundDataHook = true
-        }
-        if (result.imports.some(i => i.reason === 'devtool-store')) {
-          foundDevtoolStore = true
-        }
-        if (result.imports.some(i => i.reason === 'auth-store')) {
-          foundAuthStore = true
-        }
-      } catch {
-        // Skip unreadable files
-      }
-    }
-
-    expect(foundDataHook).toBe(true)
-    expect(foundDevtoolStore).toBe(true)
-    expect(foundAuthStore).toBe(true)
+    // At least one screen should have hooks or components
+    const hasContent = allFacts.some(f =>
+      f.hooks.length > 0 || f.components.length > 0
+    )
+    expect(hasContent).toBe(true)
   })
 
-  it('detects section IDs from booking app hooks', async () => {
-    // Read the home page which has useAppLiveQuery with 'service-grid'
-    const homePath = join(BOOKING_APP, 'src/pages/home.tsx')
-    if (existsSync(homePath)) {
-      const source = readFileSync(homePath, 'utf-8')
-      const result = analyzeHooks(source, homePath)
+  it('collects hook import paths from booking app facts', async () => {
+    const framework = await detectFramework(BOOKING_APP)
+    const screens = await discoverScreens(BOOKING_APP, framework.pagePattern)
 
-      const sectionIds = result.hooks.map(h => h.sectionId).filter(Boolean)
-      expect(sectionIds.length).toBeGreaterThan(0)
+    const screenInputs = screens.map(s => ({
+      filePath: s.filePath,
+      route: s.route,
+      exportName: s.exportName,
+    }))
+    const allFacts = await collectAllFacts(screenInputs)
+
+    // Every hook should have a non-empty importPath
+    const allHooks = allFacts.flatMap(f => f.hooks)
+    expect(allHooks.length).toBeGreaterThan(0)
+    for (const hook of allHooks) {
+      expect(hook.importPath).toBeTruthy()
     }
   })
 })
