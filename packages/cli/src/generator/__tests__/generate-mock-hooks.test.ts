@@ -14,9 +14,9 @@ describe('generateMockHook', () => {
     ]
 
     const code = generateMockHook(hooks, '@/hooks/use-app-live-query')
-    expect(code).toContain('useDevToolsStore')
+    expect(code).toContain('useRegionDataForHook')
     expect(code).toContain('export function useAppLiveQuery')
-    expect(code).toContain('regionStates')
+    expect(code).toContain('DEFAULT_STATE')
     expect(code).toContain('_loading')
     expect(code).toContain('_error')
   })
@@ -32,10 +32,10 @@ describe('generateMockHook', () => {
 
     const code = generateMockHook(hooks, '@tanstack/react-query')
     expect(code).toContain('export function useQuery')
-    expect(code).toContain('regionStates')
+    expect(code).toContain('DEFAULT_STATE')
   })
 
-  it('includes registerModels export', () => {
+  it('does not include modelRegistry or registerModels', () => {
     const hooks: HookAnalysis[] = [
       {
         hookName: 'useAppLiveQuery',
@@ -46,7 +46,10 @@ describe('generateMockHook', () => {
     ]
 
     const code = generateMockHook(hooks, '@/hooks/use-app-live-query')
-    expect(code).toContain('export function registerModels')
+    expect(code).not.toContain('export function registerModels')
+    expect(code).not.toContain('modelRegistry')
+    expect(code).not.toContain('resolveFallback')
+    expect(code).not.toContain('useDevToolsStore')
   })
 
   it('preserves original function signature for useAppLiveQuery', () => {
