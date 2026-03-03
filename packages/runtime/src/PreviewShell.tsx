@@ -2,7 +2,6 @@ import { useMemo } from 'react'
 import { useDevToolsStore } from './store/useDevToolsStore.ts'
 import { CatalogPanel } from './devtools/CatalogPanel.tsx'
 import { InspectorPanel } from './devtools/InspectorPanel.tsx'
-import { PlayModeOverlay } from './devtools/PlayModeOverlay.tsx'
 import { DeviceFrame } from './preview/DeviceFrame.tsx'
 import { ScreenRenderer } from './ScreenRenderer.tsx'
 import { getDevice } from './preview/device-frames.ts'
@@ -28,13 +27,12 @@ export function PreviewShell({ screens, onLanguageChange }: PreviewShellProps) {
   const responsiveWidth = useDevToolsStore((s) => s.responsiveWidth)
   const responsiveHeight = useDevToolsStore((s) => s.responsiveHeight)
   const setResponsiveSize = useDevToolsStore((s) => s.setResponsiveSize)
-  const playMode = useDevToolsStore((s) => s.playMode)
 
   const device = getDevice(activeDevice)
 
   return (
     <div className="flex h-svh bg-neutral-100">
-      {!playMode && <CatalogPanel />}
+      <CatalogPanel />
 
       <div className="flex flex-1 flex-col overflow-hidden">
         <DeviceFrame
@@ -48,8 +46,7 @@ export function PreviewShell({ screens, onLanguageChange }: PreviewShellProps) {
         </DeviceFrame>
       </div>
 
-      {!playMode && <InspectorPanel onLanguageChange={onLanguageChange} />}
-      {playMode && <PlayModeOverlay />}
+      <InspectorPanel onLanguageChange={onLanguageChange} />
     </div>
   )
 }

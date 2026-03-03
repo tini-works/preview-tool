@@ -13,7 +13,6 @@ interface DevToolsState {
   selectedRoute: string | null
   catalogCollapsed: boolean
   inspectorCollapsed: boolean
-  playMode: boolean
   flowHistory: Array<{ route: string }>
   networkMode: NetworkMode
   fontScale: number
@@ -31,8 +30,6 @@ interface DevToolsActions {
   setResponsiveSize: (width: number, height: number) => void
   toggleCatalogCollapsed: () => void
   toggleInspectorCollapsed: () => void
-  setPlayMode: (enabled: boolean) => void
-  togglePlayMode: () => void
   pushFlowHistory: (route: string) => void
   resetFlowHistory: () => void
   navigateFlow: (route: string) => void
@@ -56,7 +53,6 @@ const DEFAULT_STATE: DevToolsState = {
   selectedRoute: null,
   catalogCollapsed: false,
   inspectorCollapsed: false,
-  playMode: false,
   flowHistory: [],
   networkMode: 'online' as NetworkMode,
   fontScale: 1,
@@ -100,15 +96,6 @@ export const useDevToolsStore = create<DevToolsStore>()(
 
       toggleInspectorCollapsed: () =>
         set((state) => ({ inspectorCollapsed: !state.inspectorCollapsed })),
-
-      setPlayMode: (enabled) =>
-        set({ playMode: enabled }),
-
-      togglePlayMode: () =>
-        set((state) => ({
-          playMode: !state.playMode,
-          flowHistory: !state.playMode ? [] : state.flowHistory,
-        })),
 
       pushFlowHistory: (route) =>
         set((prev) => ({

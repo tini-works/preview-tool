@@ -1,5 +1,5 @@
 import type React from 'react'
-import { Moon, Sun, Monitor, PanelRightClose, PanelRight, Play } from 'lucide-react'
+import { Moon, Sun, Monitor, PanelRightClose, PanelRight } from 'lucide-react'
 import { Button } from '../ui/button.tsx'
 import { Label } from '../ui/label.tsx'
 import { Slider } from '../ui/slider.tsx'
@@ -44,7 +44,6 @@ export function InspectorPanel({ onLanguageChange }: InspectorPanelProps = {}) {
   const setRegionState = useDevToolsStore((s) => s.setRegionState)
   const regionListCounts = useDevToolsStore((s) => s.regionListCounts)
   const setRegionListCount = useDevToolsStore((s) => s.setRegionListCount)
-  const togglePlayMode = useDevToolsStore((s) => s.togglePlayMode)
 
   const modules = getScreenEntries()
   const currentModule = modules.find((m) => m.route === selectedRoute)
@@ -79,13 +78,6 @@ export function InspectorPanel({ onLanguageChange }: InspectorPanelProps = {}) {
           INSPECTOR
         </span>
         <div className="flex items-center gap-1">
-          <button
-            onClick={togglePlayMode}
-            className="text-neutral-400 hover:text-neutral-600"
-            title="Enter play mode"
-          >
-            <Play className="size-4" />
-          </button>
           <button
             onClick={toggleInspectorCollapsed}
             className="text-neutral-400 hover:text-neutral-600"

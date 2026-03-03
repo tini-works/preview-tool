@@ -4,7 +4,7 @@ export { ScreenErrorBoundary } from './ErrorBoundary.tsx'
 export { ScreenRenderer, assembleRegionData, computeRegionData, resolveFlags } from './ScreenRenderer.tsx'
 export { RegionDataProvider, useRegionDataForHook } from './RegionDataContext.tsx'
 export { registerScreens, getScreenEntries, getScreenEntry } from './ScreenRegistry.ts'
-export { registerFlows, getFlowActions, clearFlowRegistry } from './flow/index.ts'
+export { registerFlows, getFlowActions, clearFlowRegistry, type AnyFlowAction } from './flow/index.ts'
 export { FlowProvider } from './flow/index.ts'
 export { resolveTrigger } from './flow/index.ts'
 export { matchComponentTrigger } from './flow/index.ts'
@@ -13,7 +13,7 @@ export { CatalogPanel } from './devtools/index.ts'
 export { InspectorPanel } from './devtools/index.ts'
 export { DevToolsBar } from './devtools/index.ts'
 export { NetworkSimulationLayer } from './devtools/index.ts'
-export { PlayModeOverlay } from './devtools/index.ts'
+export { ResetOverlay } from './devtools/index.ts'
 export {
   DeviceFrame,
   MobileFrame,
