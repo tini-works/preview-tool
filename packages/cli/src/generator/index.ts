@@ -163,9 +163,11 @@ export async function generateAll(
   const { mockFiles, aliasManifest } = generateMockModules(allFacts, allAnalyses)
 
   for (const [importPath, code] of mockFiles) {
-    const safeName = toSafeMockName(importPath)
-    await writeFile(join(mocksDir, `${safeName}.ts`), code, 'utf-8')
-    console.log(chalk.dim(`  Mock: ${importPath} → mocks/${safeName}.ts`))
+    // Use the alias manifest path (which generateMockModules built) for consistency
+    const mockRelPath = aliasManifest[importPath]
+    const mockFileName = mockRelPath?.replace(/^\.\/mocks\//, '').replace(/\.ts$/, '') ?? importPath
+    await writeFile(join(mocksDir, `${mockFileName}.ts`), code, 'utf-8')
+    console.log(chalk.dim(`  Mock: ${importPath} → mocks/${mockFileName}.ts`))
   }
 
   await writeFile(join(previewDir, 'alias-manifest.json'), JSON.stringify(aliasManifest, null, 2), 'utf-8')
