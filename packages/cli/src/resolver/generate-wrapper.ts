@@ -1,7 +1,7 @@
 interface ProviderDef {
   dependency: string
   imports: string
-  open: string
+  open: string | ((route?: string) => string)
   close: string
   setup?: string
 }
@@ -17,8 +17,21 @@ const PROVIDER_DEFS: ProviderDef[] = [
   {
     dependency: 'react-router-dom',
     imports: "import { MemoryRouter } from 'react-router-dom'",
-    open: '<MemoryRouter>',
+    open: (route?: string) => {
+      if (route) {
+        const safeRoute = route.replace(/'/g, "\\'")
+        return `<MemoryRouter initialEntries={['${safeRoute}']}>`
+      }
+      return '<MemoryRouter>'
+    },
     close: '</MemoryRouter>',
+  },
+  {
+    dependency: 'react-hook-form',
+    imports: "import { FormProvider, useForm } from 'react-hook-form'",
+    setup: 'const methods = useForm()',
+    open: '<FormProvider {...methods}>',
+    close: '</FormProvider>',
   },
   {
     dependency: 'react-i18next',
@@ -41,7 +54,7 @@ const PROVIDER_DEFS: ProviderDef[] = [
   },
 ]
 
-export function generateWrapperCode(providers: string[]): string {
+export function generateWrapperCode(providers: string[], route?: string): string {
   const matched = PROVIDER_DEFS.filter((d) => providers.includes(d.dependency))
 
   const imports = [
@@ -64,11 +77,15 @@ export function Wrapper({ children }: { children: ReactNode }) {
 `
   }
 
+  // Resolve open tags — some are functions that accept route
+  const resolveOpen = (m: ProviderDef): string =>
+    typeof m.open === 'function' ? m.open(route) : m.open
+
   // Build nested JSX
   let jsx = ''
   let depth = 2
   for (const m of matched) {
-    jsx += `${indent(depth)}${m.open}\n`
+    jsx += `${indent(depth)}${resolveOpen(m)}\n`
     depth++
   }
   jsx += `${indent(depth)}{children}\n`

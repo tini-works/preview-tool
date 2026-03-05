@@ -1,0 +1,4 @@
+# Screen component -> source file mapping
+dashboard: packages/cli/test-fixtures/sample-app/src/screens/dashboard/index.tsx
+settings: packages/cli/test-fixtures/sample-app/src/screens/settings/index.tsx
+settings-view: packages/cli/test-fixtures/sample-app/src/screens/settings/view.tsx

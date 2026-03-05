@@ -1,6 +1,7 @@
 import type { ScreenFacts } from '../analyzer/types.js'
 import type { ScreenAnalysisOutput } from '../llm/schemas/screen-analysis.js'
 import { parseHookBinding, REACT_IMPORT_PATHS } from '../lib/hook-binding.js'
+import { classifyHook } from '../lib/hook-classifier.js'
 
 export interface MockGenerationResult {
   /** importPath -> generated mock code */
@@ -159,6 +160,7 @@ export function generateMockModules(
   for (const facts of allFacts) {
     for (const hook of facts.hooks) {
       if (REACT_IMPORT_PATHS.has(hook.importPath)) continue
+      if (classifyHook(hook.name, hook.importPath) === 'provider') continue
       const existing = hooksByImport.get(hook.importPath) ?? []
       // Deduplicate by name
       if (!existing.some((h) => h.name === hook.name)) {

@@ -76,3 +76,9 @@ Dependencies flow: `CLI → Runtime` (unidirectional). Runtime has no CLI depend
 - Keep the CLI as a Node.js tool — no browser dependencies in `packages/cli/`
 - Runtime is a React library — browser-only, consumed by generated preview apps
 - Test fixtures must be self-contained (no imports from CLI or runtime)
+
+# Specs
+
+This project uses `.specs/` for requirement tracking.
+For spec questions, changes, verification → `/spec`.
+Operations: onboard, add, query, verify, map, confirm, audit.

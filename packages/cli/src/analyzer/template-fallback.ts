@@ -2,6 +2,7 @@ import type { ScreenFacts, HookFact } from './types.js'
 import type { ScreenAnalysisOutput, RegionOutput, FlowOutput } from '../llm/schemas/screen-analysis.js'
 import { formatLabel } from '../lib/format-label.js'
 import { REACT_BUILTIN_HOOKS, REACT_IMPORT_PATHS } from '../lib/hook-binding.js'
+import { classifyHook } from '../lib/hook-classifier.js'
 
 // ---------------------------------------------------------------------------
 // Hook Template interface
@@ -221,6 +222,9 @@ export function buildFromTemplates(facts: ScreenFacts): ScreenAnalysisOutput {
   const regions: RegionOutput[] = []
 
   for (const hook of facts.hooks) {
+    // Skip provider hooks (useNavigate, useForm, etc.) — but let React built-ins through
+    // so that useContext still gets template #4 matching.
+    if (!REACT_IMPORT_PATHS.has(hook.importPath) && classifyHook(hook.name, hook.importPath) === 'provider') continue
     const template = matchTemplate(hook)
     if (!template) continue
 

@@ -125,4 +125,24 @@ describe('generateMockModules', () => {
     expect(result.mockFiles.size).toBe(0)
     expect(Object.keys(result.aliasManifest)).toHaveLength(0)
   })
+
+  it('skips provider hooks (useNavigate, useForm) from mock generation', () => {
+    const providerFacts: ScreenFacts[] = [{
+      route: '/test',
+      filePath: '/test.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useNavigate', importPath: 'react-router-dom', arguments: [] },
+        { name: 'useForm', importPath: 'react-hook-form', arguments: [] },
+        { name: 'useTranslation', importPath: 'react-i18next', arguments: [] },
+        { name: 'useQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['items'] }"] },
+      ],
+      components: [], conditionals: [], navigation: [],
+    }]
+    const result = generateMockModules(providerFacts, [{ route: '/test', regions: [], flows: [] }])
+    expect(result.mockFiles.has('react-router-dom')).toBe(false)
+    expect(result.mockFiles.has('react-hook-form')).toBe(false)
+    expect(result.mockFiles.has('react-i18next')).toBe(false)
+    expect(result.mockFiles.has('@tanstack/react-query')).toBe(true)
+  })
 })

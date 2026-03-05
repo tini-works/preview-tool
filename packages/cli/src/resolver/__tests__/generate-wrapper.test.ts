@@ -49,4 +49,40 @@ describe('generateWrapperCode', () => {
     expect(code).not.toContain('useDevToolsStore')
     expect(code).toContain('MemoryRouter')
   })
+
+  // -----------------------------------------------------------------------
+  // react-hook-form FormProvider
+  // -----------------------------------------------------------------------
+
+  it('wraps with FormProvider for react-hook-form', () => {
+    const code = generateWrapperCode(['react-hook-form'])
+    expect(code).toContain('FormProvider')
+    expect(code).toContain('useForm')
+    expect(code).toContain("from 'react-hook-form'")
+    expect(code).toContain('const methods = useForm()')
+    expect(code).toContain('<FormProvider {...methods}>')
+    expect(code).toContain('</FormProvider>')
+  })
+
+  // -----------------------------------------------------------------------
+  // Route parameter support
+  // -----------------------------------------------------------------------
+
+  it('uses MemoryRouter with initialEntries when route is provided', () => {
+    const code = generateWrapperCode(['react-router-dom'], '/register')
+    expect(code).toContain("initialEntries={['/register']}")
+    expect(code).toContain('MemoryRouter')
+  })
+
+  it('uses plain MemoryRouter when no route is provided', () => {
+    const code = generateWrapperCode(['react-router-dom'])
+    expect(code).toContain('<MemoryRouter>')
+    expect(code).not.toContain('initialEntries')
+  })
+
+  it('route parameter does not affect non-router providers', () => {
+    const code = generateWrapperCode(['@tanstack/react-query'], '/some-route')
+    expect(code).not.toContain('initialEntries')
+    expect(code).toContain('QueryClientProvider')
+  })
 })

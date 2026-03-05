@@ -215,4 +215,21 @@ describe('buildFromTemplates', () => {
     expect(result.regions).toHaveLength(0)
     expect(result.flows).toHaveLength(0)
   })
+
+  it('skips provider hooks (useNavigate, useForm, useTranslation) — no regions produced', () => {
+    const facts: ScreenFacts = {
+      route: '/register',
+      filePath: '/app/register.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useNavigate', importPath: 'react-router-dom', arguments: [] },
+        { name: 'useForm', importPath: 'react-hook-form', arguments: [] },
+        { name: 'useTranslation', importPath: 'react-i18next', arguments: [] },
+        { name: 'useParams', importPath: 'react-router-dom', arguments: [] },
+      ],
+      components: [], conditionals: [], navigation: [],
+    }
+    const result = buildFromTemplates(facts)
+    expect(result.regions).toHaveLength(0)
+  })
 })

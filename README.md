@@ -105,12 +105,131 @@ pnpm add -D vite @vitejs/plugin-react
 
 ## How It Works
 
-### Detection Pipeline
+### Per-Screen Data Flow
 
+```mermaid
+flowchart TD
+    subgraph S1["1 &mdash; Discovery"]
+        A1[/"Glob pattern<br/><code>src/screens/**/index.tsx</code>"/]
+        A2["<b>discoverScreens()</b><br/><i>analyzer/discover.ts</i>"]
+        A3[/"DiscoveredScreen[]<br/>route &bull; filePath &bull; exportName"/]
+        A1 --> A2 --> A3
+    end
+
+    subgraph S2["2 &mdash; AST Fact Collection"]
+        B1["<b>collectAllFacts()</b><br/><i>analyzer/collect-facts.ts</i>"]
+        B2[/"ScreenFacts[]"/]
+        B1 --> B2
+    end
+
+    subgraph S2D[" "]
+        direction LR
+        BH["hooks<br/><i>name, importPath, args</i>"]
+        BC["components<br/><i>name, props</i>"]
+        BN["navigation<br/><i>target, trigger</i>"]
+        BX["conditionals<br/><i>ternary, &&</i>"]
+    end
+
+    subgraph S3["3 &mdash; Semantic Analysis"]
+        C1{"LLM<br/>configured?"}
+        C2["<b>understandScreens()</b><br/><i>Anthropic / OpenAI / Ollama</i>"]
+        C3["<b>buildFromTemplates()</b><br/><i>template-fallback.ts</i>"]
+        C4[/"ScreenAnalysisOutput[]<br/>regions &bull; flows"/]
+        C1 -->|yes| C2
+        C1 -->|no| C3
+        C2 -->|parse fail| C3
+        C2 --> C4
+        C3 --> C4
+    end
+
+    subgraph S3D[" "]
+        direction LR
+        RK["key: <code>users</code>"]
+        RT["type: <code>list&thinsp;|&thinsp;auth&thinsp;|&thinsp;status</code>"]
+        RS["states: <code>populated, loading, error</code>"]
+        RH["hookBindings: <code>useQuery:users</code>"]
+    end
+
+    subgraph S4["4 &mdash; Code Generation"]
+        D1["<b>analysisToModel()</b>"] --> F1[/"model.ts"/]
+        D2["<b>analysisToController()</b>"] --> F2[/"controller.ts"/]
+        D3["<b>analyzeViewTree()</b>"] --> F3[/"view.ts"/]
+        D4["<b>generateMockModules()</b>"] --> F4[/"mocks/*.ts"/]
+        D5["<b>buildAdapterContent()</b>"] --> F5[/"adapter.tsx"/]
+    end
+
+    subgraph S4H["Hook Classification"]
+        HC1["<b>classifyHook()</b><br/><i>lib/hook-classifier.ts</i>"]
+        HC2["<code>data</code> &rarr; mock with region data"]
+        HC3["<code>provider</code> &rarr; skip, use real provider"]
+        HC1 --> HC2
+        HC1 --> HC3
+    end
+
+    subgraph S5["5 &mdash; Dev Server"]
+        E1["<b>generateEntryFiles()</b>"] --> E2[/"main.tsx<br/>import.meta.glob adapters"/]
+        E3["<b>createViteConfig()</b>"] --> E4[/"Alias chain<br/>__real: &rarr; mocks &rarr; dedup"/]
+    end
+
+    subgraph S6["6 &mdash; Runtime Rendering"]
+        R1["<b>PreviewShell</b>"]
+        R2["<b>ScreenRenderer</b><br/>dynamic import adapter"]
+        R3["<b>RegionDataProvider</b><br/>inject mock data via context"]
+        R4["<b>Original Component</b><br/>calls hooks normally"]
+        R5["<b>Mock hook</b><br/><code>useRegionDataForHook('users')</code>"]
+        R6(["Screen renders in device frame"])
+        R1 --> R2 --> R3 --> R4 --> R5 --> R6
+    end
+
+    S1 --> S2
+    B1 -.- S2D
+    S2 --> S3
+    C4 -.- S3D
+    S3 --> S4
+    D4 -.- S4H
+    S4 --> S5
+    S5 --> S6
+
+    style S1 fill:#e8f5e9,stroke:#4caf50
+    style S2 fill:#e3f2fd,stroke:#2196f3
+    style S3 fill:#fff3e0,stroke:#ff9800
+    style S4 fill:#fce4ec,stroke:#e91e63
+    style S5 fill:#f3e5f5,stroke:#9c27b0
+    style S6 fill:#e0f2f1,stroke:#009688
+    style S4H fill:#fff9c4,stroke:#fbc02d
 ```
-Discover Screens → AST Fact Collection → LLM Understanding → Code Generation
-   (~100ms)           (~500ms)             (~5-10s)            (~200ms)
+
+### Hook Lifecycle in Preview
+
+```mermaid
+sequenceDiagram
+    participant S as Screen Component
+    participant M as Mock Module
+    participant R as RegionDataProvider
+    participant Z as Zustand Store
+
+    S->>M: useQuery({ queryKey: ['users'] })
+    M->>R: useRegionDataForHook('users')
+    R->>Z: read regionData['users']
+    Z-->>R: { data: [...], isLoading: false }
+    R-->>M: region state
+    M-->>S: { data, isLoading, isError, isReady }
+    Note over S: Renders with mock data
 ```
+
+### Pipeline Summary
+
+| Stage | Function | Input | Output | Artifacts |
+|-------|----------|-------|--------|-----------|
+| 1. Discovery | `discoverScreens()` | glob pattern | `DiscoveredScreen[]` | -- |
+| 2. Facts | `collectAllFacts()` | screens | `ScreenFacts[]` | -- |
+| 3. Analysis | `understandScreens()` | facts | `ScreenAnalysisOutput[]` | -- |
+| 4. Codegen | `analysisToModel()` | analysis | model + controller + view | `model.ts`, `controller.ts`, `view.ts` |
+| 4. Mocks | `generateMockModules()` | facts + analysis | mock files + manifest | `mocks/*.ts`, `alias-manifest.json` |
+| 5. Server | `createViteConfig()` | manifest | Vite config with aliases | `main.tsx`, `index.html` |
+| 6. Runtime | `PreviewShell` | screen entries | rendered preview | browser |
+
+### Detailed Stages
 
 **Stage 1 — Screen Discovery:** Finds pages/screens via glob patterns (e.g., `src/screens/**/index.tsx`).
 
@@ -134,6 +253,8 @@ Falls back to a template library when no LLM is available.
 - `view.ts` — component tree metadata
 - `adapter.tsx` — React wrapper connecting screen to mock data
 - Mock modules replacing data-fetching hooks with region-aware mocks
+
+**Hook Classification:** During mock generation, each hook is classified as `data` (needs mocking) or `provider` (skip mocking). Data hooks like `useQuery` and `useAuthStore` get mock replacements. Provider hooks like `useNavigate`, `useForm`, and `useTranslation` are left untouched and run via real providers in `wrapper.tsx`.
 
 ### LLM Providers
 
