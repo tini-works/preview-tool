@@ -11,7 +11,7 @@ importers:
   packages/cli:
     dependencies:
       '@preview-tool/runtime':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../runtime
       chalk:
         specifier: ^5.4.1

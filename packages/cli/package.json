@@ -1,16 +1,32 @@
 {
   "name": "@preview-tool/cli",
-  "version": "0.0.1",
+  "version": "0.1.1",
+  "description": "Preview any React app's screens in isolated device frames with mock data",
   "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tini-works/preview-tool.git",
+    "directory": "packages/cli"
+  },
+  "keywords": ["react", "preview", "cli", "mock", "prototype", "device-frame"],
+  "files": ["dist"],
   "bin": {
     "preview": "./dist/index.js"
   },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "build": "tsc",
+    "clean": "rm -rf dist",
+    "build": "rm -rf dist && tsc",
     "dev": "tsc --watch"
   },
   "dependencies": {
-    "@preview-tool/runtime": "workspace:*",
+    "@preview-tool/runtime": "workspace:^",
     "chalk": "^5.4.1",
     "commander": "^13.1.0",
     "glob": "^11.0.0",
