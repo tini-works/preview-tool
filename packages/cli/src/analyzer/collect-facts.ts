@@ -91,6 +91,14 @@ function extractReturnInfo(call: CallExpression): ReturnInfo {
       return { variable: text, destructuredFields: fields }
     }
 
+    // Array destructuring: const [searchParams] = useSearchParams()
+    if (nameNode.isKind(SyntaxKind.ArrayBindingPattern)) {
+      const fields = nameNode.getElements()
+        .filter((el) => el.isKind(SyntaxKind.BindingElement))
+        .map((el) => el.getNameNode().getText())
+      return { variable: text, destructuredFields: fields }
+    }
+
     return { variable: text }
   }
 

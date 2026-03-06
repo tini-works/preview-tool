@@ -322,9 +322,11 @@ export function buildFromTemplates(facts: ScreenFacts): ScreenAnalysisOutput {
       if (derived.source === 'derived-var') {
         const derivedVar = (facts.derivedVars ?? []).find((dv) => camelToKebab(dv.name) === key)
         if (derivedVar?.sourceVariable) {
+          const sv = derivedVar.sourceVariable!
           const hook = facts.hooks.find((h) =>
-            h.destructuredFields?.includes(derivedVar.sourceVariable!) ||
-            h.returnVariable === derivedVar.sourceVariable
+            h.destructuredFields?.includes(sv) ||
+            h.returnVariable === sv ||
+            h.returnVariable?.replace(/^\[|\]$/g, '') === sv
           )
           if (hook) sourceHook = hook.name
         }
