@@ -309,4 +309,87 @@ describe('generateMockModules', () => {
     expect(result.mockFiles.has('react-i18next')).toBe(false)
     expect(result.mockFiles.has('@tanstack/react-query')).toBe(true)
   })
+
+  describe('react-router-dom mock for useSearchParams', () => {
+    it('generates useSearchParams mock when region has sourceHook=useSearchParams', () => {
+      const facts: ScreenFacts = {
+        route: '/login',
+        filePath: 'src/pages/Login.tsx',
+        sourceCode: '',
+        hooks: [
+          { name: 'useSearchParams', importPath: 'react-router-dom', arguments: [], destructuredFields: ['searchParams'] },
+        ],
+        components: [],
+        conditionals: [],
+        navigation: [],
+        localState: [],
+        derivedVars: [],
+        functions: [],
+      }
+
+      const analysis: ScreenAnalysisOutput = {
+        route: '/login',
+        regions: [
+          {
+            key: 'registration-success',
+            label: 'Registration Success',
+            type: 'derived-var',
+            hookBindings: [],
+            states: {
+              default: { label: 'default', mockData: { registrationSuccess: false } },
+              active: { label: 'active', mockData: { registrationSuccess: true } },
+            },
+            defaultState: 'default',
+            sourceHook: 'useSearchParams',
+          },
+        ],
+        flows: [],
+      }
+
+      const result = generateMockModules([facts], [analysis])
+      expect(result.aliasManifest['react-router-dom']).toBeDefined()
+      const mockCode = result.mockFiles.get('react-router-dom')!
+      expect(mockCode).toContain("export * from '__real:react-router-dom'")
+      expect(mockCode).toContain('export function useSearchParams')
+      expect(mockCode).toContain('useRegionDataForHook')
+      expect(mockCode).toContain('registration-success')
+      expect(mockCode).toContain('URLSearchParams')
+    })
+
+    it('does not generate react-router-dom mock when no sourceHook regions', () => {
+      const facts: ScreenFacts = {
+        route: '/login',
+        filePath: 'src/pages/Login.tsx',
+        sourceCode: '',
+        hooks: [],
+        components: [],
+        conditionals: [],
+        navigation: [],
+        localState: [],
+        derivedVars: [],
+        functions: [],
+      }
+
+      const analysis: ScreenAnalysisOutput = {
+        route: '/login',
+        regions: [
+          {
+            key: 'show-password',
+            label: 'Show Password',
+            type: 'local-state',
+            hookBindings: [],
+            states: {
+              default: { label: 'default', mockData: { showPassword: false } },
+              active: { label: 'active', mockData: { showPassword: true } },
+            },
+            defaultState: 'default',
+          },
+        ],
+        flows: [],
+      }
+
+      const result = generateMockModules([facts], [analysis])
+      expect(result.aliasManifest['react-router-dom']).toBeUndefined()
+    })
+  })
 })

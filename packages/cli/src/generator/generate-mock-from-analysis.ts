@@ -35,6 +35,14 @@ function isNpmPackage(importPath: string): boolean {
   return !importPath.startsWith('.') && !importPath.startsWith('@/') && !importPath.startsWith('~/')
 }
 
+/**
+ * Converts a camelCase name to a kebab-case URL parameter name.
+ * e.g. 'registrationSuccess' -> 'registration-success'
+ */
+function camelToParam(name: string): string {
+  return name.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '')
+}
+
 interface HookInfo {
   name: string
   mappingType?: HookMappingType
@@ -290,6 +298,47 @@ export function generateMockModules(
   for (const importPath of mockFiles.keys()) {
     const safeName = toSafeFileName(importPath)
     aliasManifest[importPath] = `./mocks/${safeName}.ts`
+  }
+
+  // Step 7: Generate react-router-dom mock for useSearchParams-derived regions
+  const searchParamsRegions: Array<{ regionKey: string; stateDataKeys: string[] }> = []
+  for (const analysis of allAnalyses) {
+    for (const region of analysis.regions) {
+      if ((region as any).sourceHook === 'useSearchParams') {
+        const stateDataKeys = Object.values(region.states)
+          .flatMap((s) => Object.keys(s.mockData))
+          .filter((k, i, arr) => arr.indexOf(k) === i)
+        searchParamsRegions.push({ regionKey: region.key, stateDataKeys })
+      }
+    }
+  }
+
+  if (searchParamsRegions.length > 0 && !mockFiles.has('react-router-dom')) {
+    const lines: string[] = [
+      '// Auto-generated mock by @preview-tool/cli — do not edit manually',
+      "export * from '__real:react-router-dom'",
+      "import { useRegionDataForHook } from '@preview-tool/runtime'",
+      '',
+      'export function useSearchParams() {',
+      '  const params = new URLSearchParams()',
+    ]
+
+    for (const { regionKey, stateDataKeys } of searchParamsRegions) {
+      const varName = regionKey.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()) + 'Data'
+      lines.push(`  const ${varName} = useRegionDataForHook('${regionKey}')`)
+      for (const dataKey of stateDataKeys) {
+        const paramName = camelToParam(dataKey)
+        lines.push(`  if (${varName}?.${dataKey}) params.set('${paramName}', 'true')`)
+      }
+    }
+
+    lines.push(
+      '  return [params, () => {}] as const',
+      '}',
+    )
+
+    mockFiles.set('react-router-dom', lines.join('\n'))
+    aliasManifest['react-router-dom'] = './mocks/react-router-dom.ts'
   }
 
   return { mockFiles, aliasManifest }
