@@ -50,6 +50,18 @@ describe('transformUseState', () => {
     const result = transformUseState(input)
     expect(result).toContain("usePreviewState('show', false)")
   })
+
+  it('handles useState with simple generic type parameter', () => {
+    const input = `const [formData, setFormData] = useState<LoginFormData>({email: '', password: ''})`
+    const result = transformUseState(input)
+    expect(result).toContain("usePreviewState('formData', {email: '', password: ''})")
+  })
+
+  it('handles useState with nested generic type parameter', () => {
+    const input = `const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})`
+    const result = transformUseState(input)
+    expect(result).toContain("usePreviewState('errors', {})")
+  })
 })
 
 describe('createPreviewStatePlugin', () => {

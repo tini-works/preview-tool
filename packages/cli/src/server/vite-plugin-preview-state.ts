@@ -3,8 +3,11 @@
  * Applied only during `preview dev` to screen component files.
  */
 
+// Matches: const [x, setX] = useState(init) and const [x, setX] = useState<Type>(init)
+// The (?:<[^(]+>)? handles generic type params like <LoginFormData> or <Partial<Record<K, V>>>
+// It matches any chars except '(' between < and > — safe because generic params don't contain '('
 const USE_STATE_PATTERN =
-  /const\s+\[(\w+),\s*(\w+)\]\s*=\s*(?:React\.)?useState\(([^)]*)\)/g
+  /const\s+\[(\w+),\s*(\w+)\]\s*=\s*(?:React\.)?useState(?:<[^(]+>)?\(([^)]*)\)/g
 
 export function transformUseState(code: string): string {
   let transformed = code

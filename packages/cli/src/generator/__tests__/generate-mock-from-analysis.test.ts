@@ -311,7 +311,61 @@ describe('generateMockModules', () => {
   })
 
   describe('react-router-dom mock for useSearchParams', () => {
-    it('generates useSearchParams mock when region has sourceHook=useSearchParams', () => {
+    it('generates useSearchParams mock with actual param name from DerivedVarFact expression', () => {
+      const facts: ScreenFacts = {
+        route: '/login',
+        filePath: 'src/pages/Login.tsx',
+        sourceCode: '',
+        hooks: [
+          { name: 'useSearchParams', importPath: 'react-router-dom', arguments: [], destructuredFields: ['searchParams'] },
+        ],
+        components: [],
+        conditionals: [],
+        navigation: [],
+        localState: [],
+        derivedVars: [
+          {
+            name: 'registrationSuccess',
+            expression: "searchParams.get('registered') === 'true'",
+            sourceVariable: 'searchParams',
+            valueType: 'boolean',
+          },
+        ],
+        functions: [],
+      }
+
+      const analysis: ScreenAnalysisOutput = {
+        route: '/login',
+        regions: [
+          {
+            key: 'registration-success',
+            label: 'Registration Success',
+            type: 'derived-var',
+            hookBindings: [],
+            states: {
+              default: { label: 'default', mockData: { registrationSuccess: false } },
+              active: { label: 'active', mockData: { registrationSuccess: true } },
+            },
+            defaultState: 'default',
+            sourceHook: 'useSearchParams',
+          },
+        ],
+        flows: [],
+      }
+
+      const result = generateMockModules([facts], [analysis])
+      expect(result.aliasManifest['react-router-dom']).toBeDefined()
+      const mockCode = result.mockFiles.get('react-router-dom')!
+      expect(mockCode).toContain("export * from '__real:react-router-dom'")
+      expect(mockCode).toContain('export function useSearchParams')
+      expect(mockCode).toContain('useRegionDataForHook')
+      expect(mockCode).toContain('registration-success')
+      // Key assertion: uses actual param name 'registered' from expression, not 'registration-success'
+      expect(mockCode).toContain("params.set('registered', 'true')")
+      expect(mockCode).not.toContain("params.set('registration-success'")
+    })
+
+    it('falls back to camelToParam when no DerivedVarFact expression available', () => {
       const facts: ScreenFacts = {
         route: '/login',
         filePath: 'src/pages/Login.tsx',
@@ -347,13 +401,56 @@ describe('generateMockModules', () => {
       }
 
       const result = generateMockModules([facts], [analysis])
-      expect(result.aliasManifest['react-router-dom']).toBeDefined()
       const mockCode = result.mockFiles.get('react-router-dom')!
-      expect(mockCode).toContain("export * from '__real:react-router-dom'")
-      expect(mockCode).toContain('export function useSearchParams')
-      expect(mockCode).toContain('useRegionDataForHook')
-      expect(mockCode).toContain('registration-success')
-      expect(mockCode).toContain('URLSearchParams')
+      // Without derivedVars expression, falls back to camelToParam
+      expect(mockCode).toContain("params.set('registration-success', 'true')")
+    })
+
+    it('extracts param name from searchParams.has() expression', () => {
+      const facts: ScreenFacts = {
+        route: '/page',
+        filePath: 'src/pages/Page.tsx',
+        sourceCode: '',
+        hooks: [
+          { name: 'useSearchParams', importPath: 'react-router-dom', arguments: [], destructuredFields: ['searchParams'] },
+        ],
+        components: [],
+        conditionals: [],
+        navigation: [],
+        localState: [],
+        derivedVars: [
+          {
+            name: 'debugMode',
+            expression: "searchParams.has('debug')",
+            sourceVariable: 'searchParams',
+            valueType: 'boolean',
+          },
+        ],
+        functions: [],
+      }
+
+      const analysis: ScreenAnalysisOutput = {
+        route: '/page',
+        regions: [
+          {
+            key: 'debug-mode',
+            label: 'Debug Mode',
+            type: 'derived-var',
+            hookBindings: [],
+            states: {
+              default: { label: 'default', mockData: { debugMode: false } },
+              active: { label: 'active', mockData: { debugMode: true } },
+            },
+            defaultState: 'default',
+            sourceHook: 'useSearchParams',
+          },
+        ],
+        flows: [],
+      }
+
+      const result = generateMockModules([facts], [analysis])
+      const mockCode = result.mockFiles.get('react-router-dom')!
+      expect(mockCode).toContain("params.set('debug', 'true')")
     })
 
     it('does not generate react-router-dom mock when no sourceHook regions', () => {

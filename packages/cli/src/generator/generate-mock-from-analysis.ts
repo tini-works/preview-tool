@@ -43,6 +43,36 @@ function camelToParam(name: string): string {
   return name.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '')
 }
 
+function camelToKebab(name: string): string {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1-$2')
+    .toLowerCase()
+}
+
+/**
+ * Extract the actual URL param name and value from a derived var expression.
+ * Handles patterns like:
+ *   searchParams.get('registered') === 'true'  → { paramName: 'registered', paramValue: 'true' }
+ *   searchParams.get('tab')                    → { paramName: 'tab', paramValue: 'true' }
+ *   searchParams.has('debug')                  → { paramName: 'debug', paramValue: 'true' }
+ */
+function extractSearchParamInfo(expression: string): { paramName: string; paramValue: string } | null {
+  const getMatch = expression.match(/\.get\(\s*['"]([^'"]+)['"]\s*\)/)
+  if (getMatch) {
+    const paramName = getMatch[1]
+    const valueMatch = expression.match(/===?\s*['"]([^'"]+)['"]/)
+    return { paramName, paramValue: valueMatch ? valueMatch[1] : 'true' }
+  }
+
+  const hasMatch = expression.match(/\.has\(\s*['"]([^'"]+)['"]\s*\)/)
+  if (hasMatch) {
+    return { paramName: hasMatch[1], paramValue: 'true' }
+  }
+
+  return null
+}
+
 interface HookInfo {
   name: string
   mappingType?: HookMappingType
@@ -301,6 +331,9 @@ export function generateMockModules(
   }
 
   // Step 7: Generate react-router-dom mock for useSearchParams-derived regions
+  // Collect all derivedVars across all facts for expression-based param extraction
+  const allDerivedVars = allFacts.flatMap((f) => f.derivedVars ?? [])
+
   const searchParamsRegions: Array<{ regionKey: string; stateDataKeys: string[] }> = []
   for (const analysis of allAnalyses) {
     for (const region of analysis.regions) {
@@ -327,8 +360,13 @@ export function generateMockModules(
       const varName = regionKey.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase()) + 'Data'
       lines.push(`  const ${varName} = useRegionDataForHook('${regionKey}')`)
       for (const dataKey of stateDataKeys) {
-        const paramName = camelToParam(dataKey)
-        lines.push(`  if (${varName}?.${dataKey}) params.set('${paramName}', 'true')`)
+        // Try to extract actual URL param name from the DerivedVarFact expression
+        // e.g. searchParams.get('registered') === 'true' → paramName: 'registered'
+        const derivedVar = allDerivedVars.find((dv) => camelToKebab(dv.name) === regionKey)
+        const paramInfo = derivedVar ? extractSearchParamInfo(derivedVar.expression) : null
+        const paramName = paramInfo?.paramName ?? camelToParam(dataKey)
+        const paramValue = paramInfo?.paramValue ?? 'true'
+        lines.push(`  if (${varName}?.${dataKey}) params.set('${paramName}', '${paramValue}')`)
       }
     }
 
