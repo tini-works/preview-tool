@@ -42,6 +42,10 @@ export function inferHookMappingType(hookName: string): HookMappingType {
     return 'custom-hook'
   }
 
+  if (lower === 'usestate' || lower === 'useref') {
+    return 'local-state'
+  }
+
   return 'unknown'
 }
 
