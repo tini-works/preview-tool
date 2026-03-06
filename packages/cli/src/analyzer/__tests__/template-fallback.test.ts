@@ -311,6 +311,94 @@ describe('buildFromTemplates', () => {
     )
   })
 
+  it('creates local-state regions from useState with conditionals', () => {
+    const facts: ScreenFacts = {
+      route: '/login',
+      filePath: '/app/login.tsx',
+      sourceCode: '',
+      hooks: [],
+      components: [], conditionals: [
+        { condition: 'showPassword', trueBranch: ['EyeOff'], falseBranch: ['Eye'] },
+      ],
+      navigation: [],
+      localState: [
+        { name: 'showPassword', hook: 'useState', setter: 'setShowPassword', initialValue: 'false', valueType: 'boolean' },
+      ],
+      derivedVars: [],
+      functions: [],
+    }
+    const result = buildFromTemplates(facts)
+    const region = result.regions.find(r => r.key === 'show-password')
+    expect(region).toBeDefined()
+    expect(region!.type).toBe('local-state')
+    expect(Object.keys(region!.states)).toContain('default')
+    expect(Object.keys(region!.states)).toContain('active')
+  })
+
+  it('creates derived-var regions from conditional-driven variables', () => {
+    const facts: ScreenFacts = {
+      route: '/login',
+      filePath: '/app/login.tsx',
+      sourceCode: '',
+      hooks: [],
+      components: [], conditionals: [
+        { condition: 'registrationSuccess', trueBranch: ['Banner'], falseBranch: [] },
+      ],
+      navigation: [],
+      localState: [],
+      derivedVars: [
+        { name: 'registrationSuccess', expression: 'x === "true"', sourceVariable: 'searchParams', valueType: 'boolean' },
+      ],
+      functions: [],
+    }
+    const result = buildFromTemplates(facts)
+    const region = result.regions.find(r => r.key === 'registration-success')
+    expect(region).toBeDefined()
+    expect(region!.type).toBe('derived-var')
+  })
+
+  it('generates flows from FunctionFacts', () => {
+    const facts: ScreenFacts = {
+      route: '/login',
+      filePath: '/app/login.tsx',
+      sourceCode: '',
+      hooks: [],
+      components: [], conditionals: [],
+      navigation: [],
+      localState: [],
+      derivedVars: [],
+      functions: [
+        {
+          name: 'handleSubmit',
+          kind: 'function',
+          triggers: [{ element: 'form', event: 'onSubmit' }],
+          settersCalled: ['setFieldErrors'],
+          navigationCalls: ['navigate(redirectTo)'],
+          externalCalls: ['login'],
+        },
+        {
+          name: '__inline_setShowPassword',
+          kind: 'arrow',
+          triggers: [{ element: 'button', event: 'onClick' }],
+          settersCalled: ['setShowPassword'],
+          navigationCalls: [],
+          externalCalls: [],
+        },
+      ],
+    }
+    const result = buildFromTemplates(facts)
+
+    expect(result.flows.length).toBeGreaterThanOrEqual(2)
+
+    const submitFlow = result.flows.find(f => f.trigger.selector === 'form')
+    expect(submitFlow).toBeDefined()
+
+    const toggleFlow = result.flows.find(f =>
+      f.action === 'setRegionState' && f.targetRegion === 'show-password'
+    )
+    expect(toggleFlow).toBeDefined()
+  })
+
   it('skips provider hooks (useNavigate, useForm, useTranslation) — no regions produced', () => {
     const facts: ScreenFacts = {
       route: '/register',

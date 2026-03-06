@@ -1,9 +1,9 @@
-import type { ScreenFacts, HookFact, RegionState } from './types.js'
+import type { ScreenFacts, HookFact, RegionState, FunctionFact } from './types.js'
 import type { ScreenAnalysisOutput, RegionOutput, FlowOutput } from '../llm/schemas/screen-analysis.js'
 import { formatLabel } from '../lib/format-label.js'
 import { REACT_BUILTIN_HOOKS, REACT_IMPORT_PATHS } from '../lib/hook-binding.js'
 import { classifyHook } from '../lib/hook-classifier.js'
-import { classifyDestructuredFields, findConditionalsForHook, deriveStatesFromFacts } from './derive-states.js'
+import { classifyDestructuredFields, findConditionalsForHook, deriveStatesFromFacts, deriveAllStates } from './derive-states.js'
 
 // ---------------------------------------------------------------------------
 // Hook Template interface
@@ -210,6 +210,46 @@ function navigationToFlows(facts: ScreenFacts): FlowOutput[] {
 }
 
 // ---------------------------------------------------------------------------
+// Function facts → flow conversion
+// ---------------------------------------------------------------------------
+
+function buildFunctionFlows(functions: FunctionFact[]): FlowOutput[] {
+  const flows: FlowOutput[] = []
+
+  for (const fn of functions) {
+    for (const trigger of fn.triggers) {
+      // Toggle pattern: inline setter for a boolean
+      if (fn.name.startsWith('__inline_') && fn.settersCalled.length === 1) {
+        const setterName = fn.settersCalled[0]
+        // Convert setter to region key: setShowPassword → show-password
+        const varName = setterName.replace(/^set/, '')
+        const regionKey = varName.charAt(0).toLowerCase() + varName.slice(1)
+        const kebabKey = regionKey.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '')
+
+        flows.push({
+          trigger: { selector: trigger.element, text: `${trigger.event}:${fn.name}` },
+          action: 'setRegionState',
+          target: 'active',
+          targetRegion: kebabKey,
+        })
+        continue
+      }
+
+      // Named function: general flow
+      flows.push({
+        trigger: { selector: trigger.element, text: `${trigger.event}:${fn.name}` },
+        action: fn.navigationCalls.length > 0 ? 'navigate' : 'setState',
+        target: fn.navigationCalls.length > 0
+          ? fn.navigationCalls[0].replace(/^navigate\(/, '').replace(/\)$/, '').replace(/['"]/g, '')
+          : fn.name,
+      })
+    }
+  }
+
+  return flows
+}
+
+// ---------------------------------------------------------------------------
 // Main entry point
 // ---------------------------------------------------------------------------
 
@@ -260,7 +300,37 @@ export function buildFromTemplates(facts: ScreenFacts): ScreenAnalysisOutput {
     regions.push(region)
   }
 
-  const flows = navigationToFlows(facts)
+  // --- Regions from local state and derived vars ---
+  const unifiedRegions = deriveAllStates({
+    hooks: facts.hooks,
+    localState: facts.localState ?? [],
+    derivedVars: facts.derivedVars ?? [],
+    conditionals: facts.conditionals,
+  })
+
+  for (const [key, derived] of unifiedRegions) {
+    if (seenKeys.has(key)) continue
+    seenKeys.add(key)
+
+    if (derived.source === 'local-state' || derived.source === 'derived-var') {
+      const label = formatLabel(key)
+      const stateNames = Object.keys(derived.states)
+      const defaultState = stateNames.includes('default') ? 'default' : stateNames[0]
+
+      regions.push({
+        key,
+        label,
+        type: derived.source,
+        hookBindings: [],
+        states: derived.states,
+        defaultState,
+      })
+    }
+  }
+
+  const functionFlows = buildFunctionFlows(facts.functions ?? [])
+  const navigationFlows = navigationToFlows(facts)
+  const flows = [...functionFlows, ...navigationFlows]
 
   return {
     route: facts.route,
