@@ -4,8 +4,9 @@ import {
   parseCondition,
   findConditionalsForHook,
   deriveStatesFromFacts,
+  deriveAllStates,
 } from '../derive-states.js'
-import type { HookFact, ConditionalFact } from '../types.js'
+import type { HookFact, ConditionalFact, LocalStateFact, DerivedVarFact } from '../types.js'
 
 describe('classifyDestructuredFields', () => {
   it('classifies boolean-prefixed fields as data', () => {
@@ -211,5 +212,92 @@ describe('deriveStatesFromFacts', () => {
     })
 
     expect(Object.keys(result)).toEqual(['default', 'loading'])
+  })
+})
+
+describe('deriveAllStates', () => {
+  it('creates regions from external hooks, local state, and derived vars', () => {
+    const hooks: HookFact[] = [{
+      name: 'useAuthStore',
+      importPath: '@/stores/auth-store',
+      arguments: [],
+      destructuredFields: ['login', 'isLoading', 'error', 'clearError'],
+    }]
+    const localState: LocalStateFact[] = [
+      { name: 'showPassword', hook: 'useState', setter: 'setShowPassword', initialValue: 'false', valueType: 'boolean' },
+      { name: 'fieldErrors', hook: 'useState', setter: 'setFieldErrors', initialValue: '{}', valueType: 'object' },
+    ]
+    const derivedVars: DerivedVarFact[] = [
+      { name: 'registrationSuccess', expression: 'searchParams.get("registered") === "true"', sourceVariable: 'searchParams', valueType: 'boolean' },
+    ]
+    const conditionals: ConditionalFact[] = [
+      { condition: 'isLoading', trueBranch: ['Spinner'], falseBranch: [] },
+      { condition: 'error', trueBranch: ['ErrorBanner'], falseBranch: [] },
+      { condition: 'registrationSuccess', trueBranch: ['SuccessBanner'], falseBranch: [] },
+      { condition: 'fieldErrors.email', trueBranch: [], falseBranch: [] },
+      { condition: 'showPassword', trueBranch: ['EyeOff'], falseBranch: ['Eye'] },
+    ]
+
+    const result = deriveAllStates({ hooks, localState, derivedVars, conditionals })
+
+    expect(result.has('auth-store')).toBe(true)
+    expect(result.has('show-password')).toBe(true)
+    expect(result.has('field-errors')).toBe(true)
+    expect(result.has('registration-success')).toBe(true)
+  })
+
+  it('derives boolean useState states as default/active', () => {
+    const result = deriveAllStates({
+      hooks: [],
+      localState: [{ name: 'showPassword', hook: 'useState', setter: 'setShowPassword', initialValue: 'false', valueType: 'boolean' }],
+      derivedVars: [],
+      conditionals: [{ condition: 'showPassword', trueBranch: ['EyeOff'], falseBranch: ['Eye'] }],
+    })
+
+    const region = result.get('show-password')
+    expect(region).toBeDefined()
+    expect(region!.states).toHaveProperty('default')
+    expect(region!.states).toHaveProperty('active')
+    expect(region!.states['default'].mockData).toEqual({ showPassword: false })
+    expect(region!.states['active'].mockData).toEqual({ showPassword: true })
+  })
+
+  it('derives object useState states as default/populated', () => {
+    const result = deriveAllStates({
+      hooks: [],
+      localState: [{ name: 'fieldErrors', hook: 'useState', setter: 'setFieldErrors', initialValue: '{}', valueType: 'object' }],
+      derivedVars: [],
+      conditionals: [{ condition: 'fieldErrors.email', trueBranch: [], falseBranch: [] }],
+    })
+
+    const region = result.get('field-errors')
+    expect(region).toBeDefined()
+    expect(region!.states).toHaveProperty('default')
+    expect(region!.states).toHaveProperty('populated')
+  })
+
+  it('derives derived var states as default/active', () => {
+    const result = deriveAllStates({
+      hooks: [],
+      localState: [],
+      derivedVars: [{ name: 'registrationSuccess', expression: 'x === "true"', valueType: 'boolean' }],
+      conditionals: [{ condition: 'registrationSuccess', trueBranch: ['Banner'], falseBranch: [] }],
+    })
+
+    const region = result.get('registration-success')
+    expect(region).toBeDefined()
+    expect(region!.states['default'].mockData).toEqual({ registrationSuccess: false })
+    expect(region!.states['active'].mockData).toEqual({ registrationSuccess: true })
+  })
+
+  it('skips local state not used in any conditional', () => {
+    const result = deriveAllStates({
+      hooks: [],
+      localState: [{ name: 'formData', hook: 'useState', setter: 'setFormData', initialValue: '{}', valueType: 'object' }],
+      derivedVars: [],
+      conditionals: [],
+    })
+
+    expect(result.has('form-data')).toBe(false)
   })
 })

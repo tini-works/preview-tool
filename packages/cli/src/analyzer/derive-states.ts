@@ -1,4 +1,4 @@
-import type { HookFact, ConditionalFact, RegionState } from './types.js'
+import type { HookFact, ConditionalFact, RegionState, LocalStateFact, DerivedVarFact } from './types.js'
 
 // ---------------------------------------------------------------------------
 // 1a. Classify destructured fields into data vs function
@@ -183,4 +183,186 @@ function deriveOverrides(fieldName: string): Record<string, unknown> {
 
   // Generic: truthy placeholder
   return { [fieldName]: `${fieldName}-value` }
+}
+
+// ---------------------------------------------------------------------------
+// 2. Unified state derivation across all sources
+// ---------------------------------------------------------------------------
+
+function camelToKebab(name: string): string {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1-$2')
+    .toLowerCase()
+}
+
+export interface DerivedRegion {
+  source: 'hook' | 'local-state' | 'derived-var'
+  label: string
+  states: Record<string, RegionState>
+  defaultState: string
+  hookName?: string
+}
+
+export interface DeriveAllStatesInput {
+  hooks: HookFact[]
+  localState: LocalStateFact[]
+  derivedVars: DerivedVarFact[]
+  conditionals: ConditionalFact[]
+}
+
+interface VariableSource {
+  source: 'hook' | 'local-state' | 'derived-var'
+  regionKey: string
+}
+
+export function deriveAllStates(input: DeriveAllStatesInput): Map<string, DerivedRegion> {
+  const { hooks, localState, derivedVars, conditionals } = input
+  const result = new Map<string, DerivedRegion>()
+
+  // 1. Build variable → source map
+  const variableMap = new Map<string, VariableSource>()
+
+  for (const hook of hooks) {
+    const regionKey = camelToKebab(hook.name.replace(/^use/, ''))
+    const fields = hook.destructuredFields ?? []
+    for (const field of fields) {
+      variableMap.set(field, { source: 'hook', regionKey })
+    }
+  }
+
+  for (const local of localState) {
+    const regionKey = camelToKebab(local.name)
+    variableMap.set(local.name, { source: 'local-state', regionKey })
+  }
+
+  for (const derived of derivedVars) {
+    const regionKey = camelToKebab(derived.name)
+    variableMap.set(derived.name, { source: 'derived-var', regionKey })
+  }
+
+  // 2. Match conditionals to sources (group by regionKey)
+  const conditionalsByRegion = new Map<string, ConditionalFact[]>()
+  for (const cond of conditionals) {
+    const parsed = parseCondition(cond.condition)
+    if (!parsed) continue
+    const varSource = variableMap.get(parsed.fieldName)
+    if (!varSource) continue
+    const existing = conditionalsByRegion.get(varSource.regionKey) ?? []
+    conditionalsByRegion.set(varSource.regionKey, [...existing, cond])
+  }
+
+  // 3. Build regions for external hooks
+  for (const hook of hooks) {
+    const regionKey = camelToKebab(hook.name.replace(/^use/, ''))
+    const regionConditionals = conditionalsByRegion.get(regionKey) ?? []
+    if (regionConditionals.length === 0 && !(hook.destructuredFields && hook.destructuredFields.length > 0)) continue
+
+    const fields = hook.destructuredFields ?? []
+    const { dataFields, functionFields } = classifyDestructuredFields(fields)
+
+    const states = deriveStatesFromFacts({
+      label: regionKey,
+      dataFields,
+      functionFields,
+      conditionals: regionConditionals,
+    })
+
+    result.set(regionKey, {
+      source: 'hook',
+      label: regionKey,
+      states,
+      defaultState: 'default',
+      hookName: hook.name,
+    })
+  }
+
+  // 4. Build regions for local state
+  for (const local of localState) {
+    const regionKey = camelToKebab(local.name)
+    const regionConditionals = conditionalsByRegion.get(regionKey) ?? []
+    // Skip local state not used in any conditional
+    if (regionConditionals.length === 0) continue
+
+    const states = buildLocalStateRegion(local)
+    result.set(regionKey, {
+      source: 'local-state',
+      label: regionKey,
+      states,
+      defaultState: 'default',
+    })
+  }
+
+  // 5. Build regions for derived vars
+  for (const derived of derivedVars) {
+    const regionKey = camelToKebab(derived.name)
+    const regionConditionals = conditionalsByRegion.get(regionKey) ?? []
+    // Skip derived vars not used in any conditional
+    if (regionConditionals.length === 0) continue
+
+    const states = buildDerivedVarRegion(derived)
+    result.set(regionKey, {
+      source: 'derived-var',
+      label: regionKey,
+      states,
+      defaultState: 'default',
+    })
+  }
+
+  return result
+}
+
+function buildLocalStateRegion(local: LocalStateFact): Record<string, RegionState> {
+  const { name, valueType } = local
+  const regionKey = camelToKebab(name)
+
+  switch (valueType) {
+    case 'boolean':
+      return {
+        default: { label: `${regionKey} default`, mockData: { [name]: false } },
+        active: { label: `${regionKey} active`, mockData: { [name]: true } },
+      }
+    case 'object':
+      return {
+        default: { label: `${regionKey} default`, mockData: { [name]: {} } },
+        populated: { label: `${regionKey} populated`, mockData: { [name]: { field: 'value' } } },
+      }
+    case 'array':
+      return {
+        default: { label: `${regionKey} default`, mockData: { [name]: [] } },
+        populated: { label: `${regionKey} populated`, mockData: { [name]: [{ id: '1' }] } },
+      }
+    case 'string':
+      return {
+        default: { label: `${regionKey} default`, mockData: { [name]: '' } },
+        filled: { label: `${regionKey} filled`, mockData: { [name]: 'sample text' } },
+      }
+    case 'null':
+      return {
+        default: { label: `${regionKey} default`, mockData: { [name]: null } },
+        present: { label: `${regionKey} present`, mockData: { [name]: 'value' } },
+      }
+    default:
+      return {
+        default: { label: `${regionKey} default`, mockData: { [name]: null } },
+        active: { label: `${regionKey} active`, mockData: { [name]: true } },
+      }
+  }
+}
+
+function buildDerivedVarRegion(derived: DerivedVarFact): Record<string, RegionState> {
+  const { name, valueType } = derived
+  const regionKey = camelToKebab(name)
+
+  if (valueType === 'boolean') {
+    return {
+      default: { label: `${regionKey} default`, mockData: { [name]: false } },
+      active: { label: `${regionKey} active`, mockData: { [name]: true } },
+    }
+  }
+
+  return {
+    default: { label: `${regionKey} default`, mockData: { [name]: null } },
+    active: { label: `${regionKey} active`, mockData: { [name]: `${name}-value` } },
+  }
 }
