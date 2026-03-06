@@ -28,11 +28,28 @@ describe('generateWrapperCode', () => {
     expect(code).toContain("from 'react-i18next'")
   })
 
+  it('generates I18nSyncWrapper that syncs language from Zustand', () => {
+    const code = generateWrapperCode(['react-i18next'])
+    expect(code).toContain('function I18nSyncWrapper')
+    expect(code).toContain('useDevToolsStore')
+    expect(code).toContain('i18n.changeLanguage')
+    expect(code).toContain('<I18nSyncWrapper>')
+    expect(code).toContain('</I18nSyncWrapper>')
+    const wrapperBody = code.slice(code.indexOf('export function Wrapper'))
+    expect(wrapperBody).not.toContain('<I18nextProvider')
+  })
+
+  it('I18nSyncWrapper imports useEffect and useDevToolsStore', () => {
+    const code = generateWrapperCode(['react-i18next'])
+    expect(code).toContain("import { useEffect } from 'react'")
+    expect(code).toContain("import { useDevToolsStore } from '@preview-tool/runtime'")
+  })
+
   it('nests multiple providers in correct order', () => {
     const code = generateWrapperCode(['@tanstack/react-query', 'react-router-dom', 'react-i18next'])
     const qcpIdx = code.indexOf('QueryClientProvider')
     const routerIdx = code.indexOf('MemoryRouter')
-    const i18nIdx = code.indexOf('I18nextProvider')
+    const i18nIdx = code.indexOf('<I18nSyncWrapper>')
     expect(qcpIdx).toBeLessThan(routerIdx)
     expect(routerIdx).toBeLessThan(i18nIdx)
   })

@@ -35,9 +35,21 @@ const PROVIDER_DEFS: ProviderDef[] = [
   },
   {
     dependency: 'react-i18next',
-    imports: "import { I18nextProvider } from 'react-i18next'\nimport i18n from '@host/i18n'",
-    open: '<I18nextProvider i18n={i18n}>',
-    close: '</I18nextProvider>',
+    imports: [
+      "import { I18nextProvider } from 'react-i18next'",
+      "import i18n from '@host/i18n'",
+      "import { useEffect } from 'react'",
+      "import { useDevToolsStore } from '@preview-tool/runtime'",
+    ].join('\n'),
+    setup: [
+      'function I18nSyncWrapper({ children }: { children: ReactNode }) {',
+      "  const language = useDevToolsStore((s) => s.language)",
+      '  useEffect(() => { i18n.changeLanguage(language) }, [language])',
+      '  return <I18nextProvider i18n={i18n}>{children}</I18nextProvider>',
+      '}',
+    ].join('\n'),
+    open: '<I18nSyncWrapper>',
+    close: '</I18nSyncWrapper>',
   },
   {
     dependency: '@chakra-ui/react',
