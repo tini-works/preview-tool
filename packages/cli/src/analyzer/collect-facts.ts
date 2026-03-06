@@ -7,6 +7,8 @@ import type {
   NavigationFact,
   LocalStateFact,
   DerivedVarFact,
+  FunctionFact,
+  FunctionTrigger,
   ScreenFacts,
 } from './types.js'
 
@@ -529,6 +531,194 @@ function stripQuotes(value: string): string {
     return value.slice(1, -1)
   }
   return value
+}
+
+// --- Function fact extraction (event handlers, flows) ---
+
+const EVENT_ATTRIBUTES = new Set([
+  'onClick', 'onSubmit', 'onChange', 'onBlur', 'onFocus', 'onKeyDown', 'onKeyUp',
+])
+
+/**
+ * Walk a function body and classify call expressions into setters, navigation, and external calls.
+ */
+function scanFunctionBody(
+  node: Node,
+  setterNames: Set<string>,
+  externalFnNames: Set<string>,
+): { settersCalled: string[]; navigationCalls: string[]; externalCalls: string[] } {
+  const settersCalled = new Set<string>()
+  const navigationCalls = new Set<string>()
+  const externalCalls = new Set<string>()
+
+  for (const call of node.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const callee = call.getExpression().getText()
+
+    if (setterNames.has(callee)) {
+      settersCalled.add(callee)
+      continue
+    }
+
+    if (
+      callee === 'navigate' ||
+      callee.endsWith('.push') ||
+      callee.endsWith('.navigate')
+    ) {
+      const args = call.getArguments()
+      const firstArg = args.length > 0 ? args[0].getText() : ''
+      navigationCalls.add(`${callee}(${firstArg})`)
+      continue
+    }
+
+    if (externalFnNames.has(callee)) {
+      externalCalls.add(callee)
+    }
+  }
+
+  return {
+    settersCalled: [...settersCalled],
+    navigationCalls: [...navigationCalls],
+    externalCalls: [...externalCalls],
+  }
+}
+
+/**
+ * Determine the tag name for a JSX element that contains an event attribute.
+ * Works with both JsxOpeningElement and JsxSelfClosingElement.
+ */
+function getJsxTagName(el: Node): string {
+  if (el.isKind(SyntaxKind.JsxOpeningElement) || el.isKind(SyntaxKind.JsxSelfClosingElement)) {
+    return el.getChildAtIndex(1)?.getText() ?? 'unknown'
+  }
+  return 'unknown'
+}
+
+/**
+ * Extract function facts: event handler functions and their JSX bindings.
+ * Only returns functions that have at least one JSX trigger (onClick, onSubmit, etc.).
+ */
+export function extractFunctionFacts(
+  sourceFile: SourceFile,
+  setterNames: Set<string>,
+  externalFnNames: Set<string>,
+): FunctionFact[] {
+  // Step 1: Collect all named functions and arrow variable declarations
+  const fnMap = new Map<string, { kind: FunctionFact['kind']; body: Node }>()
+
+  // Named function declarations
+  for (const fn of sourceFile.getDescendantsOfKind(SyntaxKind.FunctionDeclaration)) {
+    const name = fn.getName()
+    if (!name) continue
+    // Skip the top-level component function (the Screen function)
+    // We only want inner functions
+    const body = fn.getBody()
+    if (!body) continue
+    fnMap.set(name, { kind: 'function', body })
+  }
+
+  // Arrow function variable declarations: const handleClick = () => { ... }
+  // Also detect useCallback: const handleClick = useCallback(() => { ... }, [])
+  for (const decl of sourceFile.getDescendantsOfKind(SyntaxKind.VariableDeclaration)) {
+    const nameNode = decl.getNameNode()
+    if (!nameNode.isKind(SyntaxKind.Identifier)) continue
+    const name = nameNode.getText()
+    const init = decl.getInitializer()
+    if (!init) continue
+
+    if (init.isKind(SyntaxKind.ArrowFunction)) {
+      fnMap.set(name, { kind: 'arrow', body: init })
+    } else if (init.isKind(SyntaxKind.CallExpression)) {
+      const calleeName = init.getExpression().getText()
+      if (calleeName === 'useCallback') {
+        const cbArg = init.getArguments()[0]
+        if (cbArg && cbArg.isKind(SyntaxKind.ArrowFunction)) {
+          fnMap.set(name, { kind: 'useCallback', body: cbArg })
+        }
+      }
+    }
+  }
+
+  // Step 2: Scan JSX elements for event attributes and build trigger map
+  // triggerMap: fnName -> FunctionTrigger[]
+  const triggerMap = new Map<string, FunctionTrigger[]>()
+  // inlineFacts: facts for inline arrow functions in JSX attributes
+  const inlineFacts: FunctionFact[] = []
+
+  const jsxElements = [
+    ...sourceFile.getDescendantsOfKind(SyntaxKind.JsxOpeningElement),
+    ...sourceFile.getDescendantsOfKind(SyntaxKind.JsxSelfClosingElement),
+  ]
+
+  for (const el of jsxElements) {
+    const tagName = el.isKind(SyntaxKind.JsxOpeningElement)
+      ? el.getTagNameNode().getText()
+      : el.isKind(SyntaxKind.JsxSelfClosingElement)
+        ? el.getTagNameNode().getText()
+        : 'unknown'
+
+    const attrs = el.getDescendantsOfKind(SyntaxKind.JsxAttribute)
+    for (const attr of attrs) {
+      const attrName = attr.getNameNode().getText()
+      if (!EVENT_ATTRIBUTES.has(attrName)) continue
+
+      const initializer = attr.getInitializer()
+      if (!initializer) continue
+
+      // JsxExpression: {handleSubmit} or {() => ...}
+      if (initializer.isKind(SyntaxKind.JsxExpression)) {
+        const expression = initializer.getExpression()
+        if (!expression) continue
+
+        // Reference to a named function: onClick={handleClick}
+        if (expression.isKind(SyntaxKind.Identifier)) {
+          const refName = expression.getText()
+          if (fnMap.has(refName)) {
+            const triggers = triggerMap.get(refName) ?? []
+            triggers.push({ element: tagName, event: attrName })
+            triggerMap.set(refName, triggers)
+          }
+        }
+        // Inline arrow function: onClick={() => setShow(!show)}
+        else if (expression.isKind(SyntaxKind.ArrowFunction)) {
+          const scanResult = scanFunctionBody(expression, setterNames, externalFnNames)
+          const firstSetter = scanResult.settersCalled[0]
+          const inlineName = firstSetter
+            ? `__inline_${firstSetter}`
+            : `__inline_${tagName}_${attrName}`
+
+          inlineFacts.push({
+            name: inlineName,
+            kind: 'arrow',
+            triggers: [{ element: tagName, event: attrName }],
+            ...scanResult,
+          })
+        }
+      }
+    }
+  }
+
+  // Step 3: Build final facts — only functions with triggers
+  const facts: FunctionFact[] = []
+
+  for (const [name, { kind, body }] of fnMap) {
+    const triggers = triggerMap.get(name)
+    if (!triggers || triggers.length === 0) continue
+
+    const scanResult = scanFunctionBody(body, setterNames, externalFnNames)
+    facts.push({
+      name,
+      kind,
+      triggers,
+      ...scanResult,
+    })
+  }
+
+  // Add inline facts
+  for (const inline of inlineFacts) {
+    facts.push(inline)
+  }
+
+  return facts
 }
 
 // --- collectAllFacts orchestrator ---

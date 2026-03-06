@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { extractHookFacts, extractComponentFacts, extractConditionalFacts, extractNavigationFacts, extractLocalStateFacts, extractDerivedVarFacts, collectAllFacts } from '../collect-facts.js'
+import { extractHookFacts, extractComponentFacts, extractConditionalFacts, extractNavigationFacts, extractLocalStateFacts, extractDerivedVarFacts, extractFunctionFacts, collectAllFacts } from '../collect-facts.js'
 import { Project } from 'ts-morph'
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -450,6 +450,85 @@ describe('extractDerivedVarFacts', () => {
     const conditionals = extractConditionalFacts(sf)
     const facts = extractDerivedVarFacts(sf, conditionals, new Set(), new Set())
     expect(facts[0].valueType).toBe('boolean')
+  })
+})
+
+describe('extractFunctionFacts', () => {
+  it('extracts named function with onSubmit trigger', () => {
+    const sf = createSourceFile(`
+      import { useState } from 'react'
+      function Screen() {
+        const [data, setData] = useState('')
+        function handleSubmit(e: any) {
+          setData('submitted')
+        }
+        return <form onSubmit={handleSubmit}><button>Go</button></form>
+      }
+    `)
+    const setterNames = new Set(['setData'])
+    const externalFnNames = new Set<string>()
+    const facts = extractFunctionFacts(sf, setterNames, externalFnNames)
+    expect(facts).toHaveLength(1)
+    expect(facts[0].name).toBe('handleSubmit')
+    expect(facts[0].kind).toBe('function')
+    expect(facts[0].triggers).toEqual([{ element: 'form', event: 'onSubmit' }])
+    expect(facts[0].settersCalled).toContain('setData')
+  })
+
+  it('extracts arrow function with onClick trigger', () => {
+    const sf = createSourceFile(`
+      function Screen() {
+        const handleClick = () => { navigate('/home') }
+        return <button onClick={handleClick}>Go</button>
+      }
+    `)
+    const facts = extractFunctionFacts(sf, new Set(), new Set())
+    expect(facts).toHaveLength(1)
+    expect(facts[0].name).toBe('handleClick')
+    expect(facts[0].kind).toBe('arrow')
+    expect(facts[0].navigationCalls).toContain("navigate('/home')")
+  })
+
+  it('detects inline arrow toggling a setter', () => {
+    const sf = createSourceFile(`
+      import { useState } from 'react'
+      function Screen() {
+        const [show, setShow] = useState(false)
+        return <button onClick={() => setShow(prev => !prev)}>Toggle</button>
+      }
+    `)
+    const setterNames = new Set(['setShow'])
+    const facts = extractFunctionFacts(sf, setterNames, new Set())
+    const inlineFact = facts.find(f => f.name.startsWith('__inline_'))
+    expect(inlineFact).toBeDefined()
+    expect(inlineFact!.settersCalled).toContain('setShow')
+    expect(inlineFact!.triggers).toEqual([{ element: 'button', event: 'onClick' }])
+  })
+
+  it('detects external function calls from hooks', () => {
+    const sf = createSourceFile(`
+      function Screen() {
+        function handleSubmit() {
+          login(email, password)
+          clearError()
+        }
+        return <form onSubmit={handleSubmit}><button>Go</button></form>
+      }
+    `)
+    const externalFnNames = new Set(['login', 'clearError'])
+    const facts = extractFunctionFacts(sf, new Set(), externalFnNames)
+    expect(facts[0].externalCalls).toEqual(expect.arrayContaining(['login', 'clearError']))
+  })
+
+  it('skips functions with no JSX triggers', () => {
+    const sf = createSourceFile(`
+      function Screen() {
+        function helperFn() { return 42 }
+        return <div>{helperFn()}</div>
+      }
+    `)
+    const facts = extractFunctionFacts(sf, new Set(), new Set())
+    expect(facts).toHaveLength(0)
   })
 })
 
