@@ -15,7 +15,7 @@ describe('buildUnderstandScreensPrompt', () => {
         returnVariable: '{ login, isLoading, error, clearError }',
         destructuredFields: ['login', 'isLoading', 'error', 'clearError'],
       }],
-      components: [], conditionals: [], navigation: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
     }]
     const prompt = buildUnderstandScreensPrompt(facts)
     expect(prompt).toContain('[fields: login, isLoading, error, clearError]')
@@ -32,7 +32,7 @@ describe('buildUnderstandScreensPrompt', () => {
         arguments: [],
         returnVariable: 'store',
       }],
-      components: [], conditionals: [], navigation: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
     }]
     const prompt = buildUnderstandScreensPrompt(facts)
     // The hook line itself should NOT have a [fields: ...] annotation
@@ -47,7 +47,7 @@ describe('buildUnderstandScreensPrompt', () => {
       filePath: 'test.tsx',
       sourceCode: '',
       hooks: [],
-      components: [], conditionals: [], navigation: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
     }]
     const prompt = buildUnderstandScreensPrompt(facts)
     expect(prompt).toContain('store hooks (useXxxStore)')

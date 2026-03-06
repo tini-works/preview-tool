@@ -12,7 +12,7 @@ describe('generateMockModules', () => {
       { name: 'useQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['services'] }"] },
       { name: 'useAuthStore', importPath: '@/stores/auth', arguments: ['s => s.user'] },
     ],
-    components: [], conditionals: [], navigation: [],
+    components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
   }]
 
   const analyses: ScreenAnalysisOutput[] = [{
@@ -60,7 +60,7 @@ describe('generateMockModules', () => {
       hooks: [
         { name: 'useUnknownHook', importPath: '@/hooks/unknown', arguments: [] },
       ],
-      components: [], conditionals: [], navigation: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
     }]
     const result = generateMockModules(factsWithUnmapped, [{ route: '/test', regions: [], flows: [] }])
     const code = result.mockFiles.get('@/hooks/unknown')!
@@ -73,12 +73,12 @@ describe('generateMockModules', () => {
       {
         route: '/a', filePath: '/a.tsx', sourceCode: '',
         hooks: [{ name: 'useQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['a'] }"] }],
-        components: [], conditionals: [], navigation: [],
+        components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
       },
       {
         route: '/b', filePath: '/b.tsx', sourceCode: '',
         hooks: [{ name: 'useQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['b'] }"] }],
-        components: [], conditionals: [], navigation: [],
+        components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
       },
     ]
     const dupAnalyses: ScreenAnalysisOutput[] = [
@@ -105,7 +105,7 @@ describe('generateMockModules', () => {
       filePath: '/test.tsx',
       sourceCode: '',
       hooks: [{ name: 'useHelper', importPath: '@/hooks/helper', arguments: [] }],
-      components: [], conditionals: [], navigation: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
     }]
     const result = generateMockModules(unmappedFacts, [{ route: '/test', regions: [], flows: [] }])
     const code = result.mockFiles.get('@/hooks/helper')!
@@ -140,7 +140,7 @@ describe('generateMockModules', () => {
       hooks: [
         { name: 'useAuthStore', importPath: '@/stores/auth', arguments: [], destructuredFields: ['user', 'logout'] },
       ],
-      components: [], conditionals: [], navigation: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
     }]
     const storeAnalyses: ScreenAnalysisOutput[] = [{
       route: '/home',
@@ -170,7 +170,7 @@ describe('generateMockModules', () => {
       hooks: [
         { name: 'useQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['items'] }"], destructuredFields: ['data', 'isLoading'] },
       ],
-      components: [], conditionals: [], navigation: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
     }]
     const queryAnalyses: ScreenAnalysisOutput[] = [{
       route: '/list',
@@ -205,7 +205,7 @@ describe('generateMockModules', () => {
           destructuredFields: ['login', 'isLoading', 'error', 'clearError'],
         },
       ],
-      components: [], conditionals: [], navigation: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
     }]
     const storeAnalyses: ScreenAnalysisOutput[] = [{
       route: '/login',
@@ -239,7 +239,7 @@ describe('generateMockModules', () => {
       hooks: [
         { name: 'useAuthStore', importPath: '@/stores/auth', arguments: ['s => s.user'] },
       ],
-      components: [], conditionals: [], navigation: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
     }]
     const storeAnalyses: ScreenAnalysisOutput[] = [{
       route: '/home',
@@ -270,7 +270,7 @@ describe('generateMockModules', () => {
         { name: 'useUserStore', importPath: '@/lib/data', arguments: [], destructuredFields: ['user'] },
         { name: 'useUserQuery', importPath: '@/lib/data', arguments: [] },
       ],
-      components: [], conditionals: [], navigation: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
     }]
     const mixedAnalyses: ScreenAnalysisOutput[] = [{
       route: '/mixed',
@@ -301,7 +301,7 @@ describe('generateMockModules', () => {
         { name: 'useTranslation', importPath: 'react-i18next', arguments: [] },
         { name: 'useQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['items'] }"] },
       ],
-      components: [], conditionals: [], navigation: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
     }]
     const result = generateMockModules(providerFacts, [{ route: '/test', regions: [], flows: [] }])
     expect(result.mockFiles.has('react-router-dom')).toBe(false)

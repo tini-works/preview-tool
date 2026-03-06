@@ -557,6 +557,47 @@ describe('collectAllFacts', () => {
     rmSync(testDir, { recursive: true, force: true })
   })
 
+  it('includes localState, derivedVars, and functions in collected facts', async () => {
+    const testDirNew = join(tmpdir(), 'collect-facts-new-' + Date.now())
+    mkdirSync(testDirNew, { recursive: true })
+    writeFileSync(join(testDirNew, 'LoginPage.tsx'), `
+      import { useState } from 'react'
+      import { useAuthStore } from '@/stores/auth-store'
+      function LoginPage() {
+        const { login, isLoading, error, clearError } = useAuthStore()
+        const [showPassword, setShowPassword] = useState(false)
+        const registrationSuccess = searchParams.get('registered') === 'true'
+        function handleSubmit(e: any) {
+          login(email, password)
+        }
+        return (
+          <div>
+            {registrationSuccess && <span>Success</span>}
+            {error && <span>Error</span>}
+            {isLoading ? <span>Loading</span> : <span>Ready</span>}
+            <form onSubmit={handleSubmit}>
+              <button onClick={() => setShowPassword(p => !p)}>Toggle</button>
+            </form>
+          </div>
+        )
+      }
+    `)
+
+    const screens = [{ filePath: join(testDirNew, 'LoginPage.tsx'), route: '/login' }]
+    const facts = await collectAllFacts(screens)
+
+    expect(facts[0].localState).toHaveLength(1)
+    expect(facts[0].localState[0].name).toBe('showPassword')
+
+    expect(facts[0].derivedVars).toHaveLength(1)
+    expect(facts[0].derivedVars[0].name).toBe('registrationSuccess')
+
+    expect(facts[0].functions.length).toBeGreaterThanOrEqual(1)
+    expect(facts[0].functions.find(f => f.name === 'handleSubmit')).toBeDefined()
+
+    rmSync(testDirNew, { recursive: true, force: true })
+  })
+
   it('collects facts from multiple screens in parallel with shared Project', async () => {
     const screens = [
       { filePath: join(testDir, 'ScreenA.tsx'), route: '/screen-a' },

@@ -757,6 +757,39 @@ export async function collectAllFacts(screens: ScreenInput[]): Promise<ScreenFac
       const conditionals = extractConditionalFacts(sourceFile)
       const navigation = extractNavigationFacts(sourceFile)
 
+      // New extractors
+      const localState = extractLocalStateFacts(sourceFile)
+
+      // Build sets for derived var filtering
+      const hookVarNames = new Set<string>()
+      for (const h of hooks) {
+        if (h.destructuredFields) {
+          for (const f of h.destructuredFields) hookVarNames.add(f)
+        }
+        if (h.returnVariable && !h.returnVariable.startsWith('{')) {
+          hookVarNames.add(h.returnVariable)
+        }
+      }
+      const localStateNames = new Set(localState.map(ls => ls.name))
+
+      const derivedVars = extractDerivedVarFacts(sourceFile, conditionals, hookVarNames, localStateNames)
+
+      // Build sets for function scanning
+      const setterNames = new Set(localState.filter(ls => ls.setter).map(ls => ls.setter!))
+      const externalFnNames = new Set<string>()
+      for (const h of hooks) {
+        if (h.destructuredFields) {
+          for (const f of h.destructuredFields) {
+            if (/^(set|clear|handle|on|toggle|fetch|submit|reset|open|close)[A-Z]/.test(f) ||
+                ['login', 'logout', 'register'].includes(f)) {
+              externalFnNames.add(f)
+            }
+          }
+        }
+      }
+
+      const functions = extractFunctionFacts(sourceFile, setterNames, externalFnNames)
+
       return {
         route: screen.route,
         filePath: screen.filePath,
@@ -766,6 +799,9 @@ export async function collectAllFacts(screens: ScreenInput[]): Promise<ScreenFac
         components,
         conditionals,
         navigation,
+        localState,
+        derivedVars,
+        functions,
       }
     }),
   )

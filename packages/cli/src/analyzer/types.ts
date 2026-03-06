@@ -252,7 +252,7 @@ export interface ScreenFacts {
   components: ComponentFact[]
   conditionals: ConditionalFact[]
   navigation: NavigationFact[]
-  localState?: LocalStateFact[]
-  derivedVars?: DerivedVarFact[]
-  functions?: FunctionFact[]
+  localState: LocalStateFact[]
+  derivedVars: DerivedVarFact[]
+  functions: FunctionFact[]
 }
