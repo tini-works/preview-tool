@@ -136,7 +136,7 @@ export interface LLMGenerationOutput {
 
 // === Hook Mapping Types ===
 
-export type HookMappingType = 'query-hook' | 'custom-hook' | 'store' | 'context' | 'prop' | 'local-state' | 'unknown'
+export type HookMappingType = 'query-hook' | 'custom-hook' | 'store' | 'context' | 'prop' | 'local-state' | 'derived-var' | 'router-param' | 'unknown'
 
 // === Hook Analysis (for module aliasing) ===
 
@@ -213,6 +213,36 @@ export interface NavigationFact {
   trigger: string
 }
 
+export interface LocalStateFact {
+  name: string
+  hook: 'useState' | 'useRef'
+  setter?: string
+  initialValue: string
+  valueType: string
+}
+
+export interface DerivedVarFact {
+  name: string
+  expression: string
+  sourceVariable?: string
+  valueType: string
+}
+
+export interface FunctionTrigger {
+  element: string
+  event: string
+  elementId?: string
+}
+
+export interface FunctionFact {
+  name: string
+  kind: 'function' | 'arrow' | 'useCallback'
+  triggers: FunctionTrigger[]
+  settersCalled: string[]
+  navigationCalls: string[]
+  externalCalls: string[]
+}
+
 export interface ScreenFacts {
   route: string
   filePath: string
@@ -222,4 +252,7 @@ export interface ScreenFacts {
   components: ComponentFact[]
   conditionals: ConditionalFact[]
   navigation: NavigationFact[]
+  localState?: LocalStateFact[]
+  derivedVars?: DerivedVarFact[]
+  functions?: FunctionFact[]
 }

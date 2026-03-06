@@ -8,7 +8,7 @@ const RegionStateSchema = z.object({
 const RegionSchema = z.object({
   key: z.string(),
   label: z.string(),
-  type: z.enum(['list', 'detail', 'form', 'status', 'auth', 'media', 'custom']),
+  type: z.enum(['list', 'detail', 'form', 'status', 'auth', 'media', 'custom', 'local-state', 'derived-var']),
   hookBindings: z.array(z.string()),
   states: z.record(z.string(), RegionStateSchema),
   defaultState: z.string(),
@@ -27,11 +27,19 @@ const FlowTriggerSchema = z.object({
   nth: z.number().optional(),
 })
 
+const FlowBranchSchema = z.object({
+  condition: z.string(),
+  action: z.enum(['navigate', 'setState', 'setRegionState']),
+  target: z.string(),
+  targetRegion: z.string().optional(),
+})
+
 const FlowSchema = z.object({
   trigger: FlowTriggerSchema,
   action: z.enum(['navigate', 'setState', 'setRegionState']),
   target: z.string(),
   targetRegion: z.string().optional(),
+  branches: z.array(FlowBranchSchema).optional(),
 })
 
 export const ScreenAnalysisSchema = z.object({
@@ -43,3 +51,4 @@ export const ScreenAnalysisSchema = z.object({
 export type ScreenAnalysisOutput = z.infer<typeof ScreenAnalysisSchema>
 export type RegionOutput = z.infer<typeof RegionSchema>
 export type FlowOutput = z.infer<typeof FlowSchema>
+export type FlowBranchOutput = z.infer<typeof FlowBranchSchema>
