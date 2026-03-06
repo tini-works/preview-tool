@@ -18,12 +18,12 @@ export const previewCommand = new Command('preview')
   .argument('<source>', 'Local path or GitHub URL to the frontend project')
   .option('--path <subdir>', 'Subdirectory within the repo (for monorepos)')
   .option('--keep', 'Keep cloned temp directory on exit')
-  .option('--no-llm', 'Skip LLM generation, use heuristic fallback only')
+  .option('--llm <provider>', 'Enable LLM generation with specified provider (auto, anthropic, openai, ollama, claude-code)')
   .option('-p, --port <port>', 'Dev server port')
   .action(async (source: string, options: {
     path?: string
     keep?: boolean
-    llm: boolean
+    llm?: string
     port?: string
   }) => {
     console.log(chalk.bold('\nPreview Tool\n'))
@@ -82,8 +82,8 @@ export const previewCommand = new Command('preview')
     // Step 5: Generate MVC files
     console.log(chalk.dim('\nGenerating preview artifacts...'))
     const config = await readConfig(resolved.cwd)
-    if (!options.llm) {
-      config.llm = { ...config.llm, provider: 'none' }
+    if (options.llm) {
+      config.llm = { ...config.llm, provider: options.llm as 'auto' | 'claude-code' | 'ollama' | 'anthropic' | 'openai' }
     }
     const result = await generateAll(resolved.cwd, config, framework.devToolConfig)
     console.log(chalk.green(`  ${result.screensFound} screens found, ${result.adaptersGenerated} adapters generated`))

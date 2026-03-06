@@ -14,7 +14,7 @@ export const DEFAULT_CONFIG: PreviewConfig = {
   port: 6100,
   title: 'Preview Tool',
   llm: {
-    provider: 'auto' as const,
+    provider: 'none' as const,
     ollamaModel: 'llama3.2',
     ollamaUrl: 'http://localhost:11434',
   },

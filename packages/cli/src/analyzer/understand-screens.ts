@@ -20,7 +20,7 @@ export async function understandScreens(
 ): Promise<ScreenAnalysisOutput[]> {
   // Fast path: no LLM configured
   if (llmConfig.provider === 'none') {
-    console.log(chalk.dim('  LLM provider is "none", using template fallback'))
+    console.log(chalk.dim('  Using AST-driven template analysis (use --llm <provider> to enable LLM)'))
     return screenFacts.map(buildFromTemplates)
   }
 

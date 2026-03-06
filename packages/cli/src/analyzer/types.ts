@@ -1,3 +1,8 @@
+export interface RegionState {
+  label: string
+  mockData: Record<string, unknown>
+}
+
 export interface DiscoveredScreen {
   filePath: string
   route: string
@@ -177,6 +182,8 @@ export interface HookFact {
   arguments: string[]
   /** Destructured return: 'const { data, isLoading }' or undefined */
   returnVariable?: string
+  /** Parsed field names from object destructuring, e.g. ['login', 'isLoading'] */
+  destructuredFields?: string[]
 }
 
 export interface ComponentFact {

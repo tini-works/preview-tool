@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { analysisToModel, analysisToController } from '../generate-from-analysis.js'
+import { analysisToModel, analysisToController, inferHookMappingType } from '../generate-from-analysis.js'
 import type { ScreenAnalysisOutput } from '../../llm/schemas/screen-analysis.js'
 
 const sampleAnalysis: ScreenAnalysisOutput = {
@@ -111,6 +111,24 @@ describe('analysisToModel', () => {
     const model = analysisToModel(sampleAnalysis)
     expect(model.regions['service-list'].component).toBe('Screen')
     expect(model.regions['service-list'].componentPath).toBe('')
+  })
+})
+
+describe('inferHookMappingType', () => {
+  it('classifies useAuthStore as store', () => {
+    expect(inferHookMappingType('useAuthStore')).toBe('store')
+  })
+
+  it('classifies useQuery as query-hook', () => {
+    expect(inferHookMappingType('useQuery')).toBe('query-hook')
+  })
+
+  it('does not misclassify useRestoreSession as store', () => {
+    expect(inferHookMappingType('useRestoreSession')).not.toBe('store')
+  })
+
+  it('classifies useCartStore as store', () => {
+    expect(inferHookMappingType('useCartStore')).toBe('store')
   })
 })
 

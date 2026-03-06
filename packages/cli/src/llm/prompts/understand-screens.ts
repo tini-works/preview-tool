@@ -7,7 +7,14 @@ import type { ScreenFacts } from '../../analyzer/types.js'
 export function buildUnderstandScreensPrompt(screenFacts: ScreenFacts[]): string {
   const screenSections = screenFacts.map((facts) => {
     const hooksSection = facts.hooks.length > 0
-      ? `Hooks called:\n${facts.hooks.map((h) => `  - ${h.name}(${h.arguments.join(', ')}) from "${h.importPath}"${h.returnVariable ? ` → ${h.returnVariable}` : ''}`).join('\n')}`
+      ? `Hooks called:\n${facts.hooks.map((h) => {
+          let line = `  - ${h.name}(${h.arguments.join(', ')}) from "${h.importPath}"`
+          if (h.returnVariable) line += ` → ${h.returnVariable}`
+          if (h.destructuredFields && h.destructuredFields.length > 0) {
+            line += ` [fields: ${h.destructuredFields.join(', ')}]`
+          }
+          return line
+        }).join('\n')}`
       : 'No hooks detected.'
 
     const componentsSection = facts.components.length > 0
@@ -58,10 +65,24 @@ ${facts.sourceCode}
 
 Rules:
 - Every data-fetching hook MUST be bound to a region
-- Every region MUST have at least: a "populated" state and a "loading" state
-- List regions should also have an "empty" state
-- Forms should have: idle, submitting, success, error states
-- Auth regions should have: authenticated, unauthenticated states
+- States MUST be derived from the screen's ACTUAL conditional rendering and UI branches.
+  Look at the "Conditional rendering" section: each condition (e.g., isLoading, error, data.length === 0)
+  represents a distinct visual state the screen can be in. Create a state for EACH visual scenario.
+- For store hooks (useXxxStore):
+  - The mockData MUST include ALL destructured data fields as keys (check the [fields: ...] annotation).
+  - Fields that are functions (e.g., login, logout, clearError) should be OMITTED from mockData — they are auto-stubbed.
+  - Fields that are data (e.g., user, isLoading, error, token, isAuthenticated) MUST be included with realistic values in EVERY state.
+  - Example: if a screen destructures { login, isLoading, error, clearError } from useAuthStore,
+    the mockData for each state MUST include isLoading and error (login and clearError are auto-stubbed).
+- Minimum states per region type:
+  - list: populated, loading, empty
+  - form: default (idle form), submitting (isLoading=true), error (error message shown)
+  - auth: use the screen's actual conditionals — e.g., if it checks isLoading and error, include
+    default (idle), loading, error states. Only use "authenticated/unauthenticated" if the screen
+    conditionally renders different layouts based on isAuthenticated.
+  - detail: populated, loading
+  - status/custom: derive from conditionals
+- defaultState should be the most common visual state (usually idle/default, NOT loading)
 - Generate realistic mock data (not generic "Item 1", "Item 2")
 - Detect ALL clickable elements that navigate or change state
 

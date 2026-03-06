@@ -60,6 +60,46 @@ describe('extractHookFacts', () => {
     expect(hooks[0].importPath).toBe('@/stores/auth')
   })
 
+  it('parses destructured fields from returnVariable', () => {
+    const sf = createSourceFile(`
+      import { useAuthStore } from '@/stores/auth-store'
+      function Screen() {
+        const { login, isLoading, error, clearError } = useAuthStore()
+        return <div />
+      }
+    `)
+    const hooks = extractHookFacts(sf)
+    expect(hooks).toHaveLength(1)
+    expect(hooks[0].returnVariable).toBe('{ login, isLoading, error, clearError }')
+    expect(hooks[0].destructuredFields).toEqual([
+      'login', 'isLoading', 'error', 'clearError'
+    ])
+  })
+
+  it('returns undefined destructuredFields for non-destructured returns', () => {
+    const sf = createSourceFile(`
+      import { useAuthStore } from '@/stores/auth-store'
+      function Screen() {
+        const store = useAuthStore()
+        return <div />
+      }
+    `)
+    const hooks = extractHookFacts(sf)
+    expect(hooks[0].destructuredFields).toBeUndefined()
+  })
+
+  it('parses destructured fields with renamed bindings', () => {
+    const sf = createSourceFile(`
+      import { useAuthStore } from '@/stores/auth-store'
+      function Screen() {
+        const { error: storeError, isLoading } = useAuthStore()
+        return <div />
+      }
+    `)
+    const hooks = extractHookFacts(sf)
+    expect(hooks[0].destructuredFields).toEqual(['error', 'isLoading'])
+  })
+
   it('extracts useContext call', () => {
     const sf = createSourceFile(`
       import { useContext } from 'react'

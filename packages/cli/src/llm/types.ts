@@ -19,7 +19,7 @@ export interface LLMConfig {
 }
 
 export const DEFAULT_LLM_CONFIG: LLMConfig = {
-  provider: 'auto',
+  provider: 'none',
   ollamaModel: 'llama3.2',
   ollamaUrl: 'http://localhost:11434',
 }

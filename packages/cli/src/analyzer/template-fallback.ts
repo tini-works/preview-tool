@@ -1,17 +1,13 @@
-import type { ScreenFacts, HookFact } from './types.js'
+import type { ScreenFacts, HookFact, RegionState } from './types.js'
 import type { ScreenAnalysisOutput, RegionOutput, FlowOutput } from '../llm/schemas/screen-analysis.js'
 import { formatLabel } from '../lib/format-label.js'
 import { REACT_BUILTIN_HOOKS, REACT_IMPORT_PATHS } from '../lib/hook-binding.js'
 import { classifyHook } from '../lib/hook-classifier.js'
+import { classifyDestructuredFields, findConditionalsForHook, deriveStatesFromFacts } from './derive-states.js'
 
 // ---------------------------------------------------------------------------
 // Hook Template interface
 // ---------------------------------------------------------------------------
-
-interface RegionState {
-  label: string
-  mockData: Record<string, unknown>
-}
 
 interface HookTemplate {
   /** Match predicate: receives hook name and import path */
@@ -233,9 +229,21 @@ export function buildFromTemplates(facts: ScreenFacts): ScreenAnalysisOutput {
     seenKeys.add(key)
 
     const label = formatLabel(key)
-    const states = template.states(label)
+
+    // Try AST-derived states when destructuredFields + matching conditionals exist
+    const matchingConditionals = findConditionalsForHook(hook, facts.conditionals)
+    const hasDerivedData = hook.destructuredFields && hook.destructuredFields.length > 0 && matchingConditionals.length > 0
+
+    const states = hasDerivedData
+      ? deriveStatesForHook(hook, matchingConditionals, label)
+      : template.states(label)
+
     const stateNames = Object.keys(states)
-    const defaultState = stateNames.includes('populated') ? 'populated' : stateNames[0]
+    const defaultState = stateNames.includes('default')
+      ? 'default'
+      : stateNames.includes('populated')
+        ? 'populated'
+        : stateNames[0]
 
     const region: RegionOutput = {
       key,
@@ -259,6 +267,24 @@ export function buildFromTemplates(facts: ScreenFacts): ScreenAnalysisOutput {
     regions,
     flows,
   }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: derive states from AST data (destructuredFields + conditionals)
+// ---------------------------------------------------------------------------
+
+function deriveStatesForHook(
+  hook: HookFact,
+  matchingConditionals: import('./types.js').ConditionalFact[],
+  label: string,
+): Record<string, RegionState> {
+  const { dataFields, functionFields } = classifyDestructuredFields(hook.destructuredFields!)
+  return deriveStatesFromFacts({
+    label,
+    dataFields,
+    functionFields,
+    conditionals: matchingConditionals,
+  })
 }
 
 // ---------------------------------------------------------------------------

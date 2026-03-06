@@ -50,28 +50,47 @@ export function extractHookFacts(sourceFile: SourceFile): HookFact[] {
     // export the correct name that other consumers of the module expect.
     const name = exportNameMap.get(localName) ?? localName
     const args = call.getArguments().map((arg) => arg.getText())
-    const returnVariable = extractReturnVariable(call)
+    const { variable: returnVariable, destructuredFields } = extractReturnInfo(call)
 
     hooks.push({
       name,
       importPath,
       arguments: args,
       ...(returnVariable ? { returnVariable } : {}),
+      ...(destructuredFields ? { destructuredFields } : {}),
     })
   }
 
   return hooks
 }
 
-function extractReturnVariable(call: CallExpression): string | undefined {
+interface ReturnInfo {
+  variable?: string
+  destructuredFields?: string[]
+}
+
+function extractReturnInfo(call: CallExpression): ReturnInfo {
   const parent = call.getParent()
-  if (!parent) return undefined
+  if (!parent) return {}
 
   if (parent.isKind(SyntaxKind.VariableDeclaration)) {
-    return parent.getNameNode().getText()
+    const nameNode = parent.getNameNode()
+    const text = nameNode.getText()
+
+    // Object destructuring: const { login, isLoading, error } = useStore()
+    if (nameNode.isKind(SyntaxKind.ObjectBindingPattern)) {
+      const fields = nameNode.getElements().map((el) => {
+        // For renamed bindings like { error: storeError }, use the property name (error)
+        const propertyName = el.getPropertyNameNode()
+        return propertyName ? propertyName.getText() : el.getNameNode().getText()
+      })
+      return { variable: text, destructuredFields: fields }
+    }
+
+    return { variable: text }
   }
 
-  return undefined
+  return {}
 }
 
 // --- Import map builder (shared utility) ---

@@ -216,6 +216,97 @@ describe('buildFromTemplates', () => {
     expect(result.flows).toHaveLength(0)
   })
 
+  it('derives states from AST when Zustand store has destructuredFields + conditionals', () => {
+    const facts: ScreenFacts = {
+      route: '/booking',
+      filePath: '/app/booking.tsx',
+      sourceCode: '',
+      hooks: [
+        {
+          name: 'useBookingStore',
+          importPath: '@/stores/booking',
+          arguments: [],
+          destructuredFields: ['isLoading', 'error', 'data', 'fetchBookings', 'setData'],
+        },
+      ],
+      components: [],
+      conditionals: [
+        { condition: 'isLoading', trueBranch: ['Spinner'], falseBranch: [] },
+        { condition: 'error', trueBranch: ['ErrorBanner'], falseBranch: [] },
+      ],
+      navigation: [],
+    }
+    const result = buildFromTemplates(facts)
+    expect(result.regions).toHaveLength(1)
+    const region = result.regions[0]
+
+    // Should have derived states: default, loading, error
+    expect(Object.keys(region.states)).toEqual(
+      expect.arrayContaining(['default', 'loading', 'error'])
+    )
+    expect(region.defaultState).toBe('default')
+
+    // Default state: booleans false, nullable null — no function fields
+    expect(region.states['default'].mockData).toEqual({
+      isLoading: false,
+      error: null,
+      data: null,
+    })
+
+    // Loading state: isLoading overridden to true
+    expect(region.states['loading'].mockData.isLoading).toBe(true)
+
+    // Error state: error gets message
+    expect(region.states['error'].mockData.error).toBe('Something went wrong')
+  })
+
+  it('falls back to hardcoded auth states when no destructuredFields', () => {
+    const facts: ScreenFacts = {
+      route: '/profile',
+      filePath: '/app/profile.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useAuthStore', importPath: '@/stores/auth', arguments: ['s => s.user'] },
+      ],
+      components: [],
+      conditionals: [
+        { condition: 'isAuthenticated', trueBranch: ['Profile'], falseBranch: ['LoginPrompt'] },
+      ],
+      navigation: [],
+    }
+    const result = buildFromTemplates(facts)
+    expect(result.regions).toHaveLength(1)
+    // Without destructuredFields, falls back to template hardcoded states
+    expect(Object.keys(result.regions[0].states)).toEqual(
+      expect.arrayContaining(['authenticated', 'unauthenticated'])
+    )
+  })
+
+  it('falls back to hardcoded states when no matching conditionals', () => {
+    const facts: ScreenFacts = {
+      route: '/settings',
+      filePath: '/app/settings.tsx',
+      sourceCode: '',
+      hooks: [
+        {
+          name: 'useSettingsStore',
+          importPath: '@/stores/settings',
+          arguments: [],
+          destructuredFields: ['theme', 'language', 'setTheme'],
+        },
+      ],
+      components: [],
+      conditionals: [],
+      navigation: [],
+    }
+    const result = buildFromTemplates(facts)
+    expect(result.regions).toHaveLength(1)
+    // No matching conditionals → falls back to template states
+    expect(Object.keys(result.regions[0].states)).toEqual(
+      expect.arrayContaining(['populated', 'loading', 'error'])
+    )
+  })
+
   it('skips provider hooks (useNavigate, useForm, useTranslation) — no regions produced', () => {
     const facts: ScreenFacts = {
       route: '/register',

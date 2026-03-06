@@ -112,7 +112,7 @@ describe('generateMockModules', () => {
     expect(code).not.toContain("import { useRegionDataForHook }")
   })
 
-  it('includes resolveFromState helper in generated mocks', () => {
+  it('includes resolveFromState helper in query mock files', () => {
     const result = generateMockModules(facts, analyses)
     const code = result.mockFiles.get('@tanstack/react-query')!
     expect(code).toContain('function resolveFromState')
@@ -120,10 +120,174 @@ describe('generateMockModules', () => {
     expect(code).toContain('_error')
   })
 
+  it('includes resolveStoreState helper in store mock files', () => {
+    const result = generateMockModules(facts, analyses)
+    const code = result.mockFiles.get('@/stores/auth')!
+    expect(code).toContain('function resolveStoreState')
+  })
+
   it('handles empty facts and analyses', () => {
     const result = generateMockModules([], [])
     expect(result.mockFiles.size).toBe(0)
     expect(Object.keys(result.aliasManifest)).toHaveLength(0)
+  })
+
+  it('generates store mock that returns state directly (no resolveFromState wrapper)', () => {
+    const storeFacts: ScreenFacts[] = [{
+      route: '/home',
+      filePath: '/home.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useAuthStore', importPath: '@/stores/auth', arguments: [], destructuredFields: ['user', 'logout'] },
+      ],
+      components: [], conditionals: [], navigation: [],
+    }]
+    const storeAnalyses: ScreenAnalysisOutput[] = [{
+      route: '/home',
+      regions: [{
+        key: 'auth-store',
+        label: 'Auth Store',
+        type: 'auth',
+        hookBindings: ['useAuthStore:auth-store'],
+        states: { authenticated: { label: 'A', mockData: { user: { name: 'Alice' }, isAuthenticated: true } } },
+        defaultState: 'authenticated',
+      }],
+      flows: [],
+    }]
+    const result = generateMockModules(storeFacts, storeAnalyses)
+    const code = result.mockFiles.get('@/stores/auth')!
+
+    // Store mock should use resolveStoreState, not resolveFromState
+    expect(code).toContain('resolveStoreState')
+    expect(code).not.toContain('data: stateData.data ?? stateData')
+  })
+
+  it('generates query-hook mock with resolveFromState wrapper', () => {
+    const queryFacts: ScreenFacts[] = [{
+      route: '/list',
+      filePath: '/list.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['items'] }"], destructuredFields: ['data', 'isLoading'] },
+      ],
+      components: [], conditionals: [], navigation: [],
+    }]
+    const queryAnalyses: ScreenAnalysisOutput[] = [{
+      route: '/list',
+      regions: [{
+        key: 'items',
+        label: 'Items',
+        type: 'list',
+        hookBindings: ['useQuery:items'],
+        states: { populated: { label: 'P', mockData: { data: [{ id: '1' }] } } },
+        defaultState: 'populated',
+      }],
+      flows: [],
+    }]
+    const result = generateMockModules(queryFacts, queryAnalyses)
+    const code = result.mockFiles.get('@tanstack/react-query')!
+
+    // Query mock should use resolveFromState wrapper
+    expect(code).toContain('resolveFromState')
+    expect(code).toContain('data: stateData.data ?? stateData')
+  })
+
+  it('generates no-op stubs for destructured function fields in store mocks', () => {
+    const storeFacts: ScreenFacts[] = [{
+      route: '/login',
+      filePath: '/login.tsx',
+      sourceCode: '',
+      hooks: [
+        {
+          name: 'useAuthStore',
+          importPath: '@/stores/auth',
+          arguments: [],
+          destructuredFields: ['login', 'isLoading', 'error', 'clearError'],
+        },
+      ],
+      components: [], conditionals: [], navigation: [],
+    }]
+    const storeAnalyses: ScreenAnalysisOutput[] = [{
+      route: '/login',
+      regions: [{
+        key: 'auth-store',
+        label: 'Auth Store',
+        type: 'auth',
+        hookBindings: ['useAuthStore:auth-store'],
+        states: {
+          default: { label: 'Default', mockData: { isLoading: false, error: null } },
+        },
+        defaultState: 'default',
+      }],
+      flows: [],
+    }]
+    const result = generateMockModules(storeFacts, storeAnalyses)
+    const code = result.mockFiles.get('@/stores/auth')!
+
+    // Should have NOOP constant and resolveStoreState with fields
+    expect(code).toContain('const NOOP')
+    expect(code).toContain('resolveStoreState')
+    expect(code).toContain("'login'")
+    expect(code).toContain("'clearError'")
+  })
+
+  it('store mock without destructured fields returns state directly', () => {
+    const storeFacts: ScreenFacts[] = [{
+      route: '/home',
+      filePath: '/home.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useAuthStore', importPath: '@/stores/auth', arguments: ['s => s.user'] },
+      ],
+      components: [], conditionals: [], navigation: [],
+    }]
+    const storeAnalyses: ScreenAnalysisOutput[] = [{
+      route: '/home',
+      regions: [{
+        key: 'auth',
+        label: 'Auth',
+        type: 'auth',
+        hookBindings: ['useAuthStore:auth'],
+        states: { authenticated: { label: 'A', mockData: { user: { name: 'Alice' } } } },
+        defaultState: 'authenticated',
+      }],
+      flows: [],
+    }]
+    const result = generateMockModules(storeFacts, storeAnalyses)
+    const code = result.mockFiles.get('@/stores/auth')!
+
+    // Store without fields still uses resolveStoreState (not resolveFromState)
+    expect(code).toContain('resolveStoreState')
+    expect(code).not.toContain('data: stateData.data ?? stateData')
+  })
+
+  it('handles mixed store+query hooks from same import path', () => {
+    const mixedFacts: ScreenFacts[] = [{
+      route: '/mixed',
+      filePath: '/mixed.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useUserStore', importPath: '@/lib/data', arguments: [], destructuredFields: ['user'] },
+        { name: 'useUserQuery', importPath: '@/lib/data', arguments: [] },
+      ],
+      components: [], conditionals: [], navigation: [],
+    }]
+    const mixedAnalyses: ScreenAnalysisOutput[] = [{
+      route: '/mixed',
+      regions: [
+        { key: 'user-store', label: 'User Store', type: 'auth', hookBindings: ['useUserStore:user-store'], states: { default: { label: 'D', mockData: { user: null } } }, defaultState: 'default' },
+        { key: 'user-query', label: 'User Query', type: 'detail', hookBindings: ['useUserQuery:user-query'], states: { loaded: { label: 'L', mockData: { name: 'Alice' } } }, defaultState: 'loaded' },
+      ],
+      flows: [],
+    }]
+    const result = generateMockModules(mixedFacts, mixedAnalyses)
+    const code = result.mockFiles.get('@/lib/data')!
+
+    // Both helpers should be present
+    expect(code).toContain('resolveStoreState')
+    expect(code).toContain('resolveFromState')
+    expect(code).toContain('const NOOP')
+    expect(code).toContain('DEFAULT_STATE')
   })
 
   it('skips provider hooks (useNavigate, useForm) from mock generation', () => {

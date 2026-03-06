@@ -18,7 +18,7 @@ import { parseHookBinding } from '../lib/hook-binding.js'
  * - useLiveQuery / useAppLiveQuery → 'custom-hook'
  * - anything else → 'unknown'
  */
-function inferHookMappingType(hookName: string): HookMappingType {
+export function inferHookMappingType(hookName: string): HookMappingType {
   const lower = hookName.toLowerCase()
 
   if (
@@ -30,7 +30,7 @@ function inferHookMappingType(hookName: string): HookMappingType {
     return 'query-hook'
   }
 
-  if (lower.includes('store')) {
+  if (lower.endsWith('store') || /^use\w+Store$/.test(hookName)) {
     return 'store'
   }
 
