@@ -6,6 +6,7 @@ import type {
   ConditionalFact,
   NavigationFact,
   LocalStateFact,
+  DerivedVarFact,
   ScreenFacts,
 } from './types.js'
 
@@ -183,6 +184,106 @@ export function extractLocalStateFacts(sourceFile: SourceFile): LocalStateFact[]
         valueType,
       })
     }
+  }
+
+  return facts
+}
+
+// --- Derived variable extraction ---
+
+/**
+ * Infer the type of a value from the shape of its expression text.
+ * Comparisons and negations produce booleans; literals map to their type.
+ */
+function inferExpressionType(expr: string): string {
+  const trimmed = expr.trim()
+
+  // Comparison operators → boolean
+  if (
+    trimmed.includes('===') ||
+    trimmed.includes('!==') ||
+    trimmed.includes('==') ||
+    trimmed.includes('!=') ||
+    trimmed.includes('>=') ||
+    trimmed.includes('<=') ||
+    trimmed.includes('>') ||
+    trimmed.includes('<')
+  ) {
+    return 'boolean'
+  }
+
+  // Negation → boolean
+  if (trimmed.startsWith('!')) return 'boolean'
+
+  // Delegate to the literal type inferrer for simple values
+  return inferValueType(trimmed)
+}
+
+/**
+ * Extract the first identifier (root variable name) from an expression.
+ * e.g. "data.length > 0" → "data", "searchParams.get('x')" → "searchParams"
+ */
+function extractSourceVariable(expr: string): string | undefined {
+  const match = expr.trim().match(/^([a-zA-Z_$][a-zA-Z0-9_$]*)/)
+  return match ? match[1] : undefined
+}
+
+/**
+ * Extract derived variable facts: const declarations whose names appear in
+ * conditional conditions. Skips variables already tracked as hook returns
+ * or local state.
+ */
+export function extractDerivedVarFacts(
+  sourceFile: SourceFile,
+  conditionals: ConditionalFact[],
+  hookVarNames: Set<string>,
+  localStateNames: Set<string>,
+): DerivedVarFact[] {
+  // Collect all variable names referenced in conditional conditions
+  const conditionalVarNames = new Set<string>()
+  for (const cond of conditionals) {
+    // Extract identifiers from the condition text
+    const identifiers = cond.condition.match(/[a-zA-Z_$][a-zA-Z0-9_$]*/g)
+    if (identifiers) {
+      for (const id of identifiers) {
+        conditionalVarNames.add(id)
+      }
+    }
+  }
+
+  const facts: DerivedVarFact[] = []
+
+  // Walk all variable declarations
+  const declarations = sourceFile.getDescendantsOfKind(SyntaxKind.VariableDeclaration)
+
+  for (const decl of declarations) {
+    const nameNode = decl.getNameNode()
+
+    // Only process simple Identifier name nodes (not destructuring patterns)
+    if (!nameNode.isKind(SyntaxKind.Identifier)) continue
+
+    const name = nameNode.getText()
+
+    // Skip if already tracked by hooks or local state
+    if (hookVarNames.has(name) || localStateNames.has(name)) continue
+
+    // Skip if not used in any conditional
+    if (!conditionalVarNames.has(name)) continue
+
+    // Must have an initializer expression
+    const initializer = decl.getInitializer()
+    if (!initializer) continue
+
+    const expression = initializer.getText()
+    const sourceVariable = extractSourceVariable(expression)
+    const valueType = inferExpressionType(expression)
+
+    facts.push({
+      name,
+      expression,
+      ...(sourceVariable ? { sourceVariable } : {}),
+      valueType,
+    })
   }
 
   return facts

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { extractHookFacts, extractComponentFacts, extractConditionalFacts, extractNavigationFacts, extractLocalStateFacts, collectAllFacts } from '../collect-facts.js'
+import { extractHookFacts, extractComponentFacts, extractConditionalFacts, extractNavigationFacts, extractLocalStateFacts, extractDerivedVarFacts, collectAllFacts } from '../collect-facts.js'
 import { Project } from 'ts-morph'
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -378,6 +378,78 @@ describe('extractLocalStateFacts', () => {
     `)
     const facts = extractLocalStateFacts(sf)
     expect(facts).toHaveLength(0)
+  })
+})
+
+describe('extractDerivedVarFacts', () => {
+  it('extracts const variable used in a conditional', () => {
+    const sf = createSourceFile(`
+      function Screen() {
+        const registrationSuccess = searchParams.get('registered') === 'true'
+        return <div>{registrationSuccess && <span>Success</span>}</div>
+      }
+    `)
+    const conditionals = extractConditionalFacts(sf)
+    const hookVarNames = new Set<string>()
+    const localStateNames = new Set<string>()
+    const facts = extractDerivedVarFacts(sf, conditionals, hookVarNames, localStateNames)
+    expect(facts).toHaveLength(1)
+    expect(facts[0]).toMatchObject({
+      name: 'registrationSuccess',
+      valueType: 'boolean',
+    })
+    expect(facts[0].expression).toContain('searchParams.get')
+  })
+
+  it('resolves sourceVariable from expression', () => {
+    const sf = createSourceFile(`
+      function Screen() {
+        const isReady = data.length > 0
+        return <div>{isReady && <span>Ready</span>}</div>
+      }
+    `)
+    const conditionals = extractConditionalFacts(sf)
+    const facts = extractDerivedVarFacts(sf, conditionals, new Set(), new Set())
+    expect(facts).toHaveLength(1)
+    expect(facts[0].sourceVariable).toBe('data')
+  })
+
+  it('skips variables already tracked by hooks or local state', () => {
+    const sf = createSourceFile(`
+      import { useState } from 'react'
+      function Screen() {
+        const [isOpen, setIsOpen] = useState(false)
+        return <div>{isOpen && <span>Open</span>}</div>
+      }
+    `)
+    const conditionals = extractConditionalFacts(sf)
+    const localStateNames = new Set(['isOpen'])
+    const facts = extractDerivedVarFacts(sf, conditionals, new Set(), localStateNames)
+    expect(facts).toHaveLength(0)
+  })
+
+  it('skips variables not used in any conditional', () => {
+    const sf = createSourceFile(`
+      function Screen() {
+        const greeting = 'Hello'
+        return <div>{greeting}</div>
+      }
+    `)
+    const conditionals = extractConditionalFacts(sf)
+    const facts = extractDerivedVarFacts(sf, conditionals, new Set(), new Set())
+    expect(facts).toHaveLength(0)
+  })
+
+  it('infers boolean type from comparison expressions', () => {
+    const sf = createSourceFile(`
+      function Screen() {
+        const hasItems = items.length > 0
+        return <div>{hasItems && <span>Items</span>}</div>
+      }
+    `)
+    const conditionals = extractConditionalFacts(sf)
+    const facts = extractDerivedVarFacts(sf, conditionals, new Set(), new Set())
+    expect(facts[0].valueType).toBe('boolean')
   })
 })
 
