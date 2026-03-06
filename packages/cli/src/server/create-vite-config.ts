@@ -1,9 +1,10 @@
 import { join, dirname } from 'node:path'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import type { PreviewConfig } from '../lib/config.js'
 import { PREVIEW_DIR } from '../lib/config.js'
+import { createPreviewStatePlugin } from './vite-plugin-preview-state.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -57,7 +58,31 @@ export async function createViteConfig(
     // Tailwind CSS v4 vite plugin not available
   }
 
+  // Load screen file paths for useState transform plugin
+  const screenFilePaths: string[] = []
+  try {
+    const screensDir = join(previewDir, 'screens')
+    const screenDirs = readdirSync(screensDir, { withFileTypes: true })
+      .filter((d) => d.isDirectory())
+      .map((d) => d.name)
+    for (const screenDir of screenDirs) {
+      const modelPath = join(screensDir, screenDir, 'model.ts')
+      const modelContent = readFileSync(modelPath, 'utf-8')
+      const filePathMatch = modelContent.match(/filePath:\s*["']([^"']+)["']/)
+      if (filePathMatch) {
+        screenFilePaths.push(join(cwd, filePathMatch[1]))
+      }
+    }
+  } catch {
+    // No screens directory — skip plugin
+  }
+
+  const previewStatePlugin = screenFilePaths.length > 0
+    ? createPreviewStatePlugin(screenFilePaths)
+    : null
+
   const plugins = [
+    ...(previewStatePlugin ? [previewStatePlugin] : []),
     ...(tailwindPlugin ? [tailwindPlugin] : []),
     ...(reactPlugin ? [reactPlugin] : []),
   ]
