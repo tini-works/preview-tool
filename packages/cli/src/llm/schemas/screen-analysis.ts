@@ -15,6 +15,7 @@ const RegionSchema = z.object({
   isList: z.boolean().optional(),
   mockItems: z.array(z.unknown()).optional(),
   defaultCount: z.number().optional(),
+  sourceHook: z.string().optional(),
 }).refine(
   (r) => Object.keys(r.states).length === 0 || r.defaultState in r.states,
   { message: 'defaultState must match a key in states' },

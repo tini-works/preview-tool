@@ -399,6 +399,30 @@ describe('buildFromTemplates', () => {
     expect(toggleFlow).toBeDefined()
   })
 
+  it('propagates sourceHook on derived-var regions from useSearchParams', () => {
+    const facts: ScreenFacts = {
+      route: '/login',
+      filePath: 'src/pages/Login.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useSearchParams', importPath: 'react-router-dom', arguments: [], destructuredFields: ['searchParams'] },
+      ],
+      components: [],
+      conditionals: [{ condition: 'registrationSuccess', trueBranch: ['Alert'], falseBranch: [] }],
+      navigation: [],
+      localState: [],
+      derivedVars: [
+        { name: 'registrationSuccess', expression: "searchParams.get('registered') === 'true'", sourceVariable: 'searchParams', valueType: 'boolean' },
+      ],
+      functions: [],
+    }
+
+    const result = buildFromTemplates(facts)
+    const region = result.regions.find((r) => r.key === 'registration-success')
+    expect(region).toBeDefined()
+    expect((region as any).sourceHook).toBe('useSearchParams')
+  })
+
   it('skips provider hooks (useNavigate, useForm, useTranslation) — no regions produced', () => {
     const facts: ScreenFacts = {
       route: '/register',

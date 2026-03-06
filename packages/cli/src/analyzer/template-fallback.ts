@@ -3,7 +3,7 @@ import type { ScreenAnalysisOutput, RegionOutput, FlowOutput } from '../llm/sche
 import { formatLabel } from '../lib/format-label.js'
 import { REACT_BUILTIN_HOOKS, REACT_IMPORT_PATHS } from '../lib/hook-binding.js'
 import { classifyHook } from '../lib/hook-classifier.js'
-import { classifyDestructuredFields, findConditionalsForHook, deriveStatesFromFacts, deriveAllStates } from './derive-states.js'
+import { classifyDestructuredFields, findConditionalsForHook, deriveStatesFromFacts, deriveAllStates, camelToKebab } from './derive-states.js'
 
 // ---------------------------------------------------------------------------
 // Hook Template interface
@@ -317,6 +317,19 @@ export function buildFromTemplates(facts: ScreenFacts): ScreenAnalysisOutput {
       const stateNames = Object.keys(derived.states)
       const defaultState = stateNames.includes('default') ? 'default' : stateNames[0]
 
+      // For derived vars, trace sourceVariable back to its hook
+      let sourceHook: string | undefined
+      if (derived.source === 'derived-var') {
+        const derivedVar = (facts.derivedVars ?? []).find((dv) => camelToKebab(dv.name) === key)
+        if (derivedVar?.sourceVariable) {
+          const hook = facts.hooks.find((h) =>
+            h.destructuredFields?.includes(derivedVar.sourceVariable!) ||
+            h.returnVariable === derivedVar.sourceVariable
+          )
+          if (hook) sourceHook = hook.name
+        }
+      }
+
       regions.push({
         key,
         label,
@@ -324,6 +337,7 @@ export function buildFromTemplates(facts: ScreenFacts): ScreenAnalysisOutput {
         hookBindings: [],
         states: derived.states,
         defaultState,
+        ...(sourceHook ? { sourceHook } : {}),
       })
     }
   }
