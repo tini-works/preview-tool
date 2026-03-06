@@ -6,7 +6,7 @@ interface RegionDataContextValue {
   regionData: RegionDataMap
 }
 
-const RegionDataContext = createContext<RegionDataContextValue | null>(null)
+export const RegionDataContext = createContext<RegionDataContextValue | null>(null)
 
 interface RegionDataProviderProps {
   regions: RegionsMap
