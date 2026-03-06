@@ -5,6 +5,7 @@ import type {
   ComponentFact,
   ConditionalFact,
   NavigationFact,
+  LocalStateFact,
   ScreenFacts,
 } from './types.js'
 
@@ -110,6 +111,81 @@ function buildImportMap(sourceFile: SourceFile): Map<string, string> {
     }
   }
   return importMap
+}
+
+// --- Local state extraction (useState / useRef) ---
+
+function inferValueType(text: string): string {
+  const trimmed = text.trim()
+
+  if (trimmed === 'true' || trimmed === 'false') return 'boolean'
+  if (trimmed === 'null') return 'null'
+  if (trimmed === 'undefined') return 'undefined'
+  if (/^-?\d+(\.\d+)?$/.test(trimmed)) return 'number'
+  if (trimmed.startsWith("'") || trimmed.startsWith('"') || trimmed.startsWith('`')) return 'string'
+  if (trimmed.startsWith('[')) return 'array'
+  if (trimmed.startsWith('{')) return 'object'
+
+  return 'unknown'
+}
+
+/**
+ * Extract local state facts from useState and useRef calls.
+ * Only captures calls imported from 'react'.
+ */
+export function extractLocalStateFacts(sourceFile: SourceFile): LocalStateFact[] {
+  const importMap = buildImportMap(sourceFile)
+  const facts: LocalStateFact[] = []
+
+  const calls = sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression)
+
+  for (const call of calls) {
+    const calleeName = call.getExpression().getText()
+
+    if (calleeName !== 'useState' && calleeName !== 'useRef') continue
+
+    // Verify the hook is imported from 'react'
+    const importPath = importMap.get(calleeName)
+    if (importPath !== 'react') continue
+
+    const args = call.getArguments()
+    const initialValue = args.length > 0 ? args[0].getText() : 'undefined'
+    const valueType = inferValueType(initialValue)
+
+    const parent = call.getParent()
+    if (!parent || !parent.isKind(SyntaxKind.VariableDeclaration)) continue
+
+    const nameNode = parent.getNameNode()
+
+    if (calleeName === 'useState') {
+      // useState must use array destructuring: const [name, setter] = useState(...)
+      if (!nameNode.isKind(SyntaxKind.ArrayBindingPattern)) continue
+
+      const elements = nameNode.getElements()
+      const stateName = elements.length > 0 ? elements[0].getText() : 'unknown'
+      const setter = elements.length > 1 ? elements[1].getText() : undefined
+
+      facts.push({
+        name: stateName,
+        hook: 'useState',
+        ...(setter ? { setter } : {}),
+        initialValue,
+        valueType,
+      })
+    } else {
+      // useRef uses simple identifier: const ref = useRef(...)
+      const refName = nameNode.getText()
+
+      facts.push({
+        name: refName,
+        hook: 'useRef',
+        initialValue,
+        valueType,
+      })
+    }
+  }
+
+  return facts
 }
 
 // --- Component extraction ---

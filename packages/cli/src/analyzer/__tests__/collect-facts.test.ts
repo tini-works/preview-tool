@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { extractHookFacts, extractComponentFacts, extractConditionalFacts, extractNavigationFacts, collectAllFacts } from '../collect-facts.js'
+import { extractHookFacts, extractComponentFacts, extractConditionalFacts, extractNavigationFacts, extractLocalStateFacts, collectAllFacts } from '../collect-facts.js'
 import { Project } from 'ts-morph'
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -282,6 +282,102 @@ describe('extractNavigationFacts', () => {
     const nav = extractNavigationFacts(sf)
     expect(nav).toHaveLength(1)
     expect(nav[0].target).toContain('/home')
+  })
+})
+
+describe('extractLocalStateFacts', () => {
+  it('extracts useState with boolean initial value', () => {
+    const sf = createSourceFile(`
+      import { useState } from 'react'
+      function Screen() {
+        const [showPassword, setShowPassword] = useState(false)
+        return <div />
+      }
+    `)
+    const facts = extractLocalStateFacts(sf)
+    expect(facts).toHaveLength(1)
+    expect(facts[0]).toEqual({
+      name: 'showPassword',
+      hook: 'useState',
+      setter: 'setShowPassword',
+      initialValue: 'false',
+      valueType: 'boolean',
+    })
+  })
+
+  it('extracts useState with object initial value', () => {
+    const sf = createSourceFile(`
+      import { useState } from 'react'
+      function Screen() {
+        const [formData, setFormData] = useState({ email: '', password: '' })
+        return <div />
+      }
+    `)
+    const facts = extractLocalStateFacts(sf)
+    expect(facts).toHaveLength(1)
+    expect(facts[0].name).toBe('formData')
+    expect(facts[0].setter).toBe('setFormData')
+    expect(facts[0].valueType).toBe('object')
+  })
+
+  it('extracts useState with empty object', () => {
+    const sf = createSourceFile(`
+      import { useState } from 'react'
+      function Screen() {
+        const [errors, setErrors] = useState({})
+        return <div />
+      }
+    `)
+    const facts = extractLocalStateFacts(sf)
+    expect(facts).toHaveLength(1)
+    expect(facts[0].valueType).toBe('object')
+  })
+
+  it('extracts useRef', () => {
+    const sf = createSourceFile(`
+      import { useRef } from 'react'
+      function Screen() {
+        const inputRef = useRef(null)
+        return <div />
+      }
+    `)
+    const facts = extractLocalStateFacts(sf)
+    expect(facts).toHaveLength(1)
+    expect(facts[0]).toEqual({
+      name: 'inputRef',
+      hook: 'useRef',
+      initialValue: 'null',
+      valueType: 'null',
+    })
+  })
+
+  it('extracts multiple useState calls in order', () => {
+    const sf = createSourceFile(`
+      import { useState } from 'react'
+      function Screen() {
+        const [name, setName] = useState('')
+        const [count, setCount] = useState(0)
+        const [items, setItems] = useState([])
+        return <div />
+      }
+    `)
+    const facts = extractLocalStateFacts(sf)
+    expect(facts).toHaveLength(3)
+    expect(facts[0]).toMatchObject({ name: 'name', valueType: 'string' })
+    expect(facts[1]).toMatchObject({ name: 'count', valueType: 'number' })
+    expect(facts[2]).toMatchObject({ name: 'items', valueType: 'array' })
+  })
+
+  it('skips useState not imported from react', () => {
+    const sf = createSourceFile(`
+      import { useState } from './custom-hooks'
+      function Screen() {
+        const [val, setVal] = useState(false)
+        return <div />
+      }
+    `)
+    const facts = extractLocalStateFacts(sf)
+    expect(facts).toHaveLength(0)
   })
 })
 
