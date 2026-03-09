@@ -34,7 +34,7 @@ export function PreviewShell({ screens, onLanguageChange }: PreviewShellProps) {
     <div className="flex h-svh bg-neutral-100">
       <CatalogPanel />
 
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <main className="flex flex-1 flex-col overflow-hidden">
         <DeviceFrame
           device={device}
           osMode={osMode}
@@ -44,7 +44,7 @@ export function PreviewShell({ screens, onLanguageChange }: PreviewShellProps) {
         >
           <ScreenRenderer route={selectedRoute} />
         </DeviceFrame>
-      </div>
+      </main>
 
       <InspectorPanel onLanguageChange={onLanguageChange} />
     </div>
