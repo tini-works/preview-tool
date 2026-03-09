@@ -41,10 +41,6 @@ export async function callLLM(
 }
 
 function buildProviderChain(config: LLMConfig): LLMProvider[] {
-  if (config.provider === 'none') {
-    return []
-  }
-
   if (config.provider !== 'auto') {
     switch (config.provider) {
       case 'claude-code':

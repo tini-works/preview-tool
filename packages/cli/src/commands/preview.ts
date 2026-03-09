@@ -5,10 +5,10 @@ import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { resolveSource } from '../resolver/resolve-source.js'
 import { detectFramework } from '../resolver/detect-framework.js'
-import { generateWrapperCode } from '../resolver/generate-wrapper.js'
+import { generateWrapperCode, syncWrapperProviders } from '../resolver/generate-wrapper.js'
 import { installDependencies, ensureNodeModules } from '../resolver/install-deps.js'
 import { initPreview } from './init.js'
-import { generateAll } from '../generator/index.js'
+import { generateAllV2 } from '../generator/generate-all-v2.js'
 import { readConfig, DEFAULT_CONFIG, PREVIEW_DIR } from '../lib/config.js'
 import { generateEntryFiles } from '../server/generate-entry.js'
 import { createViteConfig } from '../server/create-vite-config.js'
@@ -79,14 +79,20 @@ export const previewCommand = new Command('preview')
       await initPreview(resolved.cwd, config, wrapperCode)
     }
 
+    // Step 4b: Sync wrapper.tsx with detected providers
+    const wrapperPath = join(previewDir, 'wrapper.tsx')
+    if (syncWrapperProviders(wrapperPath, framework.providers)) {
+      console.log(chalk.dim('  Updated wrapper.tsx with detected providers'))
+    }
+
     // Step 5: Generate MVC files
     console.log(chalk.dim('\nGenerating preview artifacts...'))
     const config = await readConfig(resolved.cwd)
     if (options.llm) {
       config.llm = { ...config.llm, provider: options.llm as 'auto' | 'claude-code' | 'ollama' | 'anthropic' | 'openai' }
     }
-    const result = await generateAll(resolved.cwd, config, framework.devToolConfig)
-    console.log(chalk.green(`  ${result.screensFound} screens found, ${result.adaptersGenerated} adapters generated`))
+    const result = await generateAllV2(resolved.cwd, config)
+    console.log(chalk.green(`  ${result.screens.length} screens found, ${result.analyses.length} analyses generated`))
 
     // Step 6: Start dev server
     if (options.port) {
