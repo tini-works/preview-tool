@@ -1,5 +1,5 @@
 import { writeFile, mkdir } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join, dirname, relative } from 'node:path'
 import { createRequire } from 'node:module'
 import { PREVIEW_DIR } from '../lib/config.js'
@@ -24,6 +24,69 @@ function resolveRuntimePath(): string {
 }
 
 /**
+ * Dynamically detect the host project's CSS entry point.
+ * Priority: explicit override > Tailwind CSS file > any @import CSS > null.
+ */
+export function detectCssEntry(cwd: string, explicitEntry?: string): string | null {
+  if (explicitEntry) {
+    return existsSync(join(cwd, explicitEntry)) ? explicitEntry : null
+  }
+
+  const cssFiles = collectCssFiles(join(cwd, 'src'), 'src')
+  if (cssFiles.length === 0) return null
+
+  for (const cssPath of cssFiles) {
+    const head = readHead(join(cwd, cssPath), 10)
+    if (/@import\s+['"]tailwindcss['"]/.test(head) || /@tailwind\s+base/.test(head)) {
+      return cssPath
+    }
+  }
+
+  for (const cssPath of cssFiles) {
+    const head = readHead(join(cwd, cssPath), 10)
+    if (/@import\s/.test(head)) {
+      return cssPath
+    }
+  }
+
+  return null
+}
+
+function collectCssFiles(dir: string, prefix: string, maxFiles = 20): string[] {
+  const results: string[] = []
+  if (!existsSync(dir)) return results
+
+  try {
+    const entries = readdirSync(dir, { withFileTypes: true })
+    for (const entry of entries) {
+      if (results.length >= maxFiles) break
+      if (entry.name === 'node_modules' || entry.name === '.preview') continue
+
+      const fullPath = join(dir, entry.name)
+      const relPath = `${prefix}/${entry.name}`
+
+      if (entry.isDirectory()) {
+        results.push(...collectCssFiles(fullPath, relPath, maxFiles - results.length))
+      } else if (entry.name.endsWith('.css')) {
+        results.push(relPath)
+      }
+    }
+  } catch {
+    // Permission errors, etc.
+  }
+  return results
+}
+
+function readHead(filePath: string, lines: number): string {
+  try {
+    const content = readFileSync(filePath, 'utf-8')
+    return content.split('\n').slice(0, lines).join('\n')
+  } catch {
+    return ''
+  }
+}
+
+/**
  * Generates the index.html, main.tsx, and preview.css entry files.
  */
 export async function generateEntryFiles(
@@ -40,14 +103,7 @@ export async function generateEntryFiles(
   )
 
   // Detect host project CSS file
-  const cssFiles = ['src/index.css', 'src/App.css', 'src/styles/globals.css']
-  let hostCssPath: string | null = null
-  for (const cssFile of cssFiles) {
-    if (existsSync(join(cwd, cssFile))) {
-      hostCssPath = cssFile
-      break
-    }
-  }
+  const hostCssPath = detectCssEntry(cwd, config.cssEntry)
 
   // Generate a wrapper CSS that imports host CSS + adds @source for runtime
   const runtimeRoot = resolveRuntimePath()
