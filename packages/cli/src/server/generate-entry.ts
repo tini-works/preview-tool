@@ -185,6 +185,10 @@ const overrideModelModules = import.meta.glob('./overrides/*/model.ts', { eager:
   string,
   { regions?: Record<string, unknown> }
 >
+const overrideControllerModules = import.meta.glob('./overrides/*/controller.ts', { eager: true }) as Record<
+  string,
+  { flows?: readonly AnyFlowAction[] }
+>
 
 /**
  * Merge override regions into the base model data.
@@ -225,8 +229,9 @@ for (const [adapterPath, importFn] of Object.entries(screenModules)) {
     regions: merged.regions as ScreenEntry['regions'],
   })
 
-  // Register flow actions from controller
-  const controller = controllerModules[controllerPath]
+  // Register flow actions from controller (override takes precedence)
+  const overrideControllerPath = \`./overrides/\${folderName}/controller.ts\`
+  const controller = overrideControllerModules[overrideControllerPath] ?? controllerModules[controllerPath]
   if (controller?.flows && controller.flows.length > 0) {
     registerFlows(model.meta.route, controller.flows)
   }

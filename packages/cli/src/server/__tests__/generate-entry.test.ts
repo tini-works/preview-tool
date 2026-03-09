@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { detectCssEntry } from '../generate-entry.js'
-import { mkdirSync, writeFileSync, rmSync } from 'node:fs'
+import { detectCssEntry, generateEntryFiles } from '../generate-entry.js'
+import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const TMP = join(import.meta.dirname, '__tmp_css_detect__')
@@ -97,5 +97,23 @@ describe('detectCssEntry', () => {
     })
     const result = detectCssEntry(dir, 'src/nonexistent.css')
     expect(result).toBeNull()
+  })
+})
+
+describe('generateMainTsx', () => {
+  it('includes override controller glob in generated main.tsx', async () => {
+    const dir = join(TMP, `proj-ctrl-${Date.now()}`)
+    mkdirSync(join(dir, '.preview'), { recursive: true })
+    writeFileSync(join(dir, '.preview', 'wrapper.tsx'), 'export const Wrapper = ({ children }: any) => children', 'utf-8')
+
+    await generateEntryFiles(dir, {
+      screenGlob: 'src/screens/**/page.tsx',
+      port: 6100,
+      title: 'Test',
+    })
+
+    const mainTsx = readFileSync(join(dir, '.preview', 'main.tsx'), 'utf-8')
+    expect(mainTsx).toContain("import.meta.glob('./overrides/*/controller.ts'")
+    expect(mainTsx).toContain('overrideControllerModules')
   })
 })
