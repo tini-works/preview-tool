@@ -42,6 +42,7 @@ const KNOWN_PROVIDERS = [
 ] as const
 
 const PAGE_PATTERNS = [
+  { dir: 'src/routes', glob: 'src/routes/**/*.tsx' },
   { dir: 'src/pages', glob: 'src/pages/**/*.tsx' },
   { dir: 'src/screens', glob: 'src/screens/**/index.tsx' },
   { dir: 'src/app', glob: 'src/app/**/page.tsx' },
