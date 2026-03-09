@@ -24,6 +24,9 @@ export async function discoverScreens(
       continue
     }
 
+    // Skip test, spec, and story files
+    if (/\.(test|spec|stories|story)\./.test(match)) continue
+
     // For non-index files, check if they look like pages
     if (!match.endsWith('/index.tsx') && !match.endsWith('index.tsx')) {
       const fileName = parts[parts.length - 1]

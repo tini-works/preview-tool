@@ -11,7 +11,16 @@ import { callLLM } from '../llm/index.js'
 const EXCLUDED_DIRS = ['node_modules', 'dist', '.preview', '.next', '.git', 'build', 'coverage']
 
 export async function scanFileTree(cwd: string): Promise<string[]> {
-  const ignore = EXCLUDED_DIRS.map((d) => `**/${d}/**`)
+  const ignore = [
+    ...EXCLUDED_DIRS.map((d) => `**/${d}/**`),
+    '**/*.test.*',
+    '**/*.spec.*',
+    '**/*.stories.*',
+    '**/*.story.*',
+    '**/__tests__/**',
+    '**/__mocks__/**',
+    '**/*.d.ts',
+  ]
   const files = await glob('**/*.{tsx,ts,jsx}', { cwd, ignore })
   return files.sort()
 }
@@ -25,6 +34,9 @@ export async function validateDiscoveredScreens(
   for (const screen of screens) {
     const absPath = join(cwd, screen.filePath)
     if (!existsSync(absPath)) continue
+
+    const basename = screen.filePath.split('/').pop() ?? ''
+    if (/\.(test|spec|stories|story)\./.test(basename)) continue
 
     const source = readFileSync(absPath, 'utf-8')
     const hasJSX = source.includes('return') && (source.includes('<') || source.includes('jsx'))

@@ -218,7 +218,10 @@ for (const [adapterPath, importFn] of Object.entries(screenModules)) {
 
   entries.push({
     route: model.meta.route,
-    module: importFn as () => Promise<{ default: React.ComponentType<{ regionData?: Record<string, { activeState: string; stateData: unknown }>; flags?: Record<string, boolean> }> }>,
+    module: () => (importFn as any)().catch((err: any) => {
+      console.error('[preview-tool] Failed to load screen:', err)
+      throw err
+    }),
     regions: merged.regions as ScreenEntry['regions'],
   })
 

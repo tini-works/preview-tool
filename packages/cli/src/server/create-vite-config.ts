@@ -115,6 +115,18 @@ export async function createViteConfig(
         } catch {
           // Package not resolvable — mock will work without re-exports
         }
+      } else {
+        // Local import — resolve __real: to the actual source file so mocks can
+        // re-export non-hook symbols (e.g. ToastContext, DevToolsWrapper).
+        let realPath: string
+        if (importPath.startsWith('@/')) {
+          realPath = join(cwd, 'src', importPath.slice(2))
+        } else if (importPath.startsWith('~/')) {
+          realPath = join(cwd, 'src', importPath.slice(2))
+        } else {
+          realPath = join(cwd, importPath)
+        }
+        realModuleEntries.push({ find: `__real:${importPath}`, replacement: realPath })
       }
     }
   } catch {

@@ -85,6 +85,7 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
   const regionStates = useDevToolsStore((s) => s.regionStates)
   const regionListCounts = useDevToolsStore((s) => s.regionListCounts)
   const [loaded, setLoaded] = useState<LoadedScreen | null>(null)
+  const [loadError, setLoadError] = useState<Error | null>(null)
 
   useEffect(() => {
     if (!route) return
@@ -93,11 +94,22 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
     if (!entry) return
 
     let cancelled = false
-    entry.module().then((mod: ScreenModule) => {
-      if (!cancelled) {
-        setLoaded({ route, Component: mod.default })
-      }
-    })
+    setLoadError(null)
+    entry.module()
+      .then((mod: ScreenModule) => {
+        if (!cancelled) {
+          if (!mod.default) {
+            setLoadError(new Error(`Screen "${route}" has no default export`))
+            return
+          }
+          setLoaded({ route, Component: mod.default })
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err : new Error(String(err)))
+        }
+      })
 
     return () => {
       cancelled = true
@@ -117,6 +129,15 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
     return (
       <div className="flex h-full items-center justify-center p-8 text-center text-neutral-400">
         <p>Screen not found: {route}</p>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div style={{ padding: 32, textAlign: 'center', color: '#92400e' }}>
+        <h3>Screen failed to load</h3>
+        <pre style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>{loadError.message}</pre>
       </div>
     )
   }

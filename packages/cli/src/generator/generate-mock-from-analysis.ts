@@ -30,14 +30,6 @@ function toSafeFileName(importPath: string): string {
 }
 
 /**
- * Returns true if the import path is an npm package (not a relative/alias import).
- * npm packages need re-exports so non-hook exports (e.g. MemoryRouter, Link) are preserved.
- */
-function isNpmPackage(importPath: string): boolean {
-  return !importPath.startsWith('.') && !importPath.startsWith('@/') && !importPath.startsWith('~/')
-}
-
-/**
  * Converts a camelCase name to a kebab-case URL parameter name.
  * e.g. 'registrationSuccess' -> 'registration-success'
  */
@@ -86,9 +78,7 @@ interface HookInfo {
 /**
  * Generates a single mock module file for a set of hooks from the same import path.
  *
- * For npm packages: re-exports all original exports via `__real:` prefix, then overrides hooks.
- * For local imports: only exports the mocked hooks.
- *
+ * Re-exports all original exports via `__real:` prefix, then overrides hooks with mocks.
  * Type-aware: store hooks return state directly, query hooks use data/isLoading wrapper.
  */
 function generateMockFile(
@@ -102,18 +92,14 @@ function generateMockFile(
   const hasDirectReturnHooks = hooks.some((h) => h.mappingType === 'store' || h.mappingType === 'custom-hook')
   const hasQueryHooks = hooks.some((h) => h.mappingType !== 'store' && h.mappingType !== 'custom-hook')
   const hasStoreHooks = hasDirectReturnHooks
-  const isNpm = isNpmPackage(importPath)
-
   const lines: string[] = [
     '// Auto-generated mock by @preview-tool/cli — do not edit manually',
   ]
 
-  // For npm packages, re-export everything from the real module first.
-  // The `__real:` prefix is resolved by Vite to the actual node_modules path,
-  // avoiding circular alias resolution.
-  if (isNpm) {
-    lines.push(`export * from '__real:${importPath}'`)
-  }
+  // Re-export everything from the real module so non-hook exports (e.g. contexts,
+  // components, constants) are preserved. The `__real:` prefix is resolved by Vite
+  // to the actual source — node_modules for npm packages, source files for local imports.
+  lines.push(`export * from '__real:${importPath}'`)
 
   if (hasRegionMappings) {
     lines.push("import { useRegionDataForHook } from '@preview-tool/runtime'")
