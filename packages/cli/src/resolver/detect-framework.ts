@@ -56,10 +56,11 @@ export async function detectFramework(cwd: string): Promise<DetectedFramework> {
   }
 
   const raw = await readFile(pkgPath, 'utf-8')
-  const pkg = JSON.parse(raw) as {
-    dependencies?: Record<string, string>
-    devDependencies?: Record<string, string>
-    scripts?: Record<string, string>
+  let pkg: { dependencies?: Record<string, string>; devDependencies?: Record<string, string>; scripts?: Record<string, string> }
+  try {
+    pkg = JSON.parse(raw)
+  } catch {
+    throw new Error(`Failed to parse package.json in ${cwd} — file may be malformed`)
   }
 
   const allDeps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) }
