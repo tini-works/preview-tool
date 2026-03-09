@@ -54,6 +54,14 @@ function resolveLocal(input: string, options: ResolveOptions): ResolvedSource {
   if (!existsSync(cwd)) {
     throw new Error(`Directory not found: ${cwd}`)
   }
+
+  const monorepoPackage = detectMonorepoPackage(cwd)
+  if (monorepoPackage) {
+    const relative = monorepoPackage.replace(cwd + '/', '')
+    console.log(`  Detected monorepo — using ${relative}/ as source`)
+    cwd = monorepoPackage
+  }
+
   return { cwd, isRemote: false }
 }
 
