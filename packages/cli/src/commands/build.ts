@@ -8,21 +8,17 @@ import { generateWrapperCode, syncWrapperProviders } from '../resolver/generate-
 import { installDependencies, ensureNodeModules } from '../resolver/install-deps.js'
 import { initPreview } from './init.js'
 import { generateAllV2 } from '../generator/generate-all-v2.js'
-import { readConfig, DEFAULT_CONFIG, PREVIEW_DIR } from '../lib/config.js'
-import type { LLMConfig } from '../llm/types.js'
-
+import { DEFAULT_CONFIG, PREVIEW_DIR } from '../lib/config.js'
 export const buildCommand = new Command('build')
   .description('Analyze screens and build static preview site')
   .argument('[source]', 'Path to React app (or GitHub URL)', '.')
   .option('--path <subdir>', 'Subdirectory within the repo (for monorepos)')
   .option('--keep', 'Keep cloned temp directory on exit')
   .option('--out <dir>', 'Output directory', 'dist-preview')
-  .option('--llm <provider>', 'LLM provider (auto, anthropic, openai, ollama, claude-code)')
   .action(async (source: string, options: {
     path?: string
     keep?: boolean
     out: string
-    llm?: string
   }) => {
     console.log(chalk.bold('\nPreview Build\n'))
 
@@ -79,15 +75,7 @@ export const buildCommand = new Command('build')
 
     // Step 5: Run V2 analysis + generation pipeline
     console.log(chalk.dim('\nRunning V2 analysis pipeline...'))
-    const config = await readConfig(resolved.cwd)
-    if (options.llm) {
-      config.llm = {
-        ...config.llm,
-        provider: options.llm as LLMConfig['provider'],
-      }
-    }
-
-    const result = await generateAllV2(resolved.cwd, config)
+    const result = await generateAllV2(resolved.cwd)
 
     const screenCount = result.screens.length
     const mockCount = result.analyses.reduce(

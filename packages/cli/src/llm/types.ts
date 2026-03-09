@@ -12,18 +12,6 @@ export interface LLMOptions {
   timeoutMs?: number
 }
 
-export interface LLMConfig {
-  provider: 'auto' | 'claude-code' | 'ollama' | 'anthropic' | 'openai'
-  ollamaModel: string
-  ollamaUrl: string
-}
-
-export const DEFAULT_LLM_CONFIG: LLMConfig = {
-  provider: 'auto',
-  ollamaModel: 'llama3.2',
-  ollamaUrl: 'http://localhost:11434',
-}
-
 /** Default timeout for LLM generate() calls: 60 seconds */
 export const DEFAULT_LLM_TIMEOUT_MS = 60_000
 

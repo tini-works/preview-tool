@@ -2,7 +2,6 @@ import { glob } from 'glob'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { LLMDiscoveredScreen } from '../llm/schemas/discovery.js'
-import type { LLMConfig } from '../llm/types.js'
 import type { DiscoveredScreen } from './types.js'
 import { buildDiscoveryPrompt } from '../llm/prompts/discover-screens.js'
 import { DiscoveryOutputSchema } from '../llm/schemas/discovery.js'
@@ -57,12 +56,11 @@ export async function validateDiscoveredScreens(
 
 export async function discoverScreensWithLLM(
   cwd: string,
-  llmConfig: LLMConfig,
 ): Promise<DiscoveredScreen[]> {
   const fileTree = await scanFileTree(cwd)
   const prompt = buildDiscoveryPrompt(fileTree)
 
-  const raw = await callLLM(prompt, llmConfig)
+  const raw = await callLLM(prompt)
   if (!raw) {
     throw new Error('LLM discovery returned no response. An LLM provider is required.')
   }

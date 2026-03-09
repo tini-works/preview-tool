@@ -49,7 +49,6 @@ export const initCommand = new Command('init')
         screenGlob: response.screenGlob as string,
         port: (response.port as number) ?? DEFAULT_CONFIG.port,
         title: DEFAULT_CONFIG.title,
-        llm: { ...DEFAULT_CONFIG.llm },
       }
     }
 

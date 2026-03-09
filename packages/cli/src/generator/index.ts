@@ -75,7 +75,7 @@ export async function generateAll(
 
   // Stage 3: LLM understanding (one batch call + template fallback)
   console.log(chalk.dim('Stage 3: Analyzing screens...'))
-  const allAnalyses = await understandScreens(allFacts, config.llm)
+  const allAnalyses = await understandScreens(allFacts)
   console.log(chalk.dim(`  Analyzed ${allAnalyses.length} screen(s)`))
 
   // Stage 4: Generate files

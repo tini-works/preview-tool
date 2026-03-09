@@ -7,19 +7,13 @@ import { generateAll } from '../generator/index.js'
 export const generateCommand = new Command('generate')
   .description('Discover screens and generate preview artifacts')
   .option('-c, --cwd <path>', 'Working directory', process.cwd())
-  .option('--llm <provider>', 'Enable LLM generation with specified provider (auto, anthropic, openai, ollama, claude-code)')
-  .action(async (options: { cwd: string; llm?: string }) => {
+  .action(async (options: { cwd: string }) => {
     const cwd = resolve(options.cwd)
 
     console.log(chalk.bold('\nPreview Tool — Generate\n'))
 
     const config = await readConfig(cwd)
     console.log(chalk.dim(`Config: glob=${config.screenGlob}, port=${config.port}`))
-
-    if (options.llm) {
-      config.llm = { ...config.llm, provider: options.llm as 'auto' | 'claude-code' | 'ollama' | 'anthropic' | 'openai' }
-      console.log(chalk.dim(`LLM enabled (provider: ${options.llm})`))
-    }
 
     console.log('')
 

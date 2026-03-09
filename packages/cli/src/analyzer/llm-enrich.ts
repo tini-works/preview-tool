@@ -1,5 +1,4 @@
 import type { HookFact, LocalStateFact, TypeShapeInfo } from './types.js'
-import type { LLMConfig } from '../llm/types.js'
 import { callLLM } from '../llm/index.js'
 
 // ---------------------------------------------------------------------------
@@ -11,15 +10,13 @@ import { callLLM } from '../llm/index.js'
  * when static analysis (TypeChecker + heuristics) fails to resolve them.
  *
  * Only runs when:
- * 1. An LLM provider is configured (LLM is now mandatory)
- * 2. The fact has resolvedType.confidence === 'none' or no resolvedType at all
- * 3. There's enough source context to make a useful query
+ * 1. The fact has resolvedType.confidence === 'none' or no resolvedType at all
+ * 2. There's enough source context to make a useful query
  */
 export async function enrichUnresolvedTypes(
   hooks: HookFact[],
   localState: LocalStateFact[],
   sourceCode: string,
-  llmConfig: LLMConfig,
 ): Promise<void> {
 
   // Collect unresolved hooks
@@ -52,7 +49,7 @@ export async function enrichUnresolvedTypes(
   const prompt = buildEnrichmentPrompt(items, sourceCode)
 
   try {
-    const result = await callLLM(prompt, llmConfig, {
+    const result = await callLLM(prompt, {
       systemPrompt: 'You are a TypeScript type inference assistant. Respond only with valid JSON.',
     })
 

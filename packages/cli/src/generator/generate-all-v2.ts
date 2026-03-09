@@ -1,7 +1,6 @@
 import { join } from 'node:path'
 import { mkdir, writeFile } from 'node:fs/promises'
 import type { ModelOutput, ComponentRegion, DiscoveredScreen } from '../analyzer/types.js'
-import type { PreviewConfig } from '../lib/config.js'
 import type { MockModuleV2, RegionV2, ScreenAnalysisV2 } from '../llm/schemas/screen-analysis-v2.js'
 import { PREVIEW_DIR } from '../lib/config.js'
 
@@ -201,7 +200,6 @@ function toSafeFileName(importPath: string): string {
  */
 export async function generateAllV2(
   cwd: string,
-  config: PreviewConfig,
 ): Promise<{ screens: DiscoveredScreen[]; analyses: ScreenAnalysisV2[] }> {
   // Lazy imports to keep pure functions testable without these deps
   const { discoverScreensWithLLM } = await import('../analyzer/discover-llm.js')
@@ -213,10 +211,10 @@ export async function generateAllV2(
   await mkdir(join(outDir, 'adapters'), { recursive: true })
 
   // Step 1: Discover screens via LLM
-  const screens = await discoverScreensWithLLM(cwd, config.llm)
+  const screens = await discoverScreensWithLLM(cwd)
 
   // Step 2: Analyze each screen via LLM
-  const analysisMap = await analyzeAllScreens(cwd, screens, config.llm)
+  const analysisMap = await analyzeAllScreens(cwd, screens)
   const analyses = screens.map((s) => analysisMap.get(s.route)!)
 
   // Step 3: Generate mock modules

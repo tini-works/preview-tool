@@ -1,6 +1,5 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
-import type { LLMConfig } from '../llm/types.js'
 import type { ScreenAnalysisV2 } from '../llm/schemas/screen-analysis-v2.js'
 import type { DiscoveredScreen } from './types.js'
 import { buildAnalyzeScreenPrompt } from '../llm/prompts/analyze-screen.js'
@@ -73,7 +72,6 @@ export function validateAnalysis(
 export async function analyzeScreenWithLLM(
   cwd: string,
   screen: DiscoveredScreen,
-  llmConfig: LLMConfig,
 ): Promise<ScreenAnalysisV2> {
   const absPath = join(cwd, screen.filePath)
   const screenSource = readFileSync(absPath, 'utf-8')
@@ -81,7 +79,7 @@ export async function analyzeScreenWithLLM(
   const typeInfo: Record<string, unknown> = {}
 
   const prompt = buildAnalyzeScreenPrompt(screenSource, hookSources, typeInfo)
-  const raw = await callLLM(prompt, llmConfig)
+  const raw = await callLLM(prompt)
 
   if (!raw) {
     throw new Error(`LLM analysis returned no response for ${screen.filePath}`)
@@ -100,12 +98,11 @@ export async function analyzeScreenWithLLM(
 export async function analyzeAllScreens(
   cwd: string,
   screens: DiscoveredScreen[],
-  llmConfig: LLMConfig,
 ): Promise<Map<string, ScreenAnalysisV2>> {
   const results = new Map<string, ScreenAnalysisV2>()
 
   const analyses = await Promise.allSettled(
-    screens.map((screen) => analyzeScreenWithLLM(cwd, screen, llmConfig)),
+    screens.map((screen) => analyzeScreenWithLLM(cwd, screen)),
   )
 
   screens.forEach((screen, i) => {

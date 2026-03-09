@@ -4,7 +4,6 @@ import { buildUnderstandScreensPrompt } from '../llm/prompts/understand-screens.
 import { ScreenAnalysisSchema, type ScreenAnalysisOutput } from '../llm/schemas/screen-analysis.js'
 import { buildFromTemplates } from './template-fallback.js'
 import type { ScreenFacts } from './types.js'
-import type { LLMConfig } from '../llm/types.js'
 import { z } from 'zod'
 
 const BatchOutputSchema = z.array(ScreenAnalysisSchema)
@@ -16,7 +15,6 @@ const BatchOutputSchema = z.array(ScreenAnalysisSchema)
  */
 export async function understandScreens(
   screenFacts: ScreenFacts[],
-  llmConfig: LLMConfig,
 ): Promise<ScreenAnalysisOutput[]> {
   console.warn('Warning: Using legacy AST-first pipeline. The LLM-first pipeline (V2) is now default via preview command.')
 
@@ -26,16 +24,16 @@ export async function understandScreens(
 
   try {
     // Try batch call first (claude-code only)
-    let raw = await callLLMBatch(prompt, llmConfig, llmOptions)
+    let raw = await callLLMBatch(prompt, llmOptions)
 
-    // Fall back to single-call provider chain
+    // Fall back to single call
     if (raw == null) {
-      raw = await callLLM(prompt, llmConfig, llmOptions)
+      raw = await callLLM(prompt, llmOptions)
     }
 
     // All providers failed
     if (raw == null) {
-      console.log(chalk.dim('  All LLM providers unavailable, using template fallback'))
+      console.log(chalk.dim('  LLM unavailable, using template fallback'))
       return screenFacts.map(buildFromTemplates)
     }
 
