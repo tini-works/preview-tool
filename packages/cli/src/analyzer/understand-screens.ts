@@ -18,6 +18,8 @@ export async function understandScreens(
   screenFacts: ScreenFacts[],
   llmConfig: LLMConfig,
 ): Promise<ScreenAnalysisOutput[]> {
+  console.warn('Warning: Using legacy AST-first pipeline. The LLM-first pipeline (V2) is now default via preview command.')
+
   // Fast path: no LLM configured
   if (llmConfig.provider === 'none') {
     console.log(chalk.dim('  Using AST-driven template analysis (use --llm <provider> to enable LLM)'))
