@@ -26,9 +26,20 @@ const FlowSchema = z.object({
   to: z.string().min(1),
 })
 
+const HookRoleEnum = z.enum([
+  'data_fetcher',
+  'mutation',
+  'realtime',
+  'state_store',
+  'side_effect',
+  'ui_utility',
+  'context',
+])
+
 const MockModuleSchema = z.object({
   hookName: z.string().min(1),
   importPath: z.string().min(1),
+  role: HookRoleEnum,
   defaultState: z.string().min(1),
   stateMap: z.record(z.string(), z.unknown()),
 })
@@ -41,4 +52,5 @@ export const ScreenAnalysisV2Schema = z.object({
 
 export type ScreenAnalysisV2 = z.infer<typeof ScreenAnalysisV2Schema>
 export type RegionV2 = z.infer<typeof RegionSchema>
+export type HookRole = z.infer<typeof HookRoleEnum>
 export type MockModuleV2 = z.infer<typeof MockModuleSchema>
