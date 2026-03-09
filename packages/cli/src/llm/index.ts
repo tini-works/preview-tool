@@ -54,11 +54,12 @@ function buildProviderChain(config: LLMConfig): LLMProvider[] {
     }
   }
 
+  // Prefer API providers (fast) over claude-code subprocess (slow)
   return [
-    createClaudeCodeProvider(),
-    createOllamaProvider(config.ollamaModel, config.ollamaUrl),
     createAnthropicProvider(),
     createOpenAIProvider(),
+    createClaudeCodeProvider(),
+    createOllamaProvider(config.ollamaModel, config.ollamaUrl),
   ]
 }
 

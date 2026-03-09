@@ -8,7 +8,7 @@ const RegionSourceSchema = z.object({
 
 const RegionStateSchema = z.object({
   label: z.string().min(1),
-  mockData: z.record(z.string(), z.unknown()),
+  mockData: z.unknown(),
 })
 
 const RegionSchema = z.object({
@@ -30,7 +30,7 @@ const MockModuleSchema = z.object({
   hookName: z.string().min(1),
   importPath: z.string().min(1),
   defaultState: z.string().min(1),
-  stateMap: z.record(z.string(), z.record(z.string(), z.unknown())),
+  stateMap: z.record(z.string(), z.unknown()),
 })
 
 export const ScreenAnalysisV2Schema = z.object({

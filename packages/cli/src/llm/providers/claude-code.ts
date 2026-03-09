@@ -28,10 +28,14 @@ export function createClaudeCodeProvider(): LLMProvider {
         ? `${options.systemPrompt}\n\n${prompt}`
         : prompt
 
+      // Unset CLAUDECODE to allow spawning from within a Claude Code session
+      const env = { ...process.env }
+      delete env.CLAUDECODE
+
       const { stdout } = await execFileAsync(
         'claude',
         ['-p', fullPrompt, '--output-format', 'json', '--max-turns', '30'],
-        { timeout, maxBuffer: 10 * 1024 * 1024 },
+        { timeout, maxBuffer: 10 * 1024 * 1024, env },
       )
 
       // claude --output-format json returns { result: "...", ... }
