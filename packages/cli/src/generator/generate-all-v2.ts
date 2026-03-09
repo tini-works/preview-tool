@@ -80,7 +80,7 @@ export function buildMockModuleCode(mock: MockModuleV2): string {
   const replaced = replaceFnPlaceholders(mock.stateMap) as Record<string, Record<string, unknown>>
 
   const lines: string[] = [
-    '// Auto-generated mock by @preview-tool/cli (V2) — do not edit manually',
+    `// Auto-generated mock by @preview-tool/cli (V2) — role: ${mock.role}`,
     "import { useRegionDataForHook } from '@preview-tool/runtime'",
     '',
     `const states = ${serializeValue(replaced, 0)}`,
