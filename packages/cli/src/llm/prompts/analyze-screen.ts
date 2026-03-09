@@ -58,8 +58,25 @@ User interactions that change state:
 For each imported hook that needs mocking:
 - **hookName**: the hook function name
 - **importPath**: the import path
+- **role**: classify the hook by what it DOES (read the source code to determine this):
+  - "data_fetcher" — returns async data (useQuery, useSWR, fetch+useEffect, any data loading hook)
+  - "mutation" — triggers writes (useMutation, useSubmit, any hook that POSTs/PUTs/DELETEs)
+  - "realtime" — subscribes to live updates (useSocket, useSubscription, WebSocket hooks)
+  - "state_store" — reads/writes shared state (useStore, useAtom, useSelector, Zustand/Redux/Jotai)
+  - "side_effect" — does something outside React (useNavigate, useAnalytics, useClipboard)
+  - "ui_utility" — pure UI logic (useDebounce, useLongPress, useMediaQuery, useLocalStorage)
+  - "context" — consumes React Context (useAuth, useTheme, useToast via useContext)
 - **defaultState**: which region state to use by default
 - **stateMap**: object where each key is a state name, and the value is the complete return object
+
+IMPORTANT for stateMap values based on role:
+- data_fetcher: include { data: <realistic data>, isLoading: false, error: null } shape. Also include a "loading" state with { data: null/undefined, isLoading: true, error: null } and "error" state.
+- mutation: include { mutate: "__fn__", mutateAsync: "__fn__", isPending: false, isSuccess: false, error: null } shape
+- realtime: same as data_fetcher but with connection status fields if applicable
+- state_store: include all state fields with realistic initial values, setters as "__fn__"
+- side_effect: all function returns as "__fn__"
+- ui_utility: return the sensible default value (true for boolean hooks, etc.)
+- context: include all context value fields with realistic defaults
 
 Return ONLY valid JSON in this exact format:
 {
