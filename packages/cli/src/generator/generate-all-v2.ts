@@ -118,7 +118,7 @@ export function buildModelFromV2(regions: ReadonlyArray<RegionV2>): ModelOutput 
     const stateKeys = Object.keys(region.states)
     const defaultState = stateKeys[0] ?? 'default'
 
-    const flatStates: Record<string, Record<string, unknown>> = {}
+    const flatStates: Record<string, unknown> = {}
     for (const [stateKey, stateValue] of Object.entries(region.states)) {
       flatStates[stateKey] = stateValue.mockData
     }
@@ -216,7 +216,8 @@ export async function generateAllV2(
   const screens = await discoverScreensWithLLM(cwd, config.llm)
 
   // Step 2: Analyze each screen via LLM
-  const analyses = await analyzeAllScreens(cwd, screens, config.llm)
+  const analysisMap = await analyzeAllScreens(cwd, screens, config.llm)
+  const analyses = screens.map((s) => analysisMap.get(s.route)!)
 
   // Step 3: Generate mock modules
   const aliasManifest: Record<string, string> = {}

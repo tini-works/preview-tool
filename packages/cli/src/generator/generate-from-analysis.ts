@@ -4,6 +4,7 @@ import type {
   ControllerOutput,
   FlowActionV2,
   HookMappingType,
+  HookFact,
   ComponentRegion,
 } from '../analyzer/types.js'
 import { parseHookBinding } from '../lib/hook-binding.js'
@@ -46,6 +47,16 @@ export function inferHookMappingType(hookName: string): HookMappingType {
     return 'local-state'
   }
 
+  // Custom hooks: useXxxController, useXxxService, useXxxManager, useXxxData, useXxxApi
+  if (/^use.+(controller|service|manager|data|api|hook|handler)$/i.test(hookName)) {
+    return 'custom-hook'
+  }
+
+  // Any remaining use* hook is custom
+  if (lower.startsWith('use') && lower.length > 3) {
+    return 'custom-hook'
+  }
+
   return 'unknown'
 }
 
@@ -57,8 +68,16 @@ export function inferHookMappingType(hookName: string): HookMappingType {
  * 2. Derives hookMapping from the first hookBinding
  * 3. Builds a ComponentRegion with all relevant fields
  */
-export function analysisToModel(analysis: ScreenAnalysisOutput): ModelOutput {
+export function analysisToModel(analysis: ScreenAnalysisOutput, hooks?: HookFact[]): ModelOutput {
   const regions: Record<string, ComponentRegion> = {}
+
+  // Build hook name → import path lookup
+  const hookImportMap = new Map<string, string>()
+  if (hooks) {
+    for (const hook of hooks) {
+      hookImportMap.set(hook.name, hook.importPath)
+    }
+  }
 
   for (const region of analysis.regions) {
     // Flatten states: { stateName: { label, mockData } } → { stateName: mockData }
@@ -76,7 +95,7 @@ export function analysisToModel(analysis: ScreenAnalysisOutput): ModelOutput {
           type: inferHookMappingType(parsed.hookName),
           hookName: parsed.hookName,
           identifier: region.key,
-          importPath: '',
+          importPath: hookImportMap.get(parsed.hookName) ?? '',
         }
       }
     }

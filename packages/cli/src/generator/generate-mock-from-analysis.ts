@@ -1,9 +1,11 @@
-import type { ScreenFacts } from '../analyzer/types.js'
+import type { ScreenFacts, PropertyChainFact, TypeShapeInfo } from '../analyzer/types.js'
 import type { ScreenAnalysisOutput } from '../llm/schemas/screen-analysis.js'
 import type { HookMappingType } from '../analyzer/types.js'
 import { parseHookBinding, REACT_IMPORT_PATHS } from '../lib/hook-binding.js'
 import { classifyHook } from '../lib/hook-classifier.js'
+import { classifyDestructuredFields, classifyFieldsFromResolvedType } from '../analyzer/derive-states.js'
 import { inferHookMappingType } from './generate-from-analysis.js'
+import { inferMockShapeForVariable } from '../analyzer/infer-shape.js'
 
 export interface MockGenerationResult {
   /** importPath -> generated mock code */
@@ -77,6 +79,8 @@ interface HookInfo {
   name: string
   mappingType?: HookMappingType
   destructuredFields?: string[]
+  propertyChains?: PropertyChainFact[]
+  resolvedType?: TypeShapeInfo
 }
 
 /**
@@ -95,8 +99,9 @@ function generateMockFile(
   const uniqueNames = [...new Set(hooks.map((h) => h.name))]
   const hookMap = new Map(hooks.map((h) => [h.name, h]))
   const hasRegionMappings = uniqueNames.some((name) => hookToRegion.has(`${importPath}::${name}`))
-  const hasStoreHooks = hooks.some((h) => h.mappingType === 'store')
-  const hasQueryHooks = hooks.some((h) => h.mappingType !== 'store')
+  const hasDirectReturnHooks = hooks.some((h) => h.mappingType === 'store' || h.mappingType === 'custom-hook')
+  const hasQueryHooks = hooks.some((h) => h.mappingType !== 'store' && h.mappingType !== 'custom-hook')
+  const hasStoreHooks = hasDirectReturnHooks
   const isNpm = isNpmPackage(importPath)
 
   const lines: string[] = [
@@ -129,26 +134,24 @@ function generateMockFile(
       '',
       '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
       'function resolveFromState(stateData: Record<string, any>) {',
-      "  if (stateData._loading) return { data: undefined, isLoading: true, isError: false, isReady: false }",
-      "  if (stateData._error) return { data: undefined, isLoading: false, isError: true, isReady: false, error: stateData.message }",
+      "  if (stateData._loading) return { data: null, isLoading: true, isError: false, isReady: false }",
+      "  if (stateData._error) return { data: null, isLoading: false, isError: true, isReady: false, error: stateData.message }",
       '  return { data: stateData.data ?? stateData, isLoading: false, isError: false, isReady: true }',
       '}',
       '',
-      'const DEFAULT_STATE = { data: undefined, isLoading: true, isError: false, isReady: false }',
+      'const DEFAULT_STATE = { data: null, isLoading: true, isError: false, isReady: false }',
     )
   }
 
-  // Store-style resolver (returns state directly, fills no-op stubs for missing fields)
+  // Store-style resolver (returns state directly, fills safe defaults for missing fields)
   if (hasStoreHooks) {
     lines.push(
       '',
       '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
-      'function resolveStoreState(stateData: Record<string, any>, fields?: string[]) {',
-      '  if (!fields) return stateData',
+      'function resolveStoreState(stateData: Record<string, any>, fnFields?: string[], dataFields?: string[], defaultShapes?: Record<string, any>) {',
       '  const result: Record<string, any> = { ...stateData }',
-      '  for (const f of fields) {',
-      '    if (!(f in result)) result[f] = NOOP',
-      '  }',
+      '  if (fnFields) { for (const f of fnFields) { if (!(f in result)) result[f] = NOOP } }',
+      '  if (dataFields) { for (const f of dataFields) { if (!(f in result)) result[f] = defaultShapes?.[f] ?? {} } }',
       '  return result',
       '}',
     )
@@ -160,39 +163,88 @@ function generateMockFile(
     const regionKey = hookToRegion.get(`${importPath}::${hookName}`)
     const info = hookMap.get(hookName)
     const isStore = info?.mappingType === 'store'
+    const isCustom = info?.mappingType === 'custom-hook'
+    const isDirectReturn = isStore || isCustom
 
     if (regionKey) {
-      if (isStore && info?.destructuredFields && info.destructuredFields.length > 0) {
-        // Store hook with known destructured fields — return state directly with no-op stubs
-        const fieldsList = info.destructuredFields.map((f) => `'${f}'`).join(', ')
+      if (isDirectReturn && info?.destructuredFields && info.destructuredFields.length > 0) {
+        // Store/custom hook with known destructured fields — return state directly with safe defaults
+        // Use resolved type info for function classification when available
+        const { dataFields, functionFields } = info.resolvedType && info.resolvedType.confidence !== 'none'
+          ? classifyFieldsFromResolvedType(info.destructuredFields, info.resolvedType)
+          : classifyDestructuredFields(info.destructuredFields)
+        const fnList = functionFields.map((f) => `'${f}'`).join(', ')
+        const dataList = dataFields.map((f) => `'${f}'`).join(', ')
+
+        // Infer default shapes for data fields — prefer resolved types, fall back to property chains
+        const defaultShapes: Record<string, unknown> = {}
+        // Layer 1: Use resolved type shapes when available
+        if (info.resolvedType && info.resolvedType.confidence !== 'none') {
+          for (const field of dataFields) {
+            if (field in info.resolvedType.shape) {
+              const value = info.resolvedType.shape[field]
+              if (value !== undefined && value !== null) {
+                defaultShapes[field] = value
+              }
+            }
+          }
+        }
+        // Layer 2: Fall back to property chain inference for unresolved fields
+        if (info.propertyChains && info.propertyChains.length > 0) {
+          for (const field of dataFields) {
+            if (field in defaultShapes) continue // already resolved from type info
+            const shape = inferMockShapeForVariable(field, info.propertyChains)
+            if (shape !== undefined && JSON.stringify(shape) !== '{}') {
+              defaultShapes[field] = shape
+            }
+          }
+        }
+        const hasShapes = Object.keys(defaultShapes).length > 0
+        const shapesJson = hasShapes ? JSON.stringify(defaultShapes) : undefined
+
         lines.push(
-          `// Mock replacement for ${hookName} — store, mapped to region '${regionKey}'`,
+          `// Mock replacement for ${hookName} — ${info.mappingType}, mapped to region '${regionKey}'`,
+        )
+        if (hasShapes) {
+          lines.push(`const ${hookName}_shapes = ${shapesJson}`)
+        }
+        const resolveWithData = hasShapes
+          ? `resolveStoreState(data as Record<string, any>, [${fnList}], [${dataList}], ${hookName}_shapes)`
+          : `resolveStoreState(data as Record<string, any>, [${fnList}], [${dataList}])`
+        const resolveDefault = hasShapes
+          ? `resolveStoreState({}, [${fnList}], [${dataList}], ${hookName}_shapes)`
+          : `resolveStoreState({}, [${fnList}], [${dataList}])`
+        lines.push(
           '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
           `export function ${hookName}(..._args: any[]) {`,
           `  const data = useRegionDataForHook('${regionKey}')`,
           '  // eslint-disable-next-line @typescript-eslint/no-explicit-any',
-          `  if (data) return resolveStoreState(data as Record<string, any>, [${fieldsList}])`,
-          `  return resolveStoreState({}, [${fieldsList}])`,
+          `  const state = data ? ${resolveWithData} : ${resolveDefault}`,
+          '  // Support Zustand selector pattern: useStore((s) => s.field)',
+          '  if (typeof _args[0] === \'function\') { try { return _args[0](state) } catch { return state } }',
+          '  return state',
           '}',
           '',
         )
-      } else if (isStore) {
-        // Store hook without field info — return state directly, no stubs
+      } else if (isDirectReturn) {
+        // Store/custom hook without field info — return state directly, no stubs
         lines.push(
-          `// Mock replacement for ${hookName} — store, mapped to region '${regionKey}'`,
+          `// Mock replacement for ${hookName} — ${info?.mappingType ?? 'custom'}, mapped to region '${regionKey}'`,
           '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
           `export function ${hookName}(..._args: any[]) {`,
           `  const data = useRegionDataForHook('${regionKey}')`,
           '  // eslint-disable-next-line @typescript-eslint/no-explicit-any',
-          '  if (data) return resolveStoreState(data as Record<string, any>)',
-          '  return {}',
+          '  const state = data ? resolveStoreState(data as Record<string, any>) : {}',
+          '  // Support Zustand selector pattern: useStore((s) => s.field)',
+          '  if (typeof _args[0] === \'function\') { try { return _args[0](state) } catch { return state } }',
+          '  return state',
           '}',
           '',
         )
       } else {
-        // Query/custom hook — use data/isLoading wrapper
+        // Query hook (useQuery, useSWR) — use data/isLoading wrapper
         lines.push(
-          `// Mock replacement for ${hookName} — mapped to region '${regionKey}'`,
+          `// Mock replacement for ${hookName} — query, mapped to region '${regionKey}'`,
           '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
           `export function ${hookName}(..._args: any[]) {`,
           `  const data = useRegionDataForHook('${regionKey}')`,
@@ -204,8 +256,8 @@ function generateMockFile(
         )
       }
     } else {
-      // No region mapping
-      const defaultReturn = isStore ? '{}' : 'DEFAULT_STATE'
+      // No region mapping — custom/store hooks return {}, query hooks return DEFAULT_STATE
+      const defaultReturn = isDirectReturn ? '{}' : 'DEFAULT_STATE'
       lines.push(
         `// Mock replacement for ${hookName} — no region mapping`,
         '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
@@ -283,8 +335,10 @@ export function generateMockModules(
     }
   }
 
-  // Step 3: Collect destructured fields per hook (union across all screens)
+  // Step 3: Collect destructured fields, property chains, and resolved types per hook (union across all screens)
   const hookDestructuredFields = new Map<string, Set<string>>()
+  const hookPropertyChains = new Map<string, PropertyChainFact[]>()
+  const hookResolvedTypes = new Map<string, TypeShapeInfo>()
   for (const facts of allFacts) {
     for (const hook of facts.hooks) {
       if (!hook.destructuredFields) continue
@@ -293,6 +347,24 @@ export function generateMockModules(
         existing.add(field)
       }
       hookDestructuredFields.set(hook.name, existing)
+
+      // Collect property chains relevant to this hook's destructured fields
+      if (facts.propertyChains && facts.propertyChains.length > 0) {
+        const fieldSet = new Set(hook.destructuredFields)
+        const relevantChains = facts.propertyChains.filter((pc) => fieldSet.has(pc.rootVariable))
+        if (relevantChains.length > 0) {
+          const existingChains = hookPropertyChains.get(hook.name) ?? []
+          hookPropertyChains.set(hook.name, [...existingChains, ...relevantChains])
+        }
+      }
+
+      // Collect resolved type info (prefer higher confidence)
+      if (hook.resolvedType && hook.resolvedType.confidence !== 'none') {
+        const existing = hookResolvedTypes.get(hook.name)
+        if (!existing || (existing.confidence === 'partial' && hook.resolvedType.confidence === 'full')) {
+          hookResolvedTypes.set(hook.name, hook.resolvedType)
+        }
+      }
     }
   }
 
@@ -306,10 +378,14 @@ export function generateMockModules(
       // Deduplicate by name
       if (!existing.some((h) => h.name === hook.name)) {
         const fields = hookDestructuredFields.get(hook.name)
+        const chains = hookPropertyChains.get(hook.name)
+        const resolved = hookResolvedTypes.get(hook.name)
         existing.push({
           name: hook.name,
           mappingType: hookToType.get(hook.name),
           ...(fields ? { destructuredFields: [...fields] } : {}),
+          ...(chains ? { propertyChains: chains } : {}),
+          ...(resolved ? { resolvedType: resolved } : {}),
         })
       }
       hooksByImport.set(hook.importPath, existing)
@@ -381,3 +457,4 @@ export function generateMockModules(
 
   return { mockFiles, aliasManifest }
 }
+

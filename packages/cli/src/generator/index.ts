@@ -87,6 +87,7 @@ export async function generateAll(
   let overridesSkipped = 0
 
   const analysisMap = new Map(allAnalyses.map((a) => [a.route, a]))
+  const factsMap = new Map(allFacts.map((f) => [f.route, f]))
 
   for (const screen of screens) {
     const safeName = routeToFolderName(screen.route)
@@ -117,7 +118,8 @@ export async function generateAll(
     // Model (from LLM analysis or template fallback)
     const hasModelOverride = existsSync(join(overrideScreenDir, 'model.ts'))
     if (!hasModelOverride && analysis) {
-      const model = analysisToModel(analysis)
+      const facts = factsMap.get(screen.route)
+      const model = analysisToModel(analysis, facts?.hooks)
       const modelMeta = {
         route: screen.route,
         pattern: screen.pattern,
