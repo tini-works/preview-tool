@@ -119,7 +119,7 @@ export async function generateAll(
     const hasModelOverride = existsSync(join(overrideScreenDir, 'model.ts'))
     if (!hasModelOverride && analysis) {
       const facts = factsMap.get(screen.route)
-      const model = analysisToModel(analysis, facts?.hooks)
+      const model = analysisToModel(analysis, facts?.hooks ?? [])
       const modelMeta = {
         route: screen.route,
         pattern: screen.pattern,
@@ -153,9 +153,12 @@ export async function generateAll(
   const { mockFiles, aliasManifest } = generateMockModules(allFacts, allAnalyses)
 
   for (const [importPath, code] of mockFiles) {
-    // Use the alias manifest path (which generateMockModules built) for consistency
     const mockRelPath = aliasManifest[importPath]
-    const mockFileName = mockRelPath?.replace(/^\.\/mocks\//, '').replace(/\.ts$/, '') ?? importPath
+    if (!mockRelPath) {
+      console.log(chalk.yellow(`  Warning: No alias for mock ${importPath}, skipping`))
+      continue
+    }
+    const mockFileName = mockRelPath.replace(/^\.\/mocks\//, '').replace(/\.ts$/, '')
     await writeFile(join(mocksDir, `${mockFileName}.ts`), code, 'utf-8')
     console.log(chalk.dim(`  Mock: ${importPath} → mocks/${mockFileName}.ts`))
   }
