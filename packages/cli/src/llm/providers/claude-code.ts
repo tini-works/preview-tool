@@ -38,11 +38,25 @@ export function createClaudeCodeProvider(): LLMProvider {
         { timeout, maxBuffer: 10 * 1024 * 1024, env },
       )
 
-      // claude --output-format json returns { result: "...", ... }
-      const envelope = JSON.parse(stdout) as { result: string }
-      const text = envelope.result
+      // Parse the CLI envelope — may be non-JSON on timeout/error
+      let envelope: { result?: string }
+      try {
+        envelope = JSON.parse(stdout) as { result?: string }
+      } catch {
+        throw new Error(`claude CLI returned non-JSON output (${stdout.length} bytes)`)
+      }
 
-      return JSON.parse(extractJson(text)) as unknown
+      const text = envelope.result
+      if (typeof text !== 'string') {
+        throw new Error(`claude CLI envelope missing "result" field: ${JSON.stringify(Object.keys(envelope))}`)
+      }
+
+      // Parse the LLM's JSON response from within the result text
+      try {
+        return JSON.parse(extractJson(text)) as unknown
+      } catch {
+        throw new Error(`LLM response is not valid JSON: ${text.slice(0, 200)}...`)
+      }
     },
   }
 }
