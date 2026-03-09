@@ -61,10 +61,16 @@ export function StatusBar({ osMode, height, showDynamicIsland = false }: StatusB
       <TimeDisplay className="text-[15px] font-semibold leading-none" />
 
       {showDynamicIsland && (
-        <div className="absolute left-1/2 top-3 -translate-x-1/2 h-[37px] w-[126px] rounded-full bg-black" />
+        <div
+          className={cn(
+            'absolute left-1/2 top-3 -translate-x-1/2 h-[37px] w-[126px] rounded-full',
+            isDark ? 'bg-neutral-950' : 'bg-black'
+          )}
+          aria-hidden="true"
+        />
       )}
 
-      <div className="flex items-center gap-1.5">
+      <div className="flex items-center gap-1.5" aria-hidden="true">
         <SignalBars />
         <WifiIcon />
         <BatteryIcon />
