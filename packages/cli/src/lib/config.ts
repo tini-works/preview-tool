@@ -6,6 +6,7 @@ export interface PreviewConfig {
   screenGlob: string
   port: number
   title: string
+  cssEntry?: string
   llm: LLMConfig
 }
 
