@@ -215,7 +215,10 @@ export async function generateAllV2(
 
   // Step 2: Analyze each screen via LLM
   const analysisMap = await analyzeAllScreens(cwd, screens)
-  const analyses = screens.map((s) => analysisMap.get(s.route)!)
+
+  // Filter to only screens that were successfully analyzed
+  const analyzedScreens = screens.filter((s) => analysisMap.has(s.route))
+  const analyses = analyzedScreens.map((s) => analysisMap.get(s.route)!)
 
   // Step 3: Generate mock modules
   const aliasManifest: Record<string, string> = {}
@@ -234,10 +237,9 @@ export async function generateAllV2(
   await writeFile(join(outDir, 'alias-manifest.ts'), manifestCode, 'utf-8')
 
   // Step 4: Generate model files per screen
-  for (let i = 0; i < screens.length; i++) {
-    const screen = screens[i]
+  for (let i = 0; i < analyzedScreens.length; i++) {
+    const screen = analyzedScreens[i]
     const analysis = analyses[i]
-    if (!analysis) continue
 
     const model = buildModelFromV2(analysis.regions)
     const safeName = toSafeFileName(screen.route || screen.filePath)
@@ -246,12 +248,12 @@ export async function generateAllV2(
   }
 
   // Step 5: Generate adapter files per screen
-  for (const screen of screens) {
+  for (const screen of analyzedScreens) {
     const componentName = screen.exportName ?? 'DefaultExport'
     const adapterCode = buildAdapterFromV2(componentName, screen.filePath)
     const safeName = toSafeFileName(screen.route || screen.filePath)
     await writeFile(join(outDir, 'adapters', `${safeName}.tsx`), adapterCode, 'utf-8')
   }
 
-  return { screens, analyses }
+  return { screens: analyzedScreens, analyses }
 }
