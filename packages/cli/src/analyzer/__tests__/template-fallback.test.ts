@@ -11,7 +11,7 @@ describe('buildFromTemplates', () => {
       hooks: [
         { name: 'useQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['users'] }"] },
       ],
-      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions).toHaveLength(1)
@@ -31,7 +31,7 @@ describe('buildFromTemplates', () => {
       hooks: [
         { name: 'useAuthStore', importPath: '@/stores/auth', arguments: ['s => s.user'] },
       ],
-      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions).toHaveLength(1)
@@ -49,7 +49,7 @@ describe('buildFromTemplates', () => {
       hooks: [
         { name: 'useSettingsStore', importPath: '@/stores/settings', arguments: [] },
       ],
-      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions).toHaveLength(1)
@@ -66,7 +66,7 @@ describe('buildFromTemplates', () => {
       navigation: [
         { target: "'/booking'", trigger: 'navigate() call' },
       ],
-      localState: [], derivedVars: [], functions: [],
+      localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.flows).toHaveLength(1)
@@ -82,7 +82,7 @@ describe('buildFromTemplates', () => {
       hooks: [
         { name: 'useAppLiveQuery', importPath: '@/hooks/live-query', arguments: ['q => q', "'service-grid'"] },
       ],
-      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions[0].key).toBe('service-grid')
@@ -97,7 +97,7 @@ describe('buildFromTemplates', () => {
         { name: 'useQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['items'] }"] },
         { name: 'useQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['items'] }"] },
       ],
-      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions).toHaveLength(1)
@@ -111,7 +111,7 @@ describe('buildFromTemplates', () => {
       hooks: [
         { name: 'useSWR', importPath: 'swr', arguments: ["'/api/posts'"] },
       ],
-      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions).toHaveLength(1)
@@ -127,7 +127,7 @@ describe('buildFromTemplates', () => {
       hooks: [
         { name: 'useContext', importPath: 'react', arguments: ['ThemeContext'] },
       ],
-      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions).toHaveLength(1)
@@ -145,7 +145,7 @@ describe('buildFromTemplates', () => {
       hooks: [
         { name: 'useCustomThing', importPath: './hooks/custom', arguments: [] },
       ],
-      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions).toHaveLength(1)
@@ -166,7 +166,7 @@ describe('buildFromTemplates', () => {
         { name: 'useEffect', importPath: 'react', arguments: [] },
         { name: 'useRef', importPath: 'react', arguments: ['null'] },
       ],
-      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions).toHaveLength(0)
@@ -180,7 +180,7 @@ describe('buildFromTemplates', () => {
       hooks: [
         { name: 'useSession', importPath: '@/services/auth-service', arguments: [] },
       ],
-      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions).toHaveLength(1)
@@ -195,7 +195,7 @@ describe('buildFromTemplates', () => {
       hooks: [
         { name: 'useQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['items'] }"] },
       ],
-      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions[0].isList).toBe(true)
@@ -209,7 +209,7 @@ describe('buildFromTemplates', () => {
       filePath: '/app/dashboard.tsx',
       sourceCode: '',
       hooks: [],
-      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.route).toBe('/dashboard')
@@ -236,7 +236,7 @@ describe('buildFromTemplates', () => {
         { condition: 'error', trueBranch: ['ErrorBanner'], falseBranch: [] },
       ],
       navigation: [],
-      localState: [], derivedVars: [], functions: [],
+      localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions).toHaveLength(1)
@@ -275,7 +275,7 @@ describe('buildFromTemplates', () => {
         { condition: 'isAuthenticated', trueBranch: ['Profile'], falseBranch: ['LoginPrompt'] },
       ],
       navigation: [],
-      localState: [], derivedVars: [], functions: [],
+      localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions).toHaveLength(1)
@@ -301,7 +301,7 @@ describe('buildFromTemplates', () => {
       components: [],
       conditionals: [],
       navigation: [],
-      localState: [], derivedVars: [], functions: [],
+      localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions).toHaveLength(1)
@@ -326,6 +326,7 @@ describe('buildFromTemplates', () => {
       ],
       derivedVars: [],
       functions: [],
+      propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     const region = result.regions.find(r => r.key === 'show-password')
@@ -350,6 +351,7 @@ describe('buildFromTemplates', () => {
         { name: 'registrationSuccess', expression: 'x === "true"', sourceVariable: 'searchParams', valueType: 'boolean' },
       ],
       functions: [],
+      propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     const region = result.regions.find(r => r.key === 'registration-success')
@@ -385,6 +387,7 @@ describe('buildFromTemplates', () => {
           externalCalls: [],
         },
       ],
+      propertyChains: [],
     }
     const result = buildFromTemplates(facts)
 
@@ -415,6 +418,7 @@ describe('buildFromTemplates', () => {
         { name: 'registrationSuccess', expression: "searchParams.get('registered') === 'true'", sourceVariable: 'searchParams', valueType: 'boolean' },
       ],
       functions: [],
+      propertyChains: [],
     }
 
     const result = buildFromTemplates(facts)
@@ -434,7 +438,7 @@ describe('buildFromTemplates', () => {
         { name: 'useTranslation', importPath: 'react-i18next', arguments: [] },
         { name: 'useParams', importPath: 'react-router-dom', arguments: [] },
       ],
-      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
     }
     const result = buildFromTemplates(facts)
     expect(result.regions).toHaveLength(0)

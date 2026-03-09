@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest'
 import {
   classifyDestructuredFields,
   parseCondition,
+  parseCompoundCondition,
   findConditionalsForHook,
   deriveStatesFromFacts,
   deriveAllStates,
 } from '../derive-states.js'
-import type { HookFact, ConditionalFact, LocalStateFact, DerivedVarFact } from '../types.js'
+import type { HookFact, ConditionalFact, LocalStateFact, DerivedVarFact, PropertyChainFact } from '../types.js'
 
 describe('classifyDestructuredFields', () => {
   it('classifies boolean-prefixed fields as data', () => {
@@ -24,6 +25,19 @@ describe('classifyDestructuredFields', () => {
   it('classifies exact function names', () => {
     const result = classifyDestructuredFields(['login', 'logout', 'register'])
     expect(result.functionFields).toEqual(['login', 'logout', 'register'])
+    expect(result.dataFields).toEqual([])
+  })
+
+  it('classifies standalone verb names as functions', () => {
+    const result = classifyDestructuredFields(['reset', 'data', 'open', 'close', 'submit', 'toggle', 'fetch'])
+    expect(result.functionFields).toEqual(['reset', 'open', 'close', 'submit', 'toggle', 'fetch'])
+    expect(result.dataFields).toEqual(['data'])
+  })
+
+  it('classifies all expanded exact function names', () => {
+    const verbs = ['clear', 'refresh', 'reload', 'retry', 'cancel', 'dismiss', 'confirm', 'approve', 'reject', 'delete', 'remove', 'save', 'send', 'start', 'stop', 'pause', 'resume', 'init']
+    const result = classifyDestructuredFields(verbs)
+    expect(result.functionFields).toEqual(verbs)
     expect(result.dataFields).toEqual([])
   })
 
@@ -299,5 +313,109 @@ describe('deriveAllStates', () => {
     })
 
     expect(result.has('form-data')).toBe(false)
+  })
+
+  it('generates region for useState(null) with property chains', () => {
+    const propertyChains: PropertyChainFact[] = [
+      { rootVariable: 'config', chain: 'config.enabled', accessType: 'property' },
+      { rootVariable: 'config', chain: 'config.maintenanceMessage', accessType: 'property' },
+    ]
+    const result = deriveAllStates({
+      hooks: [],
+      localState: [{ name: 'config', hook: 'useState', setter: 'setConfig', initialValue: 'null', valueType: 'null' }],
+      derivedVars: [],
+      conditionals: [],
+      propertyChains,
+    })
+
+    expect(result.has('config')).toBe(true)
+    const region = result.get('config')!
+    expect(region.source).toBe('local-state')
+    expect(region.defaultState).toBe('populated')
+    expect(region.states['default'].mockData).toEqual({ config: null })
+    expect(region.states['populated'].mockData.config).toBeDefined()
+    // The populated state should have inferred shape from property chains
+    const populatedConfig = region.states['populated'].mockData.config as Record<string, unknown>
+    expect(populatedConfig).toHaveProperty('enabled')
+    expect(populatedConfig.enabled).toBe(false) // boolean heuristic
+  })
+
+  it('skips useState(null) without property chains', () => {
+    const result = deriveAllStates({
+      hooks: [],
+      localState: [{ name: 'config', hook: 'useState', setter: 'setConfig', initialValue: 'null', valueType: 'null' }],
+      derivedVars: [],
+      conditionals: [],
+      propertyChains: [],
+    })
+
+    expect(result.has('config')).toBe(false)
+  })
+
+  it('handles compound conditionals matching hook fields', () => {
+    const hooks: HookFact[] = [{
+      name: 'useDataStore',
+      importPath: '@/stores/data',
+      arguments: [],
+      destructuredFields: ['isLoading', 'error', 'data'],
+    }]
+    const conditionals: ConditionalFact[] = [
+      { condition: 'isLoading && !error', trueBranch: ['Spinner'], falseBranch: [] },
+    ]
+
+    const result = deriveAllStates({ hooks, localState: [], derivedVars: [], conditionals })
+
+    const region = result.get('data-store')
+    expect(region).toBeDefined()
+  })
+})
+
+describe('parseCompoundCondition', () => {
+  it('splits && into individual conditions', () => {
+    const results = parseCompoundCondition('isLoading && !error')
+    expect(results).toHaveLength(2)
+    expect(results[0]).toEqual({ fieldName: 'isLoading', negated: false })
+    expect(results[1]).toEqual({ fieldName: 'error', negated: true })
+  })
+
+  it('splits || into individual conditions', () => {
+    const results = parseCompoundCondition('error || !data')
+    expect(results).toHaveLength(2)
+    expect(results[0]).toEqual({ fieldName: 'error', negated: false })
+    expect(results[1]).toEqual({ fieldName: 'data', negated: true })
+  })
+
+  it('handles mix of && and ||', () => {
+    const results = parseCompoundCondition('isLoading && error || hasData')
+    expect(results).toHaveLength(3)
+  })
+
+  it('delegates non-compound to parseCondition', () => {
+    const results = parseCompoundCondition('isLoading')
+    expect(results).toHaveLength(1)
+    expect(results[0]).toEqual({ fieldName: 'isLoading', negated: false })
+  })
+
+  it('returns empty for unparseable expressions', () => {
+    const results = parseCompoundCondition('a + b')
+    expect(results).toEqual([])
+  })
+})
+
+describe('findConditionalsForHook with compound conditions', () => {
+  it('matches compound conditionals containing hook fields', () => {
+    const hook: HookFact = {
+      name: 'useStore',
+      importPath: '@/stores/store',
+      arguments: [],
+      destructuredFields: ['isLoading', 'error'],
+    }
+    const conditionals: ConditionalFact[] = [
+      { condition: 'isLoading && !error', trueBranch: ['Spinner'], falseBranch: [] },
+      { condition: 'unrelated && other', trueBranch: ['Other'], falseBranch: [] },
+    ]
+    const result = findConditionalsForHook(hook, conditionals)
+    expect(result).toHaveLength(1)
+    expect(result[0].condition).toBe('isLoading && !error')
   })
 })

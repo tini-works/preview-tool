@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { extractHookFacts, extractComponentFacts, extractConditionalFacts, extractNavigationFacts, extractLocalStateFacts, extractDerivedVarFacts, extractFunctionFacts, collectAllFacts } from '../collect-facts.js'
+import { extractHookFacts, extractComponentFacts, extractConditionalFacts, extractNavigationFacts, extractLocalStateFacts, extractDerivedVarFacts, extractFunctionFacts, extractPropertyChains, collectAllFacts, findTsConfig } from '../collect-facts.js'
 import { Project } from 'ts-morph'
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -615,6 +615,69 @@ describe('collectAllFacts', () => {
     expect(facts[1].route).toBe('/screen-b')
     expect(facts[1].hooks).toHaveLength(1)
     expect(facts[1].hooks[0].name).toBe('useAuthStore')
+  })
+})
+
+describe('extractLocalStateFacts — useReducer', () => {
+  it('extracts useReducer as a local state fact', () => {
+    const sf = createSourceFile(`
+      import { useReducer } from 'react'
+      function reducer(state: any, action: any) { return state }
+      function Screen() {
+        const [state, dispatch] = useReducer(reducer, { count: 0, name: '' })
+        return <div>{state.count}</div>
+      }
+    `)
+    const facts = extractLocalStateFacts(sf)
+    expect(facts).toHaveLength(1)
+    expect(facts[0].name).toBe('state')
+    expect(facts[0].hook).toBe('useState') // Treated as useState for region generation
+    expect(facts[0].setter).toBe('dispatch')
+    expect(facts[0].initialValue).toBe("{ count: 0, name: '' }")
+    expect(facts[0].valueType).toBe('object')
+  })
+})
+
+describe('extractPropertyChains — optional chaining', () => {
+  it('normalizes optional chaining to regular property access', () => {
+    const sf = createSourceFile(`
+      import { useStore } from '@/stores/store'
+      function Screen() {
+        const { doctor } = useStore()
+        return <div>{doctor?.name}</div>
+      }
+    `)
+    const chains = extractPropertyChains(sf, new Set(['doctor']))
+    expect(chains.length).toBeGreaterThan(0)
+    const nameChain = chains.find(c => c.chain === 'doctor.name')
+    expect(nameChain).toBeDefined()
+  })
+})
+
+describe('extractDerivedVarFacts — useMemo', () => {
+  it('extracts useMemo as a derived var with array type', () => {
+    const sf = createSourceFile(`
+      import { useMemo } from 'react'
+      function Screen() {
+        const items = [{ id: '1', active: true }, { id: '2', active: false }]
+        const filteredItems = useMemo(() => items.filter(x => x.active), [items])
+        return <div>{filteredItems.length}</div>
+      }
+    `)
+    const hookVarNames = new Set<string>()
+    const localStateNames = new Set<string>()
+    const facts = extractDerivedVarFacts(sf, [], hookVarNames, localStateNames)
+    expect(facts).toHaveLength(1)
+    expect(facts[0].name).toBe('filteredItems')
+    expect(facts[0].valueType).toBe('array')
+    expect(facts[0].sourceVariable).toBe('items')
+  })
+})
+
+describe('findTsConfig', () => {
+  it('returns null for non-existent path', () => {
+    const result = findTsConfig('/nonexistent/path/to/file.tsx')
+    expect(result).toBeNull()
   })
 })
 

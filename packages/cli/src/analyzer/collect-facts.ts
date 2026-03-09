@@ -1,5 +1,7 @@
 import { type SourceFile, SyntaxKind, type CallExpression, type Node, Project } from 'ts-morph'
 import { readFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
 import type {
   HookFact,
   ComponentFact,
@@ -9,8 +11,10 @@ import type {
   DerivedVarFact,
   FunctionFact,
   FunctionTrigger,
+  PropertyChainFact,
   ScreenFacts,
 } from './types.js'
+import { extractHookReturnType, extractUseStateType, extractStoreSelectorType } from './extract-types.js'
 
 /**
  * Extract all hook call facts from a source file using AST.
@@ -105,6 +109,75 @@ function extractReturnInfo(call: CallExpression): ReturnInfo {
   return {}
 }
 
+// --- Zustand selector pattern aggregation ---
+
+/**
+ * Detects when the same store hook is called multiple times with selector pattern:
+ *   const field = useStore((s) => s.field)
+ * Aggregates these into a single HookFact with destructuredFields.
+ * Non-selector calls are passed through unchanged.
+ */
+function aggregateSelectorHooks(hooks: HookFact[]): HookFact[] {
+  // Group hooks by name+importPath
+  const groups = new Map<string, HookFact[]>()
+  for (const h of hooks) {
+    const key = `${h.name}::${h.importPath}`
+    const group = groups.get(key) ?? []
+    group.push(h)
+    groups.set(key, group)
+  }
+
+  const result: HookFact[] = []
+
+  for (const [, group] of groups) {
+    // Check if all calls in this group use selector pattern: (s) => s.field
+    const selectorFields: string[] = []
+    let allSelectors = group.length > 1 // Only aggregate if 2+ calls
+
+    if (allSelectors) {
+      for (const h of group) {
+        const field = extractSelectorField(h)
+        if (field) {
+          selectorFields.push(field)
+        } else {
+          allSelectors = false
+          break
+        }
+      }
+    }
+
+    if (allSelectors && selectorFields.length > 0) {
+      // Merge into single hook fact with destructuredFields
+      result.push({
+        name: group[0].name,
+        importPath: group[0].importPath,
+        arguments: group[0].arguments,
+        returnVariable: `{ ${selectorFields.join(', ')} }`,
+        destructuredFields: selectorFields,
+        selectorPattern: true,
+      })
+    } else {
+      // Pass through unchanged
+      for (const h of group) result.push(h)
+    }
+  }
+
+  return result
+}
+
+/**
+ * Check if a hook call uses the Zustand selector pattern: useStore((s) => s.field)
+ * Returns the field name if matched, undefined otherwise.
+ */
+function extractSelectorField(hook: HookFact): string | undefined {
+  if (hook.arguments.length === 0) return undefined
+  const arg = hook.arguments[0]
+  // Match patterns: (s) => s.field, s => s.field, (state) => state.field
+  const match = arg.match(/^\(?(\w+)\)?\s*=>\s*\1\.(\w+)$/)
+  if (match) return match[2]
+  return undefined
+}
+
 // --- Import map builder (shared utility) ---
 
 function buildImportMap(sourceFile: SourceFile): Map<string, string> {
@@ -141,7 +214,7 @@ function inferValueType(text: string): string {
 }
 
 /**
- * Extract local state facts from useState and useRef calls.
+ * Extract local state facts from useState, useRef, and useReducer calls.
  * Only captures calls imported from 'react'.
  */
 export function extractLocalStateFacts(sourceFile: SourceFile): LocalStateFact[] {
@@ -153,15 +226,13 @@ export function extractLocalStateFacts(sourceFile: SourceFile): LocalStateFact[]
   for (const call of calls) {
     const calleeName = call.getExpression().getText()
 
-    if (calleeName !== 'useState' && calleeName !== 'useRef') continue
+    if (calleeName !== 'useState' && calleeName !== 'useRef' && calleeName !== 'useReducer') continue
 
     // Verify the hook is imported from 'react'
     const importPath = importMap.get(calleeName)
     if (importPath !== 'react') continue
 
     const args = call.getArguments()
-    const initialValue = args.length > 0 ? args[0].getText() : 'undefined'
-    const valueType = inferValueType(initialValue)
 
     const parent = call.getParent()
     if (!parent || !parent.isKind(SyntaxKind.VariableDeclaration)) continue
@@ -169,6 +240,9 @@ export function extractLocalStateFacts(sourceFile: SourceFile): LocalStateFact[]
     const nameNode = parent.getNameNode()
 
     if (calleeName === 'useState') {
+      const initialValue = args.length > 0 ? args[0].getText() : 'undefined'
+      const valueType = inferValueType(initialValue)
+
       // useState must use array destructuring: const [name, setter] = useState(...)
       if (!nameNode.isKind(SyntaxKind.ArrayBindingPattern)) continue
 
@@ -183,8 +257,28 @@ export function extractLocalStateFacts(sourceFile: SourceFile): LocalStateFact[]
         initialValue,
         valueType,
       })
+    } else if (calleeName === 'useReducer') {
+      // useReducer: const [state, dispatch] = useReducer(reducer, initialState)
+      if (!nameNode.isKind(SyntaxKind.ArrayBindingPattern)) continue
+
+      const elements = nameNode.getElements()
+      const stateName = elements.length > 0 ? elements[0].getText() : 'unknown'
+      const dispatch = elements.length > 1 ? elements[1].getText() : undefined
+      // Initial state is the 2nd argument
+      const initialValue = args.length > 1 ? args[1].getText() : 'undefined'
+      const valueType = inferValueType(initialValue)
+
+      facts.push({
+        name: stateName,
+        hook: 'useState', // Treat useReducer like useState for region generation
+        ...(dispatch ? { setter: dispatch } : {}),
+        initialValue,
+        valueType,
+      })
     } else {
       // useRef uses simple identifier: const ref = useRef(...)
+      const initialValue = args.length > 0 ? args[0].getText() : 'undefined'
+      const valueType = inferValueType(initialValue)
       const refName = nameNode.getText()
 
       facts.push({
@@ -240,8 +334,8 @@ function extractSourceVariable(expr: string): string | undefined {
 
 /**
  * Extract derived variable facts: const declarations whose names appear in
- * conditional conditions. Skips variables already tracked as hook returns
- * or local state.
+ * conditional conditions. Also extracts useMemo return values as derived vars.
+ * Skips variables already tracked as hook returns or local state.
  */
 export function extractDerivedVarFacts(
   sourceFile: SourceFile,
@@ -261,6 +355,7 @@ export function extractDerivedVarFacts(
     }
   }
 
+  const importMap = buildImportMap(sourceFile)
   const facts: DerivedVarFact[] = []
 
   // Walk all variable declarations
@@ -277,12 +372,37 @@ export function extractDerivedVarFacts(
     // Skip if already tracked by hooks or local state
     if (hookVarNames.has(name) || localStateNames.has(name)) continue
 
-    // Skip if not used in any conditional
-    if (!conditionalVarNames.has(name)) continue
-
     // Must have an initializer expression
     const initializer = decl.getInitializer()
     if (!initializer) continue
+
+    // Handle useMemo: const filteredItems = useMemo(() => items.filter(...), [items])
+    if (initializer.isKind(SyntaxKind.CallExpression)) {
+      const callee = initializer.getExpression().getText()
+      if (callee === 'useMemo' && importMap.get('useMemo') === 'react') {
+        const memoArgs = initializer.getArguments()
+        if (memoArgs.length > 0) {
+          const cbArg = memoArgs[0]
+          const cbText = cbArg.getText()
+          const sourceVariable = extractSourceVariable(cbText.replace(/^\(?.*?\)?\s*=>\s*/, ''))
+          // Infer type from the callback body
+          const isArray = cbText.includes('.filter') || cbText.includes('.map') ||
+            cbText.includes('.sort') || cbText.includes('.slice') || cbText.includes('.flat')
+          const valueType = isArray ? 'array' : inferExpressionType(cbText)
+
+          facts.push({
+            name,
+            expression: cbText,
+            ...(sourceVariable ? { sourceVariable } : {}),
+            valueType,
+          })
+          continue
+        }
+      }
+    }
+
+    // Skip if not used in any conditional (for non-useMemo vars)
+    if (!conditionalVarNames.has(name)) continue
 
     const expression = initializer.getText()
     const sourceVariable = extractSourceVariable(expression)
@@ -414,8 +534,9 @@ function extractComponentNamesFromNode(node: Node): string[] {
 }
 
 /**
- * Extract conditional rendering facts from JSX ternaries and logical AND.
- * Only captures conditionals where at least one branch contains JSX.
+ * Extract conditional rendering facts from JSX ternaries, logical AND,
+ * and early-return if statements.
+ * Captures conditionals where at least one branch contains JSX.
  */
 export function extractConditionalFacts(sourceFile: SourceFile): ConditionalFact[] {
   const conditionals: ConditionalFact[] = []
@@ -444,6 +565,32 @@ export function extractConditionalFacts(sourceFile: SourceFile): ConditionalFact
 
     const condition = binary.getLeft().getText()
     const trueBranch = extractComponentNamesFromNode(right)
+
+    conditionals.push({ condition, trueBranch, falseBranch: [] })
+  }
+
+  // Early-return if statements: if (isLoading) return <div>Loading...</div>
+  for (const ifStmt of sourceFile.getDescendantsOfKind(SyntaxKind.IfStatement)) {
+    const thenStmt = ifStmt.getThenStatement()
+    if (!thenStmt) continue
+
+    // Check for: if (x) return <JSX /> (block or direct return)
+    const returnStmts = thenStmt.isKind(SyntaxKind.ReturnStatement)
+      ? [thenStmt]
+      : thenStmt.getDescendantsOfKind(SyntaxKind.ReturnStatement)
+
+    const hasJsxReturn = returnStmts.some((ret) => {
+      const expr = ret.getExpression()
+      return expr ? containsJsx(expr) : false
+    })
+
+    if (!hasJsxReturn) continue
+
+    const condition = ifStmt.getExpression().getText()
+    const trueBranch = returnStmts.flatMap((ret) => {
+      const expr = ret.getExpression()
+      return expr ? extractComponentNamesFromNode(expr) : []
+    })
 
     conditionals.push({ condition, trueBranch, falseBranch: [] })
   }
@@ -729,6 +876,106 @@ export function extractFunctionFacts(
   return facts
 }
 
+// --- Property chain extraction ---
+
+/**
+ * Extract property access chains from a source file.
+ * Tracks how variables from hooks and local state are accessed.
+ * e.g. `doctor.name` → { rootVariable: 'doctor', chain: 'doctor.name', accessType: 'property' }
+ */
+export function extractPropertyChains(
+  sourceFile: SourceFile,
+  trackableVariables: Set<string>,
+): PropertyChainFact[] {
+  const facts: PropertyChainFact[] = []
+  const seen = new Set<string>()
+
+  // Walk all PropertyAccessExpression nodes
+  for (const node of sourceFile.getDescendantsOfKind(SyntaxKind.PropertyAccessExpression)) {
+    const chain = buildChainFromAccess(node)
+    if (!chain) continue
+
+    const root = chain.split('.')[0].split('[')[0]
+    if (!trackableVariables.has(root)) continue
+
+    // Skip single-level (just the variable name itself)
+    if (chain === root) continue
+
+    if (seen.has(chain)) continue
+    seen.add(chain)
+
+    const accessType = inferAccessType(node)
+    facts.push({ rootVariable: root, chain, accessType })
+  }
+
+  // Walk ElementAccessExpression for bracket access (e.g. items[0])
+  for (const node of sourceFile.getDescendantsOfKind(SyntaxKind.ElementAccessExpression)) {
+    const chain = buildChainText(node)
+    if (!chain) continue
+
+    const root = chain.split('.')[0].split('[')[0]
+    if (!trackableVariables.has(root)) continue
+    if (chain === root) continue
+
+    if (seen.has(chain)) continue
+    seen.add(chain)
+
+    facts.push({ rootVariable: root, chain, accessType: 'index' })
+  }
+
+  return facts
+}
+
+function buildChainFromAccess(node: Node): string | null {
+  return buildChainText(node)
+}
+
+function buildChainText(node: Node): string | null {
+  const text = node.getText()
+  // Filter out complex expressions (function calls on the chain, template literals, etc.)
+  // Keep simple property access chains and bracket access
+  if (/[(`]/.test(text) && !text.includes('[')) return null
+  // Allow method calls like `.get(...)` but extract only up to the method name
+  // Also handle optional chaining (?.) by normalizing to regular property access
+  const match = text.match(/^([a-zA-Z_$][a-zA-Z0-9_$]*(?:\??\.([a-zA-Z_$][a-zA-Z0-9_$]*)|\.[a-zA-Z_$][a-zA-Z0-9_$]*|\[\d+\])*)/)
+  if (!match) return null
+  // Normalize optional chaining: doctor?.name → doctor.name
+  return match[1].replace(/\?\./g, '.')
+}
+
+function inferAccessType(node: Node): PropertyChainFact['accessType'] {
+  const parent = node.getParent()
+  if (parent && parent.isKind(SyntaxKind.CallExpression)) {
+    return 'method'
+  }
+  // Check for optional chaining (?.): the text will contain '?.'
+  if (node.getText().includes('?.')) {
+    return 'optional'
+  }
+  return 'property'
+}
+
+// --- tsconfig detection ---
+
+/**
+ * Walk up from a file path to find the nearest tsconfig.json.
+ * Returns the absolute path to tsconfig.json, or null if none found.
+ */
+export function findTsConfig(startPath: string): string | null {
+  let dir = dirname(resolve(startPath))
+  const root = resolve('/')
+
+  while (dir !== root) {
+    const candidate = join(dir, 'tsconfig.json')
+    if (existsSync(candidate)) return candidate
+    const parent = dirname(dir)
+    if (parent === dir) break
+    dir = parent
+  }
+
+  return null
+}
+
 // --- collectAllFacts orchestrator ---
 
 export interface ScreenInput {
@@ -740,13 +987,17 @@ export interface ScreenInput {
 /**
  * Collects all facts from multiple screens using a shared ts-morph Project.
  * Creates one Project, adds all files, then extracts facts in parallel.
+ * When a tsconfig.json is found near the screen files, it is loaded to
+ * enable TypeChecker-based type resolution (Phase 1a).
  */
 export async function collectAllFacts(screens: ScreenInput[]): Promise<ScreenFacts[]> {
+  const tsConfigPath = screens.length > 0 ? findTsConfig(screens[0].filePath) : null
+
   const project = new Project({
     useInMemoryFileSystem: false,
-    tsConfigFilePath: undefined,
+    tsConfigFilePath: tsConfigPath ?? undefined,
     skipAddingFilesFromTsConfig: true,
-    compilerOptions: { strict: true, jsx: 4 },
+    ...(tsConfigPath ? {} : { compilerOptions: { strict: true, jsx: 4 } }),
   })
 
   // Add all screen files to the shared project
@@ -760,7 +1011,8 @@ export async function collectAllFacts(screens: ScreenInput[]): Promise<ScreenFac
       const sourceFile = project.getSourceFileOrThrow(screen.filePath)
       const sourceCode = await readFile(screen.filePath, 'utf-8')
 
-      const hooks = extractHookFacts(sourceFile)
+      const rawHooks = extractHookFacts(sourceFile)
+      const hooks = aggregateSelectorHooks(rawHooks)
       const components = extractComponentFacts(sourceFile)
       const conditionals = extractConditionalFacts(sourceFile)
       const navigation = extractNavigationFacts(sourceFile)
@@ -798,18 +1050,128 @@ export async function collectAllFacts(screens: ScreenInput[]): Promise<ScreenFac
 
       const functions = extractFunctionFacts(sourceFile, setterNames, externalFnNames)
 
+      // Build set of trackable variables for property chain extraction
+      const trackableVars = new Set<string>()
+      for (const h of hooks) {
+        if (h.destructuredFields) {
+          for (const f of h.destructuredFields) trackableVars.add(f)
+        }
+        // Also track simple return variables (e.g. const doctor = useBookingStore(...))
+        if (h.returnVariable && !h.returnVariable.startsWith('{') && !h.returnVariable.startsWith('[')) {
+          trackableVars.add(h.returnVariable)
+        }
+      }
+      for (const ls of localState) {
+        trackableVars.add(ls.name)
+      }
+      const propertyChains = extractPropertyChains(sourceFile, trackableVars)
+
+      // --- Type resolution enrichment (Phase 1c) ---
+      // When a tsconfig was loaded, use the TypeChecker to resolve types.
+      // Build immutable maps of resolved types, then create enriched copies.
+      const hookResolvedTypes = new Map<number, import('./types.js').TypeShapeInfo>()
+      const localResolvedTypes = new Map<string, import('./types.js').TypeShapeInfo>()
+
+      if (tsConfigPath) {
+        const typeChecker = project.getTypeChecker()
+
+        // Build a map of hook call nodes by their callee name for enrichment
+        const callNodes = sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression)
+        const hookCallMap = new Map<string, CallExpression[]>()
+        for (const call of callNodes) {
+          const callee = call.getExpression().getText()
+          if (!callee.startsWith('use')) continue
+          const existing = hookCallMap.get(callee) ?? []
+          existing.push(call)
+          hookCallMap.set(callee, existing)
+        }
+
+        // Build a local-name → original-name map for alias resolution
+        const localToOriginal = new Map<string, string>()
+        for (const decl of sourceFile.getImportDeclarations()) {
+          for (const named of decl.getNamedImports()) {
+            const alias = named.getAliasNode()
+            const originalName = named.getName()
+            const localName = alias ? alias.getText() : originalName
+            localToOriginal.set(localName, originalName)
+          }
+        }
+
+        for (let i = 0; i < hooks.length; i++) {
+          const hook = hooks[i]
+          // Find the call node(s) matching this hook
+          // Use the local alias name to find calls (not the original export name)
+          const localName = [...localToOriginal.entries()].find(([, orig]) => orig === hook.name)?.[0] ?? hook.name
+          const calls = hookCallMap.get(localName)
+          if (!calls || calls.length === 0) continue
+
+          const call = calls[0]
+
+          // For selector-pattern stores, try to resolve the store state type
+          if (hook.selectorPattern) {
+            const storeType = extractStoreSelectorType(call, typeChecker)
+            if (storeType && storeType.confidence !== 'none') {
+              hookResolvedTypes.set(i, storeType)
+              continue
+            }
+          }
+
+          // General hook return type resolution
+          const returnType = extractHookReturnType(call, typeChecker)
+          if (returnType && returnType.confidence !== 'none') {
+            hookResolvedTypes.set(i, returnType)
+          }
+        }
+
+        // Enrich local state with useState<T> types
+        for (const local of localState) {
+          if (local.hook !== 'useState') continue
+          const calls = hookCallMap.get('useState')
+          if (!calls) continue
+
+          // Find the specific useState call for this variable
+          const matchingCall = calls.find((call) => {
+            const parent = call.getParent()
+            if (!parent || !parent.isKind(SyntaxKind.VariableDeclaration)) return false
+            const nameNode = parent.getNameNode()
+            if (!nameNode.isKind(SyntaxKind.ArrayBindingPattern)) return false
+            const elements = nameNode.getElements()
+            return elements.length > 0 && elements[0].getText() === local.name
+          })
+
+          if (matchingCall) {
+            const stateType = extractUseStateType(matchingCall, typeChecker)
+            if (stateType && stateType.confidence !== 'none') {
+              localResolvedTypes.set(local.name, stateType)
+            }
+          }
+        }
+      }
+
+      // Build enriched copies (immutable — no mutation of original facts)
+      const enrichedHooks = hooks.map((hook, i) => {
+        const resolved = hookResolvedTypes.get(i)
+        return resolved ? { ...hook, resolvedType: resolved } : hook
+      })
+
+      const enrichedLocalState = localState.map((local) => {
+        const resolved = localResolvedTypes.get(local.name)
+        return resolved ? { ...local, resolvedType: resolved } : local
+      })
+
       return {
         route: screen.route,
         filePath: screen.filePath,
         ...(screen.exportName ? { exportName: screen.exportName } : {}),
         sourceCode,
-        hooks,
+        hooks: enrichedHooks,
         components,
         conditionals,
         navigation,
-        localState,
+        localState: enrichedLocalState,
         derivedVars,
         functions,
+        propertyChains,
       }
     }),
   )

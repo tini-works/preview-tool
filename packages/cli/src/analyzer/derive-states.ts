@@ -1,4 +1,5 @@
-import type { HookFact, ConditionalFact, RegionState, LocalStateFact, DerivedVarFact } from './types.js'
+import type { HookFact, ConditionalFact, RegionState, LocalStateFact, DerivedVarFact, PropertyChainFact, TypeShapeInfo } from './types.js'
+import { inferMockShapeForVariable } from './infer-shape.js'
 
 // ---------------------------------------------------------------------------
 // 1a. Classify destructured fields into data vs function
@@ -11,6 +12,10 @@ const FUNCTION_PREFIXES = [
 
 const EXACT_FUNCTION_NAMES = new Set([
   'login', 'logout', 'register',
+  'reset', 'open', 'close', 'submit', 'toggle', 'fetch',
+  'clear', 'refresh', 'reload', 'retry', 'cancel', 'dismiss',
+  'confirm', 'approve', 'reject', 'delete', 'remove', 'save',
+  'send', 'start', 'stop', 'pause', 'resume', 'init',
 ])
 
 export function classifyDestructuredFields(
@@ -52,7 +57,7 @@ export interface ParsedCondition {
 export function parseCondition(condition: string): ParsedCondition | null {
   const trimmed = condition.trim()
 
-  // Compound expressions → unparseable
+  // Compound expressions → split into individual conditions
   if (/&&|\|\|/.test(trimmed)) return null
 
   // Negated: !fieldName or !field.something
@@ -71,6 +76,31 @@ export function parseCondition(condition: string): ParsedCondition | null {
   }
 
   return null
+}
+
+/**
+ * Parse compound conditionals (&&, ||) into individual field references.
+ * e.g. "isLoading && !error" → [{ fieldName: 'isLoading', negated: false }, { fieldName: 'error', negated: true }]
+ */
+export function parseCompoundCondition(condition: string): ParsedCondition[] {
+  const trimmed = condition.trim()
+
+  // If not compound, delegate to parseCondition
+  if (!/&&|\|\|/.test(trimmed)) {
+    const single = parseCondition(trimmed)
+    return single ? [single] : []
+  }
+
+  // Split on && and || (simple split, not full parser)
+  const parts = trimmed.split(/\s*(?:&&|\|\|)\s*/)
+  const results: ParsedCondition[] = []
+
+  for (const part of parts) {
+    const parsed = parseCondition(part.trim())
+    if (parsed) results.push(parsed)
+  }
+
+  return results
 }
 
 function extractFieldName(expr: string): string | null {
@@ -93,8 +123,13 @@ export function findConditionalsForHook(
   const fieldSet = new Set(fields)
 
   return conditionals.filter((cond) => {
+    // Try simple parse first
     const parsed = parseCondition(cond.condition)
-    return parsed !== null && fieldSet.has(parsed.fieldName)
+    if (parsed !== null) return fieldSet.has(parsed.fieldName)
+
+    // Try compound parse for && / || expressions
+    const compounds = parseCompoundCondition(cond.condition)
+    return compounds.some((c) => fieldSet.has(c.fieldName))
   })
 }
 
@@ -209,6 +244,7 @@ export interface DeriveAllStatesInput {
   localState: LocalStateFact[]
   derivedVars: DerivedVarFact[]
   conditionals: ConditionalFact[]
+  propertyChains?: PropertyChainFact[]
 }
 
 interface VariableSource {
@@ -217,7 +253,7 @@ interface VariableSource {
 }
 
 export function deriveAllStates(input: DeriveAllStatesInput): Map<string, DerivedRegion> {
-  const { hooks, localState, derivedVars, conditionals } = input
+  const { hooks, localState, derivedVars, conditionals, propertyChains = [] } = input
   const result = new Map<string, DerivedRegion>()
 
   // 1. Build variable → source map
@@ -242,14 +278,31 @@ export function deriveAllStates(input: DeriveAllStatesInput): Map<string, Derive
   }
 
   // 2. Match conditionals to sources (group by regionKey)
+  // Supports both simple and compound conditions
   const conditionalsByRegion = new Map<string, ConditionalFact[]>()
   for (const cond of conditionals) {
+    // Try simple condition first
     const parsed = parseCondition(cond.condition)
-    if (!parsed) continue
-    const varSource = variableMap.get(parsed.fieldName)
-    if (!varSource) continue
-    const existing = conditionalsByRegion.get(varSource.regionKey) ?? []
-    conditionalsByRegion.set(varSource.regionKey, [...existing, cond])
+    if (parsed) {
+      const varSource = variableMap.get(parsed.fieldName)
+      if (varSource) {
+        const existing = conditionalsByRegion.get(varSource.regionKey) ?? []
+        conditionalsByRegion.set(varSource.regionKey, [...existing, cond])
+      }
+      continue
+    }
+
+    // Try compound condition — associate with all matched regions
+    const compounds = parseCompoundCondition(cond.condition)
+    const seen = new Set<string>()
+    for (const c of compounds) {
+      const varSource = variableMap.get(c.fieldName)
+      if (varSource && !seen.has(varSource.regionKey)) {
+        seen.add(varSource.regionKey)
+        const existing = conditionalsByRegion.get(varSource.regionKey) ?? []
+        conditionalsByRegion.set(varSource.regionKey, [...existing, cond])
+      }
+    }
   }
 
   // 3. Build regions for external hooks
@@ -281,15 +334,29 @@ export function deriveAllStates(input: DeriveAllStatesInput): Map<string, Derive
   for (const local of localState) {
     const regionKey = camelToKebab(local.name)
     const regionConditionals = conditionalsByRegion.get(regionKey) ?? []
-    // Skip local state not used in any conditional
-    if (regionConditionals.length === 0) continue
 
-    const states = buildLocalStateRegion(local)
+    // Generate region if used in a conditional OR if it's a useState(null) with property chains
+    const hasPropertyChains = propertyChains.some((pc) => pc.rootVariable === local.name)
+    if (regionConditionals.length === 0 && !(local.valueType === 'null' && hasPropertyChains)) continue
+
+    let states: Record<string, RegionState>
+
+    if (regionConditionals.length === 0 && local.valueType === 'null' && hasPropertyChains) {
+      // useState(null) with property accesses — generate populated mock from inferred shape
+      const shape = inferMockShapeForVariable(local.name, propertyChains)
+      states = {
+        default: { label: `${regionKey} default`, mockData: { [local.name]: null } },
+        populated: { label: `${regionKey} populated`, mockData: { [local.name]: shape } },
+      }
+    } else {
+      states = buildLocalStateRegion(local)
+    }
+
     result.set(regionKey, {
       source: 'local-state',
       label: regionKey,
       states,
-      defaultState: 'default',
+      defaultState: local.valueType === 'null' && hasPropertyChains ? 'populated' : 'default',
     })
   }
 
@@ -365,4 +432,31 @@ function buildDerivedVarRegion(derived: DerivedVarFact): Record<string, RegionSt
     default: { label: `${regionKey} default`, mockData: { [name]: null } },
     active: { label: `${regionKey} active`, mockData: { [name]: `${name}-value` } },
   }
+}
+
+// ---------------------------------------------------------------------------
+// Classify fields using resolved type info (shared utility)
+// ---------------------------------------------------------------------------
+
+/**
+ * Classify destructured fields using resolved type information instead of name heuristics.
+ * Methods from the type are classified as functions; everything else as data.
+ */
+export function classifyFieldsFromResolvedType(
+  fields: string[],
+  resolvedType: TypeShapeInfo,
+): { dataFields: string[]; functionFields: string[] } {
+  const methodSet = new Set(resolvedType.methods)
+  const dataFields: string[] = []
+  const functionFields: string[] = []
+
+  for (const field of fields) {
+    if (methodSet.has(field)) {
+      functionFields.push(field)
+    } else {
+      dataFields.push(field)
+    }
+  }
+
+  return { dataFields, functionFields }
 }

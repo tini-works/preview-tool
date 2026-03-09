@@ -1,9 +1,10 @@
-import type { ScreenFacts, HookFact, RegionState, FunctionFact } from './types.js'
+import type { ScreenFacts, HookFact, RegionState, FunctionFact, PropertyChainFact, TypeShapeInfo } from './types.js'
 import type { ScreenAnalysisOutput, RegionOutput, FlowOutput } from '../llm/schemas/screen-analysis.js'
 import { formatLabel } from '../lib/format-label.js'
 import { REACT_BUILTIN_HOOKS, REACT_IMPORT_PATHS } from '../lib/hook-binding.js'
 import { classifyHook } from '../lib/hook-classifier.js'
-import { classifyDestructuredFields, findConditionalsForHook, deriveStatesFromFacts, deriveAllStates, camelToKebab } from './derive-states.js'
+import { classifyDestructuredFields, classifyFieldsFromResolvedType, findConditionalsForHook, deriveStatesFromFacts, deriveAllStates, camelToKebab } from './derive-states.js'
+import { inferMockShapeForVariable } from './infer-shape.js'
 
 // ---------------------------------------------------------------------------
 // Hook Template interface
@@ -272,11 +273,17 @@ export function buildFromTemplates(facts: ScreenFacts): ScreenAnalysisOutput {
 
     // Try AST-derived states when destructuredFields + matching conditionals exist
     const matchingConditionals = findConditionalsForHook(hook, facts.conditionals)
-    const hasDerivedData = hook.destructuredFields && hook.destructuredFields.length > 0 && matchingConditionals.length > 0
+    const hasConditionals = hook.destructuredFields && hook.destructuredFields.length > 0 && matchingConditionals.length > 0
+    const hasFieldsOnly = !hasConditionals && hook.destructuredFields && hook.destructuredFields.length > 0
 
-    const states = hasDerivedData
+    const rawStates = hasConditionals
       ? deriveStatesForHook(hook, matchingConditionals, label)
-      : template.states(label)
+      : hasFieldsOnly
+        ? buildStatesFromFields(hook.destructuredFields!, label, facts.propertyChains, hook.resolvedType)
+        : template.states(label)
+
+    // Post-process: replace null data field values with inferred shapes from property chains or resolved types
+    const states = augmentStatesWithShapes(rawStates, hook.destructuredFields, facts.propertyChains, hook.resolvedType)
 
     const stateNames = Object.keys(states)
     const defaultState = stateNames.includes('default')
@@ -306,6 +313,7 @@ export function buildFromTemplates(facts: ScreenFacts): ScreenAnalysisOutput {
     localState: facts.localState ?? [],
     derivedVars: facts.derivedVars ?? [],
     conditionals: facts.conditionals,
+    propertyChains: facts.propertyChains ?? [],
   })
 
   for (const [key, derived] of unifiedRegions) {
@@ -356,6 +364,108 @@ export function buildFromTemplates(facts: ScreenFacts): ScreenAnalysisOutput {
 }
 
 // ---------------------------------------------------------------------------
+// Helper: augment state mock data — replace null data fields with inferred shapes
+// ---------------------------------------------------------------------------
+
+function augmentStatesWithShapes(
+  states: Record<string, RegionState>,
+  fields?: string[],
+  propertyChains?: PropertyChainFact[],
+  resolvedType?: TypeShapeInfo,
+): Record<string, RegionState> {
+  if (!fields) return states
+  const { dataFields } = classifyDestructuredFields(fields)
+  if (dataFields.length === 0) return states
+
+  // Build shapes for fields — prefer resolved types over property chain heuristics
+  const shapeMap = new Map<string, unknown>()
+
+  // Layer 1: Use resolved type shapes when available with full/partial confidence
+  if (resolvedType && resolvedType.confidence !== 'none') {
+    for (const field of dataFields) {
+      if (field in resolvedType.shape) {
+        const value = resolvedType.shape[field]
+        if (value !== undefined && value !== null) {
+          shapeMap.set(field, value)
+        }
+      }
+    }
+  }
+
+  // Layer 2: Fall back to property chain inference for unresolved fields
+  if (propertyChains && propertyChains.length > 0) {
+    for (const field of dataFields) {
+      if (shapeMap.has(field)) continue // already resolved from type info
+      const shape = inferMockShapeForVariable(field, propertyChains)
+      if (shape !== undefined && JSON.stringify(shape) !== '{}') {
+        shapeMap.set(field, shape)
+      }
+    }
+  }
+
+  // For remaining data fields that are null in states but have no shape,
+  // infer a sensible default based on naming (string, number, etc.)
+  for (const field of dataFields) {
+    if (shapeMap.has(field)) continue
+    // Skip fields that are already boolean-classified or error-like
+    if (/^(is|has|can|should|was|did|will)[A-Z]/.test(field)) continue
+    if (/^(error|err)$/i.test(field)) continue
+    if (/^(data|items|list|results|records)$/i.test(field)) continue
+    // Check if any state has this field as null
+    const anyNull = Object.values(states).some(
+      (s) => field in s.mockData && s.mockData[field] === null,
+    )
+    if (anyNull) {
+      shapeMap.set(field, inferLeafDefault(field))
+    }
+  }
+
+  if (shapeMap.size === 0) return states
+
+  // Clone states and replace null values with shapes
+  const augmented: Record<string, RegionState> = {}
+  for (const [stateName, stateValue] of Object.entries(states)) {
+    const newMockData = { ...stateValue.mockData }
+    for (const [field, shape] of shapeMap) {
+      if (field in newMockData && newMockData[field] === null) {
+        newMockData[field] = shape
+      }
+    }
+    augmented[stateName] = { ...stateValue, mockData: newMockData }
+  }
+
+  // If no state has populated data fields, add a 'populated' state
+  const hasPopulatedState = Object.keys(augmented).some((k) => k === 'populated')
+  if (!hasPopulatedState) {
+    const populatedData: Record<string, unknown> = {}
+    for (const field of dataFields) {
+      populatedData[field] = shapeMap.get(field) ?? null
+    }
+    if ([...shapeMap.values()].some((v) => v !== null)) {
+      augmented.populated = {
+        label: `${Object.values(states)[0]?.label?.replace(/ \w+$/, '') ?? ''} loaded`.trim(),
+        mockData: populatedData,
+      }
+    }
+  }
+
+  return augmented
+}
+
+/** Infer a simple default value for a data field based on naming */
+function inferLeafDefault(field: string): unknown {
+  const lower = field.toLowerCase()
+  if (lower.includes('name')) return 'Sample Name'
+  if (lower.includes('email')) return 'user@example.com'
+  if (lower.includes('id')) return '1'
+  if (lower.includes('url') || lower.includes('image') || lower.includes('avatar')) return 'https://example.com/image.png'
+  if (lower.includes('date') || lower.includes('time') || lower.endsWith('at')) return '2026-01-01T00:00:00Z'
+  if (lower.includes('count') || lower.includes('total') || lower.includes('amount') || lower.includes('price') || lower.includes('step')) return 1
+  if (lower.includes('type') || lower.includes('status') || lower.includes('role') || lower.includes('kind')) return 'default'
+  return 'sample'
+}
+
+// ---------------------------------------------------------------------------
 // Helper: derive states from AST data (destructuredFields + conditionals)
 // ---------------------------------------------------------------------------
 
@@ -371,6 +481,63 @@ function deriveStatesForHook(
     functionFields,
     conditionals: matchingConditionals,
   })
+}
+
+// ---------------------------------------------------------------------------
+// Helper: build states from destructured fields (no conditionals available)
+// ---------------------------------------------------------------------------
+
+function buildStatesFromFields(
+  fields: string[],
+  label: string,
+  propertyChains?: PropertyChainFact[],
+  resolvedType?: TypeShapeInfo,
+): Record<string, RegionState> {
+  // Use resolved type for function classification when available
+  const { dataFields, functionFields: _functionFields } = resolvedType && resolvedType.confidence !== 'none'
+    ? classifyFieldsFromResolvedType(fields, resolvedType)
+    : classifyDestructuredFields(fields)
+
+  const populatedData: Record<string, unknown> = {}
+  const loadingData: Record<string, unknown> = {}
+  const errorData: Record<string, unknown> = {}
+
+  for (const field of dataFields) {
+    if (/^(is|has|can|should|was|did|will)[A-Z]/.test(field)) {
+      // Boolean fields
+      populatedData[field] = false
+      loadingData[field] = field.toLowerCase().includes('loading')
+      errorData[field] = field.toLowerCase().includes('error')
+    } else if (/^(error|err)$/i.test(field)) {
+      populatedData[field] = null
+      loadingData[field] = null
+      errorData[field] = { message: 'Failed to load' }
+    } else if (/^(data|items|list|results|records)$/i.test(field)) {
+      populatedData[field] = [{ id: '1', name: `Sample ${label}` }]
+      loadingData[field] = null
+      errorData[field] = null
+    } else {
+      // Generic data field — prefer resolved type shape, fall back to property chains
+      let inferredShape: unknown = undefined
+      if (resolvedType && resolvedType.confidence !== 'none' && field in resolvedType.shape) {
+        inferredShape = resolvedType.shape[field]
+      }
+      if (inferredShape === undefined || inferredShape === null) {
+        inferredShape = propertyChains && propertyChains.length > 0
+          ? inferMockShapeForVariable(field, propertyChains)
+          : {}
+      }
+      populatedData[field] = inferredShape
+      loadingData[field] = null
+      errorData[field] = null
+    }
+  }
+
+  return {
+    populated: { label: `${label} loaded`, mockData: populatedData },
+    loading: { label: `${label} loading`, mockData: loadingData },
+    error: { label: `${label} error`, mockData: errorData },
+  }
 }
 
 // ---------------------------------------------------------------------------

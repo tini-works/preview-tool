@@ -104,12 +104,17 @@ export async function analyzeAllScreens(
 ): Promise<Map<string, ScreenAnalysisV2>> {
   const results = new Map<string, ScreenAnalysisV2>()
 
-  const analyses = await Promise.all(
+  const analyses = await Promise.allSettled(
     screens.map((screen) => analyzeScreenWithLLM(cwd, screen, llmConfig)),
   )
 
   screens.forEach((screen, i) => {
-    results.set(screen.route, analyses[i])
+    const result = analyses[i]
+    if (result.status === 'fulfilled') {
+      results.set(screen.route, result.value)
+    } else {
+      console.warn(`  Warning: Failed to analyze ${screen.filePath}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`)
+    }
   })
 
   return results

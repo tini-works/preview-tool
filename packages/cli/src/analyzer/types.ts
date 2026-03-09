@@ -76,7 +76,7 @@ export interface ComponentRegion {
   label: string
   component: string
   componentPath: string
-  states: Record<string, Record<string, unknown>>
+  states: Record<string, unknown>
   defaultState: string
   isList?: boolean
   mockItems?: unknown[]
@@ -171,6 +171,18 @@ export interface HookAnalysisResult {
   imports: ImportAnalysis[]
 }
 
+// === Type Resolution (Phase 1) ===
+
+export interface TypeShapeInfo {
+  /** The resolved type shape as a mock-ready object */
+  shape: Record<string, unknown>
+  /** Whether the type was fully resolved (vs partial/any) */
+  confidence: 'full' | 'partial' | 'none'
+  /** Field classifications from the type (methods vs properties) */
+  methods: string[]
+  properties: string[]
+}
+
 // === Stage 2: AST Fact Collection ===
 
 export interface HookFact {
@@ -184,6 +196,10 @@ export interface HookFact {
   returnVariable?: string
   /** Parsed field names from object destructuring, e.g. ['login', 'isLoading'] */
   destructuredFields?: string[]
+  /** True when fields were aggregated from Zustand selector pattern: useStore((s) => s.field) */
+  selectorPattern?: boolean
+  /** Resolved return type shape from TypeChecker (null if unresolvable) */
+  resolvedType?: TypeShapeInfo
 }
 
 export interface ComponentFact {
@@ -219,6 +235,8 @@ export interface LocalStateFact {
   setter?: string
   initialValue: string
   valueType: string
+  /** Resolved generic type for useState<T> */
+  resolvedType?: TypeShapeInfo
 }
 
 export interface DerivedVarFact {
@@ -243,6 +261,15 @@ export interface FunctionFact {
   externalCalls: string[]
 }
 
+export interface PropertyChainFact {
+  /** Root variable name: 'doctor', 'appointments' */
+  rootVariable: string
+  /** Full chain: 'doctor.name', 'doctor.specialties[0].name', 'appointments.length' */
+  chain: string
+  /** Access type: 'property' | 'index' | 'method' | 'optional' */
+  accessType: 'property' | 'index' | 'method' | 'optional'
+}
+
 export interface ScreenFacts {
   route: string
   filePath: string
@@ -255,4 +282,5 @@ export interface ScreenFacts {
   localState: LocalStateFact[]
   derivedVars: DerivedVarFact[]
   functions: FunctionFact[]
+  propertyChains: PropertyChainFact[]
 }
