@@ -1,3 +1,5 @@
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
+
 interface ProviderDef {
   dependency: string
   imports: string
@@ -117,4 +119,24 @@ ${jsx.trimEnd()}
   )
 }
 `
+}
+
+export function syncWrapperProviders(wrapperPath: string, providers: string[]): boolean {
+  const matched = PROVIDER_DEFS.filter((d) => providers.includes(d.dependency))
+
+  if (!existsSync(wrapperPath)) {
+    writeFileSync(wrapperPath, generateWrapperCode(providers), 'utf-8')
+    return true
+  }
+
+  const existing = readFileSync(wrapperPath, 'utf-8')
+
+  // Check if each detected provider's dependency import is present
+  const missing = matched.filter((def) => !existing.includes(def.dependency))
+
+  if (missing.length === 0) return false
+
+  // Regenerate with all detected providers
+  writeFileSync(wrapperPath, generateWrapperCode(providers), 'utf-8')
+  return true
 }

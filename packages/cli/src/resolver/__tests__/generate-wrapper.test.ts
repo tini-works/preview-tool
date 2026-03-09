@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest'
-import { generateWrapperCode } from '../generate-wrapper.js'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+import { generateWrapperCode, syncWrapperProviders } from '../generate-wrapper.js'
 
 describe('generateWrapperCode', () => {
   it('generates empty wrapper when no providers', () => {
@@ -101,5 +104,59 @@ describe('generateWrapperCode', () => {
     const code = generateWrapperCode(['@tanstack/react-query'], '/some-route')
     expect(code).not.toContain('initialEntries')
     expect(code).toContain('QueryClientProvider')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// syncWrapperProviders
+// ---------------------------------------------------------------------------
+
+describe('syncWrapperProviders', () => {
+  let tmpDir: string
+  let wrapperPath: string
+
+  beforeEach(() => {
+    tmpDir = join(tmpdir(), `preview-test-${Date.now()}`)
+    mkdirSync(tmpDir, { recursive: true })
+    wrapperPath = join(tmpDir, 'wrapper.tsx')
+  })
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it('creates wrapper if file is missing', () => {
+    const updated = syncWrapperProviders(wrapperPath, ['react-router-dom'])
+    expect(updated).toBe(true)
+    expect(existsSync(wrapperPath)).toBe(true)
+    const content = readFileSync(wrapperPath, 'utf-8')
+    expect(content).toContain('MemoryRouter')
+  })
+
+  it('skips sync when all providers already present', () => {
+    const initial = generateWrapperCode(['react-router-dom', '@tanstack/react-query'])
+    writeFileSync(wrapperPath, initial, 'utf-8')
+
+    const updated = syncWrapperProviders(wrapperPath, ['react-router-dom', '@tanstack/react-query'])
+    expect(updated).toBe(false)
+  })
+
+  it('updates wrapper when new provider detected', () => {
+    const initial = generateWrapperCode(['react-router-dom'])
+    writeFileSync(wrapperPath, initial, 'utf-8')
+
+    const updated = syncWrapperProviders(wrapperPath, ['react-router-dom', '@tanstack/react-query'])
+    expect(updated).toBe(true)
+    const content = readFileSync(wrapperPath, 'utf-8')
+    expect(content).toContain('MemoryRouter')
+    expect(content).toContain('QueryClientProvider')
+  })
+
+  it('returns false when providers list is empty', () => {
+    const initial = generateWrapperCode([])
+    writeFileSync(wrapperPath, initial, 'utf-8')
+
+    const updated = syncWrapperProviders(wrapperPath, [])
+    expect(updated).toBe(false)
   })
 })
