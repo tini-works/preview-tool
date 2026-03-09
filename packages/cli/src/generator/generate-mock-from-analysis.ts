@@ -220,7 +220,7 @@ function generateMockFile(
           `export function ${hookName}(..._args: any[]) {`,
           `  const data = useRegionDataForHook('${regionKey}')`,
           '  // eslint-disable-next-line @typescript-eslint/no-explicit-any',
-          '  const state = data ? resolveStoreState(data as Record<string, any>) : {}',
+          '  const state = data ? resolveStoreState(data as Record<string, any>) : null',
           '  // Support Zustand selector pattern: useStore((s) => s.field)',
           '  if (typeof _args[0] === \'function\') { try { return _args[0](state) } catch { return state } }',
           '  return state',
@@ -242,8 +242,9 @@ function generateMockFile(
         )
       }
     } else {
-      // No region mapping — custom/store hooks return {}, query hooks return DEFAULT_STATE
-      const defaultReturn = isDirectReturn ? '{}' : 'DEFAULT_STATE'
+      // No region mapping — store/custom hooks return null (falsy, safe for !== null checks),
+      // query hooks return DEFAULT_STATE (has data: null)
+      const defaultReturn = isDirectReturn ? 'null' : 'DEFAULT_STATE'
       lines.push(
         `// Mock replacement for ${hookName} — no region mapping`,
         '// eslint-disable-next-line @typescript-eslint/no-explicit-any',

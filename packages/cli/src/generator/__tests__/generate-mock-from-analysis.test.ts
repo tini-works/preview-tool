@@ -310,6 +310,56 @@ describe('generateMockModules', () => {
     expect(result.mockFiles.has('@tanstack/react-query')).toBe(true)
   })
 
+  it('store hook without field info falls back to null, not empty object', () => {
+    const storeFacts: ScreenFacts[] = [{
+      route: '/profile',
+      filePath: '/profile.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useProfileStore', importPath: '@/stores/profile', arguments: [] },
+      ],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
+    }]
+    const storeAnalyses: ScreenAnalysisOutput[] = [{
+      route: '/profile',
+      regions: [
+        { key: 'profile', label: 'Profile', type: 'custom', hookBindings: ['useProfileStore:profile'], states: { loaded: { label: 'Loaded', mockData: {} } }, defaultState: 'loaded' },
+      ],
+      flows: [],
+    }]
+    const result = generateMockModules(storeFacts, storeAnalyses)
+    const code = result.mockFiles.get('@/stores/profile')!
+    // When no region data, should return null (falsy) not {} (truthy)
+    expect(code).toContain(': null')
+    expect(code).not.toMatch(/: \{\}/)
+  })
+
+  it('store hook with selector arg and no fields falls back to null, not empty object', () => {
+    const storeFacts: ScreenFacts[] = [{
+      route: '/settings',
+      filePath: '/settings.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useSettingsStore', importPath: '@/stores/settings', arguments: ['s => s.theme'] },
+      ],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
+    }]
+    const storeAnalyses: ScreenAnalysisOutput[] = [{
+      route: '/settings',
+      regions: [
+        { key: 'settings', label: 'Settings', type: 'custom', hookBindings: ['useSettingsStore:settings'], states: { loaded: { label: 'Loaded', mockData: { theme: 'dark' } } }, defaultState: 'loaded' },
+      ],
+      flows: [],
+    }]
+    const result = generateMockModules(storeFacts, storeAnalyses)
+    const code = result.mockFiles.get('@/stores/settings')!
+    // When no region data, should return null (falsy) not {} (truthy)
+    expect(code).toContain(': null')
+    expect(code).not.toMatch(/: \{\}/)
+    // Should still support Zustand selector pattern
+    expect(code).toContain("typeof _args[0] === 'function'")
+  })
+
   describe('react-router-dom mock for useSearchParams', () => {
     it('generates useSearchParams mock with actual param name from DerivedVarFact expression', () => {
       const facts: ScreenFacts = {
