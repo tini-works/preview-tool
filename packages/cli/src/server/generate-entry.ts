@@ -192,7 +192,7 @@ const overrideControllerModules = import.meta.glob('./overrides/*/controller.ts'
 
 /**
  * Merge override regions into the base model data.
- * Override regions are shallow-merged by key.
+ * Override regions replace base regions entirely.
  */
 function mergeOverrides(
   base: { regions: Record<string, unknown> },
@@ -200,7 +200,7 @@ function mergeOverrides(
 ): { regions: Record<string, unknown> } {
   if (!override) return base
   return {
-    regions: { ...base.regions, ...(override.regions ?? {}) },
+    regions: override.regions ?? base.regions,
   }
 }
 

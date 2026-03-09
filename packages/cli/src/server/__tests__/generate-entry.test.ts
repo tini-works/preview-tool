@@ -116,4 +116,21 @@ describe('generateMainTsx', () => {
     expect(mainTsx).toContain("import.meta.glob('./overrides/*/controller.ts'")
     expect(mainTsx).toContain('overrideControllerModules')
   })
+
+  it('mergeOverrides uses replacement semantics when override has regions', async () => {
+    const dir = join(TMP, `proj-merge-${Date.now()}`)
+    mkdirSync(join(dir, '.preview'), { recursive: true })
+    writeFileSync(join(dir, '.preview', 'wrapper.tsx'), 'export const Wrapper = ({ children }: any) => children', 'utf-8')
+
+    await generateEntryFiles(dir, {
+      screenGlob: 'src/screens/**/page.tsx',
+      port: 6100,
+      title: 'Test',
+    })
+
+    const mainTsx = readFileSync(join(dir, '.preview', 'main.tsx'), 'utf-8')
+    // Should use replacement: override.regions takes over entirely, not shallow merge
+    expect(mainTsx).toContain('override.regions ?? base.regions')
+    expect(mainTsx).not.toContain('...base.regions, ...(override.regions')
+  })
 })
