@@ -66,11 +66,15 @@ export async function createViteConfig(
       .filter((d) => d.isDirectory())
       .map((d) => d.name)
     for (const screenDir of screenDirs) {
-      const modelPath = join(screensDir, screenDir, 'model.ts')
-      const modelContent = readFileSync(modelPath, 'utf-8')
-      const filePathMatch = modelContent.match(/filePath:\s*["']([^"']+)["']/)
-      if (filePathMatch) {
-        screenFilePaths.push(join(cwd, filePathMatch[1]))
+      try {
+        const modelPath = join(screensDir, screenDir, 'model.ts')
+        const modelContent = readFileSync(modelPath, 'utf-8')
+        const filePathMatch = modelContent.match(/filePath:\s*["']([^"']+)["']/)
+        if (filePathMatch) {
+          screenFilePaths.push(join(cwd, filePathMatch[1]))
+        }
+      } catch {
+        // Individual model file unreadable — skip this screen
       }
     }
   } catch {
