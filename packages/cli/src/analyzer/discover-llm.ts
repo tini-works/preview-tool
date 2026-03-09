@@ -37,17 +37,21 @@ export async function validateDiscoveredScreens(
     const basename = screen.filePath.split('/').pop() ?? ''
     if (/\.(test|spec|stories|story)\./.test(basename)) continue
 
-    const source = readFileSync(absPath, 'utf-8')
-    const hasJSX = source.includes('return') && (source.includes('<') || source.includes('jsx'))
-    const hasExport = source.includes('export')
+    try {
+      const source = readFileSync(absPath, 'utf-8')
+      const hasJSX = source.includes('return') && (source.includes('<') || source.includes('jsx'))
+      const hasExport = source.includes('export')
 
-    if (hasJSX && hasExport) {
-      validated.push({
-        filePath: screen.filePath,
-        route: screen.route,
-        pattern: 'monolithic',
-        exportName: undefined,
-      })
+      if (hasJSX && hasExport) {
+        validated.push({
+          filePath: screen.filePath,
+          route: screen.route,
+          pattern: 'monolithic',
+          exportName: undefined,
+        })
+      }
+    } catch {
+      // File unreadable (permissions, race) — skip silently
     }
   }
 
