@@ -53,7 +53,8 @@ export function extractHookFacts(sourceFile: SourceFile): HookFact[] {
     // Only process hook calls (useXxx pattern)
     if (!localName.startsWith('use') || !importMap.has(localName)) continue
 
-    const importPath = importMap.get(localName)!
+    const importPath = importMap.get(localName)
+    if (!importPath) continue
     // Use the original export name (not the local alias) so generated mocks
     // export the correct name that other consumers of the module expect.
     const name = exportNameMap.get(localName) ?? localName
@@ -465,9 +466,12 @@ export function extractComponentFacts(sourceFile: SourceFile): ComponentFact[] {
       }
     }
 
+    const importPath = importMap.get(tagName)
+    if (!importPath) continue
+
     components.push({
       name: tagName,
-      importPath: importMap.get(tagName)!,
+      importPath,
       props,
       children,
     })
@@ -485,9 +489,12 @@ export function extractComponentFacts(sourceFile: SourceFile): ComponentFact[] {
       .filter((attr) => attr.isKind(SyntaxKind.JsxAttribute))
       .map((attr) => attr.getNameNode().getText())
 
+    const importPath = importMap.get(tagName)
+    if (!importPath) continue
+
     components.push({
       name: tagName,
-      importPath: importMap.get(tagName)!,
+      importPath,
       props,
       children: [],
     })
