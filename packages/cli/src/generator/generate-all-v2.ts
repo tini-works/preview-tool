@@ -276,8 +276,8 @@ function deriveScreenName(route: string): string {
 }
 
 /** Generates a V1-compatible adapter.tsx that main.tsx can load. */
-function buildV1Adapter(screen: DiscoveredScreen, screenOutDir: string): string {
-  const relToScreen = toRelativeImport(screenOutDir, join('..', '..', screen.filePath))
+function buildV1Adapter(screen: DiscoveredScreen, screenOutDir: string, cwd: string): string {
+  const relToScreen = toRelativeImport(screenOutDir, join(cwd, screen.filePath))
   const screenImport = screen.exportName
     ? `import { ${screen.exportName} as Screen } from '${relToScreen}'`
     : `import Screen from '${relToScreen}'`
@@ -400,7 +400,7 @@ export async function generateAllV2(
     await writeFile(join(screenOutDir, 'model.ts'), buildModelFile(screen, cwd, model.regions), 'utf-8')
     await writeFile(join(screenOutDir, 'controller.ts'), buildControllerFile(analysis.flows), 'utf-8')
     await writeFile(join(screenOutDir, 'view.ts'), buildViewFile(screen), 'utf-8')
-    await writeFile(join(screenOutDir, 'adapter.tsx'), buildV1Adapter(screen, screenOutDir), 'utf-8')
+    await writeFile(join(screenOutDir, 'adapter.tsx'), buildV1Adapter(screen, screenOutDir, cwd), 'utf-8')
   }
 
   return { screens: analyzedScreens, analyses }
