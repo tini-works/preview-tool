@@ -1,6 +1,6 @@
 {
   "name": "@preview-tool/runtime",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "React preview shell components for @preview-tool/cli",
   "type": "module",
   "license": "MIT",
