@@ -9,8 +9,17 @@
     "url": "https://github.com/tini-works/preview-tool.git",
     "directory": "packages/cli"
   },
-  "keywords": ["react", "preview", "cli", "mock", "prototype", "device-frame"],
-  "files": ["dist"],
+  "keywords": [
+    "react",
+    "preview",
+    "cli",
+    "mock",
+    "prototype",
+    "device-frame"
+  ],
+  "files": [
+    "dist"
+  ],
   "bin": {
     "preview": "./dist/index.js"
   },
@@ -37,6 +46,7 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/prompts": "^2.4.9",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.18"
   }
 }
