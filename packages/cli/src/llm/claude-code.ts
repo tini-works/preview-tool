@@ -24,7 +24,7 @@ function spawnClaude(prompt: string, timeout: number, env: NodeJS.ProcessEnv): P
   return new Promise((resolve, reject) => {
     const child = spawn(
       'claude',
-      ['-p', '--output-format', 'json', '--max-turns', '30'],
+      ['-p', '--output-format', 'json', '--max-turns', '2'],
       { timeout, env, stdio: ['pipe', 'pipe', 'pipe'] },
     )
 

@@ -19,11 +19,21 @@ const RegionSchema = z.object({
   states: z.record(z.string(), RegionStateSchema),
 })
 
+/** Coerce non-string values (objects/arrays the LLM may return) into a string. */
+const coerceString = z.unknown().transform((val) =>
+  typeof val === 'string' ? val : JSON.stringify(val),
+)
+
+/** Like coerceString but allows null/undefined → undefined (for optional fields). */
+const coerceStringOptional = z.unknown().transform((val) =>
+  val == null ? undefined : typeof val === 'string' ? val : JSON.stringify(val),
+)
+
 const FlowSchema = z.object({
-  trigger: z.string().min(1),
+  trigger: coerceString,
   action: z.enum(['navigate', 'setState', 'setRegionState']),
-  from: z.string().optional(),
-  to: z.string().min(1),
+  from: coerceStringOptional,
+  to: coerceString,
 })
 
 const HookRoleEnum = z.enum([

@@ -7,6 +7,11 @@ import { buildAnalyzeScreenPrompt } from '../llm/prompts/analyze-screen.js'
 import { ScreenAnalysisV2Schema } from '../llm/schemas/screen-analysis-v2.js'
 import { callClaudeCode } from '../llm/claude-code.js'
 
+/** Returns true if the file source exports at least one React hook (use* naming convention). */
+function containsHookExport(source: string): boolean {
+  return /export\s+(function|const)\s+use[A-Z]/.test(source)
+}
+
 export async function extractHookSources(
   cwd: string,
   screenFilePath: string,
@@ -22,7 +27,11 @@ export async function extractHookSources(
       const resolved = resolveImportPath(cwd, importPath, screenFilePath)
       if (resolved && existsSync(resolved)) {
         try {
-          sources[importPath] = readFileSync(resolved, 'utf-8')
+          const fileSource = readFileSync(resolved, 'utf-8')
+          // Only include files that export React hooks — skip UI components, utilities, constants
+          if (containsHookExport(fileSource)) {
+            sources[importPath] = fileSource
+          }
         } catch {
           // File unreadable — skip
         }
@@ -112,22 +121,38 @@ export async function analyzeScreenWithLLM(
   return validateAnalysis(parsed.data, screenSource)
 }
 
+const ANALYSIS_CONCURRENCY = 3
+const MAX_RETRIES = 1
+
 export async function analyzeAllScreens(
   cwd: string,
   screens: DiscoveredScreen[],
 ): Promise<Map<string, ScreenAnalysisV2>> {
   const results = new Map<string, ScreenAnalysisV2>()
+  const queue = screens.map((s) => ({ screen: s, attempt: 0 }))
 
-  // Process screens sequentially to avoid spawning too many claude processes
-  for (const screen of screens) {
-    try {
-      console.log(chalk.dim(`  Analyzing ${screen.filePath}...`))
-      const analysis = await analyzeScreenWithLLM(cwd, screen)
-      results.set(screen.route, analysis)
-    } catch (error) {
-      console.warn(`  Warning: Failed to analyze ${screen.filePath}: ${error instanceof Error ? error.message : String(error)}`)
+  const worker = async () => {
+    while (queue.length > 0) {
+      const item = queue.shift()!
+      const { screen, attempt } = item
+      try {
+        console.log(chalk.dim(`  Analyzing ${screen.filePath}...${attempt > 0 ? ` (retry ${attempt})` : ''}`))
+        const analysis = await analyzeScreenWithLLM(cwd, screen)
+        results.set(screen.route, analysis)
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error)
+        if (attempt < MAX_RETRIES) {
+          console.warn(chalk.yellow(`  Retrying ${screen.filePath} (attempt ${attempt + 1}): ${msg}`))
+          queue.push({ screen, attempt: attempt + 1 })
+        } else {
+          console.warn(`  Warning: Failed to analyze ${screen.filePath}: ${msg}`)
+        }
+      }
     }
   }
+
+  const workerCount = Math.min(ANALYSIS_CONCURRENCY, screens.length)
+  await Promise.allSettled(Array.from({ length: workerCount }, () => worker()))
 
   return results
 }

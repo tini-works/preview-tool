@@ -14,7 +14,7 @@ describe('extractHookSources', () => {
     )
 
     const screenSource = `import { useAuth } from '@/hooks/useAuth'\nexport default function Page() { const { user } = useAuth() }`
-    const sources = await extractHookSources(dir, screenSource)
+    const sources = await extractHookSources(dir, 'src/pages/TestPage.tsx', screenSource)
     expect(sources['@/hooks/useAuth']).toContain('useAuth')
   })
 })
