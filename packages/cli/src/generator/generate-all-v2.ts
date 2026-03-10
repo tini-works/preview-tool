@@ -77,6 +77,10 @@ function safeKey(key: string): string {
  * - Returns the active state from region data
  */
 export function buildMockModuleCode(mock: MockModuleV2): string {
+  if (!VALID_IDENTIFIER.test(mock.hookName)) {
+    throw new Error(`Invalid hookName from LLM: "${mock.hookName}" — must be a valid JS identifier`)
+  }
+
   const replaced = replaceFnPlaceholders(mock.stateMap) as Record<string, Record<string, unknown>>
 
   const lines: string[] = [
@@ -175,14 +179,17 @@ export function buildAdapterFromV2(componentName: string, importPath: string): s
 // ---------------------------------------------------------------------------
 
 function toSafeFileName(importPath: string): string {
-  return importPath
+  const safe = importPath
     .replace(/^@\//, '')
     .replace(/^@/, '')
     .replace(/\//g, '-')
     .replace(/[^a-zA-Z0-9-_]/g, '-')
     .replace(/^-+/, '')
     .replace(/-+/g, '-')
+  return safe || 'root'
 }
+
+const VALID_IDENTIFIER = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/
 
 // ---------------------------------------------------------------------------
 // generateAllV2 — full pipeline (side-effectful, not unit-tested)
@@ -216,9 +223,16 @@ export async function generateAllV2(
   // Step 2: Analyze each screen via LLM
   const analysisMap = await analyzeAllScreens(cwd, screens)
 
-  // Filter to only screens that were successfully analyzed
-  const analyzedScreens = screens.filter((s) => analysisMap.has(s.route))
-  const analyses = analyzedScreens.map((s) => analysisMap.get(s.route)!)
+  // Pair each screen with its analysis, skipping screens that failed analysis
+  const analyzedScreens: DiscoveredScreen[] = []
+  const analyses: ScreenAnalysisV2[] = []
+  for (const s of screens) {
+    const analysis = analysisMap.get(s.route)
+    if (analysis) {
+      analyzedScreens.push(s)
+      analyses.push(analysis)
+    }
+  }
 
   // Step 3: Generate mock modules
   const aliasManifest: Record<string, string> = {}

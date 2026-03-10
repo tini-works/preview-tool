@@ -1,4 +1,5 @@
 import { spawn, execFile } from 'node:child_process'
+import { Readable } from 'node:stream'
 import { promisify } from 'node:util'
 import chalk from 'chalk'
 import { SYSTEM_PROMPT } from './prompts/system.js'
@@ -17,6 +18,7 @@ export interface CallOptions {
 /**
  * Spawns `claude -p` and pipes the prompt via stdin to avoid
  * command-line argument length limits on large codebases.
+ * Uses stream piping to handle backpressure on large prompts (>64KB).
  */
 function spawnClaude(prompt: string, timeout: number, env: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
@@ -28,21 +30,33 @@ function spawnClaude(prompt: string, timeout: number, env: NodeJS.ProcessEnv): P
 
     let stdout = ''
     let stderr = ''
+    let settled = false
 
     child.stdout.on('data', (data: Buffer) => { stdout += data.toString() })
     child.stderr.on('data', (data: Buffer) => { stderr += data.toString() })
 
-    child.on('error', (err: Error) => reject(err))
-    child.on('close', (code: number | null) => {
-      if (code !== 0) {
+    child.on('error', (err: Error) => {
+      if (!settled) {
+        settled = true
+        reject(err)
+      }
+    })
+
+    child.on('close', (code: number | null, signal: string | null) => {
+      if (settled) return
+      settled = true
+
+      if (signal === 'SIGTERM') {
+        reject(new Error(`claude CLI timed out after ${timeout / 1000}s`))
+      } else if (code !== 0) {
         reject(new Error(`claude CLI exited with code ${code}${stderr ? `: ${stderr.slice(0, 500)}` : ''}`))
       } else {
         resolve({ stdout, stderr })
       }
     })
 
-    child.stdin.write(prompt)
-    child.stdin.end()
+    // Pipe prompt via stdin using stream to handle backpressure on large prompts
+    Readable.from([prompt]).pipe(child.stdin)
   })
 }
 
@@ -95,9 +109,15 @@ export async function callClaudeCode(
 }
 
 function extractJson(text: string): string {
+  // Try code block first (defense-in-depth: prompt says no fences, but LLM may add them)
   const codeBlockMatch = text.match(/```(?:json)?\s*\n?([\s\S]*?)\n?```/)
   if (codeBlockMatch) {
     return codeBlockMatch[1].trim()
+  }
+  // Try to find a JSON object in the text
+  const jsonMatch = text.match(/(\{[\s\S]*\})/)
+  if (jsonMatch) {
+    return jsonMatch[1].trim()
   }
   return text.trim()
 }

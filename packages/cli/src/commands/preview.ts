@@ -24,6 +24,7 @@ export const previewCommand = new Command('preview')
     keep?: boolean
     port?: string
   }) => {
+    try {
     console.log(chalk.bold('\nPreview Tool\n'))
 
     // Step 1: Resolve source
@@ -90,16 +91,17 @@ export const previewCommand = new Command('preview')
     console.log(chalk.green(`  ${result.screens.length} screens found, ${result.analyses.length} analyses generated`))
 
     // Step 6: Start dev server
+    const serverConfig = { ...config }
     if (options.port) {
       const port = parseInt(options.port, 10)
       if (isNaN(port) || port < 1 || port > 65535) {
         console.error(chalk.red(`Invalid port: ${options.port}`))
         process.exit(1)
       }
-      config.port = port
+      serverConfig.port = port
     }
-    await generateEntryFiles(resolved.cwd, config)
-    const viteConfig = await createViteConfig(resolved.cwd, config)
+    await generateEntryFiles(resolved.cwd, serverConfig)
+    const viteConfig = await createViteConfig(resolved.cwd, serverConfig)
 
     try {
       const require = createRequire(join(resolved.cwd, 'package.json'))
@@ -113,7 +115,7 @@ export const previewCommand = new Command('preview')
       const server = await vite.createServer(viteConfig)
       await server.listen()
 
-      const actualPort = server.config.server.port ?? config.port
+      const actualPort = server.config.server.port ?? serverConfig.port
       console.log('')
       console.log(chalk.green('  Preview ready at:'))
       console.log(chalk.cyan(`  http://localhost:${actualPort}`))
@@ -124,6 +126,11 @@ export const previewCommand = new Command('preview')
       console.error(chalk.red(`Failed to start dev server: ${message}`))
       console.error(chalk.dim('\nMake sure Vite is installed in the target project:'))
       console.error(chalk.dim('  npm install -D vite @vitejs/plugin-react'))
+      process.exit(1)
+    }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.error(chalk.red(`\nFailed: ${message}`))
       process.exit(1)
     }
   })

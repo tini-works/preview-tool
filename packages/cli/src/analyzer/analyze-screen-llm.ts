@@ -1,5 +1,5 @@
 import { readFileSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, dirname } from 'node:path'
 import chalk from 'chalk'
 import type { ScreenAnalysisV2 } from '../llm/schemas/screen-analysis-v2.js'
 import type { DiscoveredScreen } from './types.js'
@@ -9,6 +9,7 @@ import { callClaudeCode } from '../llm/claude-code.js'
 
 export async function extractHookSources(
   cwd: string,
+  screenFilePath: string,
   screenSource: string,
 ): Promise<Record<string, string>> {
   const importRegex = /import\s+.*?\s+from\s+['"]([^'"]+)['"]/g
@@ -18,9 +19,13 @@ export async function extractHookSources(
   while ((match = importRegex.exec(screenSource)) !== null) {
     const importPath = match[1]
     if (importPath.startsWith('.') || importPath.startsWith('@/') || importPath.startsWith('~/')) {
-      const resolved = resolveImportPath(cwd, importPath)
+      const resolved = resolveImportPath(cwd, importPath, screenFilePath)
       if (resolved && existsSync(resolved)) {
-        sources[importPath] = readFileSync(resolved, 'utf-8')
+        try {
+          sources[importPath] = readFileSync(resolved, 'utf-8')
+        } catch {
+          // File unreadable — skip
+        }
       }
     }
   }
@@ -28,10 +33,14 @@ export async function extractHookSources(
   return sources
 }
 
-function resolveImportPath(cwd: string, importPath: string): string | null {
+function resolveImportPath(cwd: string, importPath: string, fromFile?: string): string | null {
   let basePath: string
   if (importPath.startsWith('@/') || importPath.startsWith('~/')) {
     basePath = join(cwd, 'src', importPath.slice(2))
+  } else if (importPath.startsWith('.') && fromFile) {
+    // Resolve relative to the screen file's directory
+    const screenDir = dirname(join(cwd, fromFile))
+    basePath = join(screenDir, importPath)
   } else {
     basePath = join(cwd, importPath)
   }
@@ -75,8 +84,15 @@ export async function analyzeScreenWithLLM(
   screen: DiscoveredScreen,
 ): Promise<ScreenAnalysisV2> {
   const absPath = join(cwd, screen.filePath)
-  const screenSource = readFileSync(absPath, 'utf-8')
-  const hookSources = await extractHookSources(cwd, screenSource)
+
+  let screenSource: string
+  try {
+    screenSource = readFileSync(absPath, 'utf-8')
+  } catch {
+    throw new Error(`Cannot read screen file: ${screen.filePath}`)
+  }
+
+  const hookSources = await extractHookSources(cwd, screen.filePath, screenSource)
   const typeInfo: Record<string, unknown> = {}
 
   const prompt = buildAnalyzeScreenPrompt(screenSource, hookSources, typeInfo)
