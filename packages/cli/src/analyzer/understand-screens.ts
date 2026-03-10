@@ -1,5 +1,5 @@
 import chalk from 'chalk'
-import { callLLMBatch, callLLM } from '../llm/index.js'
+import { callClaudeCode } from '../llm/claude-code.js'
 import { buildUnderstandScreensPrompt } from '../llm/prompts/understand-screens.js'
 import { ScreenAnalysisSchema, type ScreenAnalysisOutput } from '../llm/schemas/screen-analysis.js'
 import { buildFromTemplates } from './template-fallback.js'
@@ -20,18 +20,11 @@ export async function understandScreens(
 
 
   const prompt = buildUnderstandScreensPrompt(screenFacts)
-  const llmOptions = { temperature: 0.2, maxTokens: 32768, jsonMode: true }
+  const llmOptions = { temperature: 0.2, maxTokens: 32768 }
 
   try {
-    // Try batch call first (claude-code only)
-    let raw = await callLLMBatch(prompt, llmOptions)
+    const raw = await callClaudeCode(prompt, llmOptions)
 
-    // Fall back to single call
-    if (raw == null) {
-      raw = await callLLM(prompt, llmOptions)
-    }
-
-    // All providers failed
     if (raw == null) {
       console.log(chalk.dim('  LLM unavailable, using template fallback'))
       return screenFacts.map(buildFromTemplates)

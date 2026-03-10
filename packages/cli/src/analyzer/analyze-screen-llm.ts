@@ -4,7 +4,7 @@ import type { ScreenAnalysisV2 } from '../llm/schemas/screen-analysis-v2.js'
 import type { DiscoveredScreen } from './types.js'
 import { buildAnalyzeScreenPrompt } from '../llm/prompts/analyze-screen.js'
 import { ScreenAnalysisV2Schema } from '../llm/schemas/screen-analysis-v2.js'
-import { callLLM } from '../llm/index.js'
+import { callClaudeCode } from '../llm/claude-code.js'
 
 export async function extractHookSources(
   cwd: string,
@@ -79,7 +79,7 @@ export async function analyzeScreenWithLLM(
   const typeInfo: Record<string, unknown> = {}
 
   const prompt = buildAnalyzeScreenPrompt(screenSource, hookSources, typeInfo)
-  const raw = await callLLM(prompt)
+  const raw = await callClaudeCode(prompt)
 
   if (!raw) {
     throw new Error(`LLM analysis returned no response for ${screen.filePath}`)

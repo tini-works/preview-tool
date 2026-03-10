@@ -5,7 +5,7 @@ import type { LLMDiscoveredScreen } from '../llm/schemas/discovery.js'
 import type { DiscoveredScreen } from './types.js'
 import { buildDiscoveryPrompt } from '../llm/prompts/discover-screens.js'
 import { DiscoveryOutputSchema } from '../llm/schemas/discovery.js'
-import { callLLM } from '../llm/index.js'
+import { callClaudeCode } from '../llm/claude-code.js'
 
 const EXCLUDED_DIRS = ['node_modules', 'dist', '.preview', '.next', '.git', 'build', 'coverage']
 
@@ -64,7 +64,7 @@ export async function discoverScreensWithLLM(
   const fileTree = await scanFileTree(cwd)
   const prompt = buildDiscoveryPrompt(fileTree)
 
-  const raw = await callLLM(prompt)
+  const raw = await callClaudeCode(prompt)
   if (!raw) {
     throw new Error('LLM discovery returned no response. An LLM provider is required.')
   }

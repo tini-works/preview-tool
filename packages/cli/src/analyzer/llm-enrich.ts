@@ -1,5 +1,5 @@
 import type { HookFact, LocalStateFact, TypeShapeInfo } from './types.js'
-import { callLLM } from '../llm/index.js'
+import { callClaudeCode } from '../llm/claude-code.js'
 
 // ---------------------------------------------------------------------------
 // LLM enrichment for unresolved types (Phase 3)
@@ -49,7 +49,7 @@ export async function enrichUnresolvedTypes(
   const prompt = buildEnrichmentPrompt(items, sourceCode)
 
   try {
-    const result = await callLLM(prompt, {
+    const result = await callClaudeCode(prompt, {
       systemPrompt: 'You are a TypeScript type inference assistant. Respond only with valid JSON.',
     })
 
