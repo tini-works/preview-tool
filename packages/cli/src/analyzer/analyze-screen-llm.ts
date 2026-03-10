@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
+import chalk from 'chalk'
 import type { ScreenAnalysisV2 } from '../llm/schemas/screen-analysis-v2.js'
 import type { DiscoveredScreen } from './types.js'
 import { buildAnalyzeScreenPrompt } from '../llm/prompts/analyze-screen.js'
@@ -101,18 +102,16 @@ export async function analyzeAllScreens(
 ): Promise<Map<string, ScreenAnalysisV2>> {
   const results = new Map<string, ScreenAnalysisV2>()
 
-  const analyses = await Promise.allSettled(
-    screens.map((screen) => analyzeScreenWithLLM(cwd, screen)),
-  )
-
-  screens.forEach((screen, i) => {
-    const result = analyses[i]
-    if (result.status === 'fulfilled') {
-      results.set(screen.route, result.value)
-    } else {
-      console.warn(`  Warning: Failed to analyze ${screen.filePath}: ${result.reason instanceof Error ? result.reason.message : String(result.reason)}`)
+  // Process screens sequentially to avoid spawning too many claude processes
+  for (const screen of screens) {
+    try {
+      console.log(chalk.dim(`  Analyzing ${screen.filePath}...`))
+      const analysis = await analyzeScreenWithLLM(cwd, screen)
+      results.set(screen.route, analysis)
+    } catch (error) {
+      console.warn(`  Warning: Failed to analyze ${screen.filePath}: ${error instanceof Error ? error.message : String(error)}`)
     }
-  })
+  }
 
   return results
 }
