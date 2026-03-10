@@ -1,4 +1,4 @@
-import { execFile } from 'node:child_process'
+import { spawn, execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import chalk from 'chalk'
 import { SYSTEM_PROMPT } from './prompts/system.js'
@@ -12,6 +12,38 @@ export interface CallOptions {
   maxTokens?: number
   systemPrompt?: string
   timeoutMs?: number
+}
+
+/**
+ * Spawns `claude -p` and pipes the prompt via stdin to avoid
+ * command-line argument length limits on large codebases.
+ */
+function spawnClaude(prompt: string, timeout: number, env: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      'claude',
+      ['-p', '--output-format', 'json', '--max-turns', '30'],
+      { timeout, env, stdio: ['pipe', 'pipe', 'pipe'] },
+    )
+
+    let stdout = ''
+    let stderr = ''
+
+    child.stdout.on('data', (data: Buffer) => { stdout += data.toString() })
+    child.stderr.on('data', (data: Buffer) => { stderr += data.toString() })
+
+    child.on('error', (err: Error) => reject(err))
+    child.on('close', (code: number | null) => {
+      if (code !== 0) {
+        reject(new Error(`claude CLI exited with code ${code}${stderr ? `: ${stderr.slice(0, 500)}` : ''}`))
+      } else {
+        resolve({ stdout, stderr })
+      }
+    })
+
+    child.stdin.write(prompt)
+    child.stdin.end()
+  })
 }
 
 export async function callClaudeCode(
@@ -35,15 +67,24 @@ export async function callClaudeCode(
     const env = { ...process.env }
     delete env.CLAUDECODE
 
-    const { stdout } = await execFileAsync(
-      'claude',
-      ['-p', fullPrompt, '--output-format', 'json', '--max-turns', '30'],
-      { timeout, maxBuffer: 10 * 1024 * 1024, env },
-    )
+    const { stdout, stderr } = await spawnClaude(fullPrompt, timeout, env)
+
+    if (stderr) {
+      process.stderr.write(stderr)
+    }
 
     // claude --output-format json returns { result: "...", ... }
-    const envelope = JSON.parse(stdout) as { result: string }
+    let envelope: { result?: string }
+    try {
+      envelope = JSON.parse(stdout) as { result?: string }
+    } catch {
+      throw new Error(`claude CLI returned non-JSON output (${stdout.length} bytes): ${stdout.slice(0, 200)}`)
+    }
+
     const text = envelope.result
+    if (typeof text !== 'string') {
+      throw new Error(`claude CLI envelope missing "result" field: ${JSON.stringify(Object.keys(envelope))}`)
+    }
 
     return JSON.parse(extractJson(text)) as unknown
   } catch (error) {

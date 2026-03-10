@@ -1,6 +1,7 @@
 import { glob } from 'glob'
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import chalk from 'chalk'
 import type { LLMDiscoveredScreen } from '../llm/schemas/discovery.js'
 import type { DiscoveredScreen } from './types.js'
 import { buildDiscoveryPrompt } from '../llm/prompts/discover-screens.js'
@@ -58,6 +59,56 @@ export async function validateDiscoveredScreens(
   return validated
 }
 
+/**
+ * Fallback screen discovery using file patterns when LLM is unavailable.
+ * Scans common page/route directories and validates each file.
+ */
+async function discoverScreensByFilePattern(cwd: string): Promise<DiscoveredScreen[]> {
+  const patterns = [
+    'src/routes/**/*.tsx',
+    'src/pages/**/*.tsx',
+    'src/screens/**/index.tsx',
+    'src/app/**/page.tsx',
+    'pages/**/*.tsx',
+    'app/**/page.tsx',
+  ]
+
+  const ignore = [
+    ...EXCLUDED_DIRS.map((d) => `**/${d}/**`),
+    '**/*.test.*',
+    '**/*.spec.*',
+    '**/*.stories.*',
+    '**/*.story.*',
+    '**/__tests__/**',
+    '**/__mocks__/**',
+    '**/*.d.ts',
+    '**/layout.tsx',
+    '**/loading.tsx',
+    '**/error.tsx',
+    '**/not-found.tsx',
+  ]
+
+  for (const pattern of patterns) {
+    const files = await glob(pattern, { cwd, ignore })
+    if (files.length > 0) {
+      const screens: LLMDiscoveredScreen[] = files.map((f) => ({
+        filePath: f,
+        screenName: f.split('/').pop()?.replace(/\.tsx$/, '') ?? 'Screen',
+        route: '/' + f
+          .replace(/^src\/(routes|pages|screens|app)\//, '')
+          .replace(/\/index\.tsx$/, '')
+          .replace(/\/page\.tsx$/, '')
+          .replace(/\.tsx$/, '')
+          .replace(/\.\$/, '/:')  // TanStack Router dynamic params
+          .replace(/\[([^\]]+)\]/g, ':$1'),  // Next.js dynamic params
+      }))
+      return validateDiscoveredScreens(cwd, screens)
+    }
+  }
+
+  return []
+}
+
 export async function discoverScreensWithLLM(
   cwd: string,
 ): Promise<DiscoveredScreen[]> {
@@ -66,12 +117,14 @@ export async function discoverScreensWithLLM(
 
   const raw = await callClaudeCode(prompt)
   if (!raw) {
-    throw new Error('LLM discovery returned no response. An LLM provider is required.')
+    console.log(chalk.yellow('  LLM unavailable — using file-based screen discovery'))
+    return discoverScreensByFilePattern(cwd)
   }
 
   const parsed = DiscoveryOutputSchema.safeParse(raw)
   if (!parsed.success) {
-    throw new Error(`LLM discovery returned invalid format: ${parsed.error.message}`)
+    console.log(chalk.yellow(`  LLM returned invalid format — using file-based fallback`))
+    return discoverScreensByFilePattern(cwd)
   }
 
   return validateDiscoveredScreens(cwd, parsed.data.screens)
