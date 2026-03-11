@@ -164,7 +164,8 @@ export function inferLeafValue(name: string): unknown {
   }
 
   // Date / time
-  if (lower.includes('date') || lower.includes('time') || lower.endsWith('at') || lower.endsWith('At')) {
+  if (lower.includes('date') || lower.includes('time') || lower.endsWith('at') || lower.endsWith('At') ||
+      lower === 'start' || lower === 'end' || lower === 'from' || lower === 'to') {
     return '2026-01-01T00:00:00Z'
   }
 
