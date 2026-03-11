@@ -1,4 +1,4 @@
-import { resolve } from 'node:path'
+import { resolve, join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { Project, SyntaxKind, type SourceFile } from 'ts-morph'
 import { extractHookFacts } from '../analyzer/collect-facts.js'
@@ -8,6 +8,7 @@ import { classifyHook } from '../lib/hook-classifier.js'
 import { REACT_IMPORT_PATHS, REACT_BUILTIN_HOOKS } from '../lib/hook-binding.js'
 import { PROVIDER_PACKAGES } from '../lib/hook-classifier.js'
 import { distributeByState } from './state-distributor.js'
+import { TypeCache, hashContent } from './type-cache.js'
 import type { HookFact, TypeShapeInfo } from '../analyzer/types.js'
 import type { SpecManifestScreen, SpecDataDep } from './types.js'
 import type { RegionsMap, RegionDef } from './spec-to-model.js'
@@ -422,6 +423,9 @@ export async function runSpecPipeline(
   // Track all AST hooks for context detection
   const allAstHooks: HookFact[] = []
 
+  // Type extraction cache for fast startup
+  const typeCache = new TypeCache(join(cwd, '.preview', '.cache'))
+
   // Process each screen
   for (const screen of screens) {
     const absPath = resolveSourceFilePath(screen, cwd, specsDir)
@@ -431,21 +435,38 @@ export async function runSpecPipeline(
     const astHooks = sf ? discoverHooksFromSource(sf) : []
     allAstHooks.push(...astHooks)
 
-    // Resolve hook return types via TypeChecker
-    const resolvedTypes = new Map<string, TypeShapeInfo>()
+    // Resolve hook return types via TypeChecker (with caching)
+    let resolvedTypes = new Map<string, TypeShapeInfo>()
     if (sf && project) {
-      const typeChecker = project.getTypeChecker()
-      const callExprs = sf.getDescendantsOfKind(SyntaxKind.CallExpression)
-      for (const call of callExprs) {
-        const callText = call.getExpression().getText()
-        if (!callText.startsWith('use')) continue
-        try {
-          const resolved = extractHookReturnType(call, typeChecker)
-          if (resolved && resolved.confidence !== 'none') {
-            resolvedTypes.set(callText, resolved)
+      const sourceContent = sf.getFullText()
+      const sourceHash = hashContent(sourceContent)
+      const cached = await typeCache.get(screen.id, sourceHash)
+
+      if (cached) {
+        resolvedTypes = new Map(Object.entries(cached))
+      } else {
+        const typeChecker = project.getTypeChecker()
+        const callExprs = sf.getDescendantsOfKind(SyntaxKind.CallExpression)
+        for (const call of callExprs) {
+          const callText = call.getExpression().getText()
+          if (!callText.startsWith('use')) continue
+          try {
+            const resolved = extractHookReturnType(call, typeChecker)
+            if (resolved && resolved.confidence !== 'none') {
+              resolvedTypes.set(callText, resolved)
+            }
+          } catch {
+            // Type extraction failed for this hook — skip
           }
-        } catch {
-          // Type extraction failed for this hook — skip
+        }
+
+        // Cache the results
+        if (resolvedTypes.size > 0) {
+          const hookMap: Record<string, TypeShapeInfo> = {}
+          for (const [name, type] of resolvedTypes) {
+            hookMap[name] = type
+          }
+          await typeCache.set(screen.id, sourceHash, hookMap)
         }
       }
     }
