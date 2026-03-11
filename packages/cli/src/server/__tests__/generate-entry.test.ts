@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { detectCssEntry, generateEntryFiles, generateSpecMainTsx } from '../generate-entry.js'
+import { detectCssEntry, detectExportType, generateEntryFiles, generateSpecMainTsx } from '../generate-entry.js'
+import type { SpecScreenImport } from '../generate-entry.js'
 import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -136,10 +137,10 @@ describe('generateMainTsx', () => {
 })
 
 describe('generateSpecMainTsx', () => {
-  const MOCK_SCREENS = [
-    { id: 'scr-home', sourceFile: 'src/routes/index.tsx' },
-    { id: 'scr-detail', sourceFile: 'src/routes/detail.tsx' },
-    { id: 'scr-empty', sourceFile: null },
+  const MOCK_SCREENS: SpecScreenImport[] = [
+    { id: 'scr-home', sourceFile: 'src/routes/index.tsx', exportType: 'default' },
+    { id: 'scr-detail', sourceFile: 'src/routes/detail.tsx', exportType: 'default' },
+    { id: 'scr-empty', sourceFile: null, exportType: 'default' },
   ]
 
   it('imports from virtual:spec-manifest', () => {
@@ -153,11 +154,34 @@ describe('generateSpecMainTsx', () => {
     expect(code).toContain('PreviewShell')
   })
 
-  it('generates static import map with correct paths', () => {
+  it('imports Wrapper and wraps PreviewShell', () => {
     const code = generateSpecMainTsx(MOCK_SCREENS)
-    expect(code).toContain("'scr-home': () => import('../src/routes/index.tsx')")
-    expect(code).toContain("'scr-detail': () => import('../src/routes/detail.tsx')")
+    expect(code).toContain("import { Wrapper } from './wrapper'")
+    expect(code).toContain('<Wrapper>')
+    expect(code).toContain('</Wrapper>')
+  })
+
+  it('generates static import map with correct paths for default exports', () => {
+    const code = generateSpecMainTsx(MOCK_SCREENS)
+    expect(code).toContain("'scr-home': () => import('../src/routes/index.tsx'),")
+    expect(code).toContain("'scr-detail': () => import('../src/routes/detail.tsx'),")
     expect(code).not.toContain('scr-empty')
+  })
+
+  it('generates .then(m => m.Route.options.component) for tanstack-route exports', () => {
+    const screens: SpecScreenImport[] = [
+      { id: 'scr-route', sourceFile: 'src/routes/home.tsx', exportType: 'tanstack-route' },
+    ]
+    const code = generateSpecMainTsx(screens)
+    expect(code).toContain(".then(m => ({ default: m.Route.options.component }))")
+  })
+
+  it('generates .then(m => ({ default: m.ExportName })) for named exports', () => {
+    const screens: SpecScreenImport[] = [
+      { id: 'scr-named', sourceFile: 'src/screens/Home.tsx', exportType: 'named', exportName: 'HomeScreen' },
+    ]
+    const code = generateSpecMainTsx(screens)
+    expect(code).toContain(".then(m => ({ default: m.HomeScreen }))")
   })
 
   it('uses spec mode when specsDir is set in config', async () => {
@@ -177,5 +201,54 @@ describe('generateSpecMainTsx', () => {
     const mainTsx = readFileSync(join(dir, '.preview', 'main.tsx'), 'utf-8')
     expect(mainTsx).toContain("from 'virtual:spec-manifest'")
     expect(mainTsx).not.toContain("import.meta.glob('./screens/*/adapter.tsx')")
+  })
+})
+
+describe('detectExportType', () => {
+  it('detects TanStack Router createFileRoute', () => {
+    const dir = makeProject({
+      'route.tsx': `import { createFileRoute } from '@tanstack/react-router'\nexport const Route = createFileRoute('/')({ component: Home })\nfunction Home() { return <div /> }`,
+    })
+    const result = detectExportType(join(dir, 'route.tsx'))
+    expect(result.type).toBe('tanstack-route')
+  })
+
+  it('detects TanStack Router createLazyFileRoute', () => {
+    const dir = makeProject({
+      'route.lazy.tsx': `import { createLazyFileRoute } from '@tanstack/react-router'\nexport const Route = createLazyFileRoute('/')({ component: Home })\nfunction Home() { return <div /> }`,
+    })
+    const result = detectExportType(join(dir, 'route.lazy.tsx'))
+    expect(result.type).toBe('tanstack-route')
+  })
+
+  it('detects default export', () => {
+    const dir = makeProject({
+      'page.tsx': 'export default function Page() { return <div /> }',
+    })
+    const result = detectExportType(join(dir, 'page.tsx'))
+    expect(result.type).toBe('default')
+  })
+
+  it('detects named function export', () => {
+    const dir = makeProject({
+      'screen.tsx': 'export function HomeScreen() { return <div /> }',
+    })
+    const result = detectExportType(join(dir, 'screen.tsx'))
+    expect(result.type).toBe('named')
+    expect(result.name).toBe('HomeScreen')
+  })
+
+  it('detects named const export', () => {
+    const dir = makeProject({
+      'screen.tsx': 'export const Dashboard = () => <div />',
+    })
+    const result = detectExportType(join(dir, 'screen.tsx'))
+    expect(result.type).toBe('named')
+    expect(result.name).toBe('Dashboard')
+  })
+
+  it('returns default for non-existent file', () => {
+    const result = detectExportType('/nonexistent/path/file.tsx')
+    expect(result.type).toBe('default')
   })
 })
