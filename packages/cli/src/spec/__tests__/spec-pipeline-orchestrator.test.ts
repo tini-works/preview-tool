@@ -186,3 +186,84 @@ describe('toSafeFileName', () => {
     expect(toSafeFileName('@/stores/auth')).toBe('stores-auth')
   })
 })
+
+// ---------------------------------------------------------------------------
+// Integration: type-extracted mock data
+// ---------------------------------------------------------------------------
+
+const TYPED_FIXTURES = join(import.meta.dirname, 'fixtures', 'typed-app')
+
+const TYPED_SCREEN: SpecManifestScreen = {
+  id: 'scr-home',
+  title: 'Home',
+  sourceFile: 'src/pages/HomePage.tsx',
+  states: ['loading', 'populated', 'empty', 'error'],
+  defaultState: 'loading',
+  stateData: {},
+  dataDeps: [],
+  routeParams: null,
+}
+
+describe('integration: type-extracted mock data', () => {
+  it('discovers useRooms from AST and resolves its typed return', async () => {
+    const result = await runSpecPipeline([TYPED_SCREEN], TYPED_FIXTURES)
+    const home = result.enrichedScreens.find((s) => s.id === 'scr-home')
+    expect(home).toBeDefined()
+
+    // Should have discovered useRooms from AST
+    const hookNames = home!.mergedDeps.map((d) => d.hook)
+    expect(hookNames).toContain('useRooms')
+
+    // useRooms dep should have resolvedType
+    const roomsDep = home!.mergedDeps.find((d) => d.hook === 'useRooms')
+    expect(roomsDep?.resolvedType).toBeDefined()
+    expect(roomsDep!.resolvedType!.confidence).not.toBe('none')
+  })
+
+  it('generates type-aware state data in enriched regions', async () => {
+    const result = await runSpecPipeline([TYPED_SCREEN], TYPED_FIXTURES)
+    const home = result.enrichedScreens.find((s) => s.id === 'scr-home')!
+    const roomsRegion = home.enrichedRegions['rooms']
+    expect(roomsRegion).toBeDefined()
+
+    // Loading state: isLoading true, empty array, no error
+    expect(roomsRegion.states.loading.isLoading).toBe(true)
+    expect(roomsRegion.states.loading.rooms).toEqual([])
+    expect(roomsRegion.states.loading.error).toBeNull()
+
+    // Populated state: isLoading false, filled array with typed items
+    expect(roomsRegion.states.populated.isLoading).toBe(false)
+    const populatedRooms = roomsRegion.states.populated.rooms as unknown[]
+    expect(populatedRooms.length).toBeGreaterThan(0)
+    expect(populatedRooms[0]).toHaveProperty('id')
+    expect(populatedRooms[0]).toHaveProperty('name')
+    expect(populatedRooms[0]).toHaveProperty('capacity')
+
+    // Error state: error message present, empty array
+    expect(roomsRegion.states.error.error).toBeTruthy()
+    expect(roomsRegion.states.error.rooms).toEqual([])
+
+    // Empty state: empty array, no error
+    expect(roomsRegion.states.empty.rooms).toEqual([])
+    expect(roomsRegion.states.empty.error).toBeNull()
+  })
+
+  it('includes NOOP for method fields (refetch)', async () => {
+    const result = await runSpecPipeline([TYPED_SCREEN], TYPED_FIXTURES)
+    const home = result.enrichedScreens.find((s) => s.id === 'scr-home')!
+    const roomsRegion = home.enrichedRegions['rooms']
+
+    // refetch should be a NOOP string in all states
+    expect(roomsRegion.states.populated.refetch).toBe('NOOP')
+  })
+
+  it('generates mock code with default shapes from resolved types', async () => {
+    const result = await runSpecPipeline([TYPED_SCREEN], TYPED_FIXTURES)
+    const mockCode = result.mockFiles.get('../hooks/useRooms')
+    expect(mockCode).toBeDefined()
+    expect(mockCode).toContain('export function useRooms')
+    expect(mockCode).toContain('useRegionDataForHook')
+    // Should have non-empty defaults object (not just {})
+    expect(mockCode).toContain('const defaults =')
+  })
+})
