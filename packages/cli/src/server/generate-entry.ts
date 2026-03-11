@@ -261,13 +261,13 @@ import { screens, screenEntries } from 'virtual:spec-manifest'
 import './preview.css'
 
 // Map screen sourceFile paths to dynamic import functions.
-// Uses @host alias (resolved to cwd/src by Vite) so paths work at runtime.
+// main.tsx lives in .preview/, so "../" reaches cwd.
 function createImporter(sourceFile: string | null) {
   if (!sourceFile) return () => Promise.resolve({ default: () => null })
   // sourceFile is relative to cwd (e.g. "src/routes/index.tsx")
-  // Strip leading "src/" and use @host/ alias which Vite resolves to cwd/src/
-  const aliased = sourceFile.replace(/^src\\//, '@host/')
-  return () => import(/* @vite-ignore */ aliased)
+  // Prefix with "../" to go from .preview/ up to cwd
+  const rel = '../' + sourceFile
+  return () => import(/* @vite-ignore */ rel)
 }
 
 // Build screen entries from spec manifest
