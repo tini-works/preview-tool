@@ -10,6 +10,8 @@ import {
   detectContextHooks,
   generateContextShim,
   toSafeFileName,
+  isServerFunctionImport,
+  generateServerFunctionStub,
   type MergedHookDep,
 } from '../spec-pipeline-orchestrator.js'
 
@@ -265,5 +267,43 @@ describe('integration: type-extracted mock data', () => {
     expect(mockCode).toContain('useRegionDataForHook')
     // Should have non-empty defaults object (not just {})
     expect(mockCode).toContain('const defaults =')
+  })
+})
+
+describe('isServerFunctionImport', () => {
+  it('detects server-functions paths', () => {
+    expect(isServerFunctionImport('~/server-functions/rooms.js')).toBe(true)
+    expect(isServerFunctionImport('~/server_functions/auth.js')).toBe(true)
+    expect(isServerFunctionImport('~/serverFunctions/rooms.js')).toBe(true)
+    expect(isServerFunctionImport('~/serverfunctions/rooms.js')).toBe(true)
+    expect(isServerFunctionImport('~/server-function/rooms.js')).toBe(true)
+  })
+
+  it('detects actions paths', () => {
+    expect(isServerFunctionImport('~/actions/submit.js')).toBe(true)
+    expect(isServerFunctionImport('@/actions/create.ts')).toBe(true)
+  })
+
+  it('rejects non-server paths', () => {
+    expect(isServerFunctionImport('~/hooks/useRooms.js')).toBe(false)
+    expect(isServerFunctionImport('~/lib/utils.js')).toBe(false)
+    expect(isServerFunctionImport('react')).toBe(false)
+  })
+})
+
+describe('generateServerFunctionStub', () => {
+  it('generates async no-op stubs for all exports', () => {
+    const stub = generateServerFunctionStub('~/server-functions/rooms.js', ['getRooms', 'getRoom'])
+    expect(stub).toContain('export function getRooms')
+    expect(stub).toContain('export function getRoom')
+    expect(stub).toContain('Promise.resolve(undefined)')
+    // Must NOT re-export from __real: (would crash)
+    expect(stub).not.toContain('__real:')
+  })
+
+  it('includes comment header', () => {
+    const stub = generateServerFunctionStub('~/server-functions/auth.js', ['login'])
+    expect(stub).toContain('Auto-generated server function stub')
+    expect(stub).toContain('~/server-functions/auth.js')
   })
 })

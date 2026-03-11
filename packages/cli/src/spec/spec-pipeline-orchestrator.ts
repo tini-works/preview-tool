@@ -233,16 +233,27 @@ function isLikelyBarrel(importPath: string): boolean {
 function generateMockFileForImportPath(
   hooks: MergedHookDep[],
   importPath: string,
+  barrelReExports?: Array<{ names: string[]; fullModulePath: string }>,
 ): string {
-  const skipRealReexport = isLikelyBarrel(importPath)
+  const isBarrel = isLikelyBarrel(importPath)
   const lines: string[] = [
     `// Auto-generated spec-driven mock for ${importPath}`,
   ]
 
-  if (!skipRealReexport) {
+  if (!isBarrel) {
     lines.push(`export * from '__real:${importPath}'`)
   } else {
-    lines.push(`// Barrel file — skipping __real: re-export to prevent transitive import crashes`)
+    // For barrel files, re-export non-mocked names from their individual sub-modules.
+    // Vite aliases resolve each sub-module to its own mock (or the real module).
+    const mockedNames = new Set(hooks.map((h) => h.hook))
+    if (barrelReExports && barrelReExports.length > 0) {
+      for (const group of barrelReExports) {
+        const unmocked = group.names.filter((n) => !mockedNames.has(n))
+        if (unmocked.length > 0) {
+          lines.push(`export { ${unmocked.join(', ')} } from '${group.fullModulePath}'`)
+        }
+      }
+    }
   }
 
   lines.push(
@@ -370,6 +381,129 @@ export function generateContextShim(hook: HookFact, importPath: string): string 
   )
 
   return lines.join('\n')
+}
+
+// ---------------------------------------------------------------------------
+// Module path resolution
+// ---------------------------------------------------------------------------
+
+/**
+ * Resolve a module import path (~/foo, @/foo) to an absolute file path.
+ * Tries common extensions and index files.
+ */
+function resolveModulePath(importPath: string, cwd: string): string | null {
+  let rel = importPath
+  if (rel.startsWith('~/')) rel = 'src/' + rel.slice(2)
+  else if (rel.startsWith('@/')) rel = 'src/' + rel.slice(2)
+  else return null // Only resolve alias imports
+
+  // Strip .js/.jsx/.ts/.tsx extension
+  rel = rel.replace(/\.[jt]sx?$/, '')
+
+  for (const ext of ['.ts', '.tsx', '.js', '.jsx']) {
+    const full = resolve(cwd, rel + ext)
+    if (existsSync(full)) return full
+  }
+  for (const ext of ['.ts', '.tsx']) {
+    const full = resolve(cwd, rel, 'index' + ext)
+    if (existsSync(full)) return full
+  }
+  return null
+}
+
+/**
+ * Convert a relative import path in a barrel file to a full aliased path.
+ * E.g. `./use-employees.js` relative to `~/hooks/index.js` → `~/hooks/use-employees.js`
+ */
+function resolveRelativeExport(relativePath: string, barrelImportPath: string): string {
+  if (!relativePath.startsWith('.')) return relativePath
+  const barrelDir = barrelImportPath.replace(/\/[^/]+$/, '')
+  return barrelDir + '/' + relativePath.replace(/^\.\//, '')
+}
+
+/**
+ * Parse a barrel source file to discover all its named re-exports.
+ * Returns export groups: which names come from which sub-module.
+ */
+function getBarrelReExports(
+  project: Project,
+  barrelAbsPath: string,
+  barrelImportPath: string,
+): Array<{ names: string[]; fullModulePath: string }> {
+  let sf = project.getSourceFile(barrelAbsPath)
+  if (!sf) {
+    try {
+      project.addSourceFileAtPath(barrelAbsPath)
+      sf = project.getSourceFile(barrelAbsPath)
+    } catch {
+      return []
+    }
+  }
+  if (!sf) return []
+
+  const result: Array<{ names: string[]; fullModulePath: string }> = []
+
+  for (const exportDecl of sf.getExportDeclarations()) {
+    const moduleSpec = exportDecl.getModuleSpecifierValue()
+    if (!moduleSpec) continue
+
+    const names = exportDecl.getNamedExports().map((n) => n.getName())
+    if (names.length > 0) {
+      result.push({
+        names,
+        fullModulePath: resolveRelativeExport(moduleSpec, barrelImportPath),
+      })
+    }
+  }
+
+  return result
+}
+
+/**
+ * Get all named exports from a source file (export const, export function,
+ * export { ... } from, named re-exports).
+ */
+function getAllExportNames(project: Project, absPath: string): string[] {
+  let sf = project.getSourceFile(absPath)
+  if (!sf) {
+    try {
+      project.addSourceFileAtPath(absPath)
+      sf = project.getSourceFile(absPath)
+    } catch {
+      return []
+    }
+  }
+  if (!sf) return []
+
+  const names: string[] = []
+
+  // Named re-exports: export { foo, bar } from '...'
+  for (const exportDecl of sf.getExportDeclarations()) {
+    for (const named of exportDecl.getNamedExports()) {
+      names.push(named.getName())
+    }
+  }
+
+  // Direct exports: export const foo = ..., export function bar() {}
+  for (const stmt of sf.getStatements()) {
+    if (stmt.isKind(SyntaxKind.VariableStatement)) {
+      const varStmt = stmt.asKindOrThrow(SyntaxKind.VariableStatement)
+      if (varStmt.hasExportKeyword()) {
+        for (const decl of varStmt.getDeclarationList().getDeclarations()) {
+          names.push(decl.getName())
+        }
+      }
+    }
+    if (stmt.isKind(SyntaxKind.FunctionDeclaration)) {
+      const fnDecl = stmt.asKindOrThrow(SyntaxKind.FunctionDeclaration)
+      if (fnDecl.hasExportKeyword()) {
+        const name = fnDecl.getName()
+        if (name) names.push(name)
+      }
+    }
+  }
+
+  return names
 }
 
 // ---------------------------------------------------------------------------
@@ -584,7 +718,15 @@ export async function runSpecPipeline(
 
     for (const [importPath, hooks] of hooksByImport) {
       if (!mockFiles.has(importPath)) {
-        mockFiles.set(importPath, generateMockFileForImportPath(hooks, importPath))
+        // For barrel files, resolve the barrel source and get re-exports
+        let barrelReExports: Array<{ names: string[]; fullModulePath: string }> | undefined
+        if (isLikelyBarrel(importPath) && project) {
+          const barrelAbsPath = resolveModulePath(importPath, cwd)
+          if (barrelAbsPath) {
+            barrelReExports = getBarrelReExports(project, barrelAbsPath, importPath)
+          }
+        }
+        mockFiles.set(importPath, generateMockFileForImportPath(hooks, importPath, barrelReExports))
       }
     }
   }
@@ -621,18 +763,77 @@ export async function runSpecPipeline(
 
   // Detect and stub server function imports (Layer 4)
   // These crash at module eval time (e.g. createServerFn accessing isServer)
-  const alreadyMocked = new Set(mockFiles.keys())
+  // Collect ALL named imports per server function module from screens AND hook files
+  const serverFnExports = new Map<string, Set<string>>()
+
+  // Scan screen source files
   for (const screen of screens) {
     const absPath = resolveSourceFilePath(screen, cwd, specsDir)
     const sf = absPath ? sourceFileMap.get(absPath) : undefined
     if (!sf) continue
 
-    const serverImports = discoverServerFunctionImports(sf, alreadyMocked)
+    const serverImports = discoverServerFunctionImports(sf, new Set())
     for (const { modulePath, namedExports } of serverImports) {
-      if (mockFiles.has(modulePath)) continue
-      mockFiles.set(modulePath, generateServerFunctionStub(modulePath, namedExports))
-      alreadyMocked.add(modulePath)
+      const existing = serverFnExports.get(modulePath) ?? new Set<string>()
+      for (const name of namedExports) existing.add(name)
+      serverFnExports.set(modulePath, existing)
     }
+  }
+
+  // Also scan hook source files (e.g. use-rooms.ts imports getRooms from server-functions)
+  // Hook mocks with __real: re-export load the real hook module which may import server functions
+  // Include both directly-mocked hook modules AND barrel sub-module paths
+  if (project) {
+    const hookImportPaths = new Set<string>()
+    for (const [importPath] of mockFiles) {
+      if (!isLikelyBarrel(importPath) && !isServerFunctionImport(importPath)) {
+        hookImportPaths.add(importPath)
+      }
+    }
+    // Also add barrel sub-module paths (barrel re-exports load these via Vite aliases)
+    for (const [importPath] of mockFiles) {
+      if (!isLikelyBarrel(importPath)) continue
+      const barrelAbsPath = resolveModulePath(importPath, cwd)
+      if (!barrelAbsPath) continue
+      const reExports = getBarrelReExports(project, barrelAbsPath, importPath)
+      for (const group of reExports) {
+        hookImportPaths.add(group.fullModulePath)
+      }
+    }
+    for (const hookImportPath of hookImportPaths) {
+      const hookAbsPath = resolveModulePath(hookImportPath, cwd)
+      if (!hookAbsPath) continue
+      let hookSf = sourceFileMap.get(hookAbsPath)
+      if (!hookSf) {
+        try {
+          project.addSourceFileAtPath(hookAbsPath)
+          hookSf = project.getSourceFile(hookAbsPath)
+          if (hookSf) sourceFileMap.set(hookAbsPath, hookSf)
+        } catch { continue }
+      }
+      if (!hookSf) continue
+
+      const serverImports = discoverServerFunctionImports(hookSf, new Set())
+      for (const { modulePath, namedExports } of serverImports) {
+        const existing = serverFnExports.get(modulePath) ?? new Set<string>()
+        for (const name of namedExports) existing.add(name)
+        serverFnExports.set(modulePath, existing)
+      }
+    }
+
+    // Also resolve ALL exports from server function source files (defense-in-depth)
+    for (const [modulePath, collectedNames] of serverFnExports) {
+      const sfAbsPath = resolveModulePath(modulePath, cwd)
+      if (!sfAbsPath) continue
+      const allNames = getAllExportNames(project, sfAbsPath)
+      for (const name of allNames) collectedNames.add(name)
+    }
+  }
+
+  // Generate stubs
+  for (const [modulePath, exportNames] of serverFnExports) {
+    if (mockFiles.has(modulePath)) continue
+    mockFiles.set(modulePath, generateServerFunctionStub(modulePath, [...exportNames]))
   }
 
   // Build alias manifest
