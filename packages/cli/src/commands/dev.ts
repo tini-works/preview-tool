@@ -10,7 +10,8 @@ export const devCommand = new Command('dev')
   .description('Start preview dev server')
   .option('-c, --cwd <path>', 'Working directory', process.cwd())
   .option('-p, --port <port>', 'Dev server port')
-  .action(async (options: { cwd: string; port?: string }) => {
+  .option('--specs <dir>', 'Path to .specs/ directory for spec-driven preview')
+  .action(async (options: { cwd: string; port?: string; specs?: string }) => {
     const cwd = resolve(options.cwd)
 
     console.log(chalk.bold('\nPreview Tool — Dev Server\n'))
@@ -20,6 +21,11 @@ export const devCommand = new Command('dev')
     // Override port from CLI flag if provided
     if (options.port) {
       config.port = parseInt(options.port, 10)
+    }
+
+    // Override specsDir from CLI flag if provided
+    if (options.specs) {
+      config.specsDir = resolve(options.specs)
     }
 
     // Generate entry files (index.html + main.tsx)

@@ -6,6 +6,7 @@ export interface PreviewConfig {
   port: number
   title: string
   cssEntry?: string
+  specsDir?: string
 }
 
 export const DEFAULT_CONFIG: PreviewConfig = {

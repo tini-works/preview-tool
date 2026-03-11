@@ -85,7 +85,15 @@ export async function createViteConfig(
     ? createPreviewStatePlugin(screenFilePaths)
     : null
 
+  // Spec-driven preview plugin (when specsDir is configured)
+  let specPlugin: unknown = null
+  if (config.specsDir) {
+    const { createSpecPreviewPlugin } = await import('./vite-plugin-spec-preview.js')
+    specPlugin = createSpecPreviewPlugin({ specsDir: config.specsDir, cwd })
+  }
+
   const plugins = [
+    ...(specPlugin ? [specPlugin] : []),
     ...(previewStatePlugin ? [previewStatePlugin] : []),
     ...(tailwindPlugin ? [tailwindPlugin] : []),
     ...(reactPlugin ? [reactPlugin] : []),
