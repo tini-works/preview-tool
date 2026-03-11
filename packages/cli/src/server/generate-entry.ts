@@ -195,6 +195,11 @@ function generateIndexHtml(title: string): string {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${escapeHtml(title)}</title>
+    <script>
+      // Shim Node.js globals for server-side code pulled into browser bundle
+      window.process = window.process || { env: {}, argv: [], version: '' };
+      window.global = window.global || globalThis;
+    </script>
   </head>
   <body>
     <div id="root"></div>

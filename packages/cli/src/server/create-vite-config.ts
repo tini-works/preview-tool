@@ -244,12 +244,6 @@ export async function createViteConfig(
         allow: [cwd, runtimeRoot, previewDir],
       },
     },
-    // Shim Node.js globals that server-side code references at module level.
-    // `process.env.X` gets replaced at compile time; `global` prevents runtime ReferenceError.
-    define: {
-      'process.env': '({})',
-      'global': 'globalThis',
-    },
     resolve: {
       alias: aliasArray,
       dedupe: ['react', 'react-dom'],
