@@ -1,12 +1,11 @@
 import { resolve, relative } from 'node:path'
 import { existsSync } from 'node:fs'
 import { loadSpecs } from '../spec/spec-loader.js'
-import { generateMockCode, generateAliasManifest } from '../spec/spec-to-mocks.js'
 import { specToScreenEntry } from '../spec/spec-to-model.js'
+import { runSpecPipeline, type EnrichedScreen } from '../spec/spec-pipeline-orchestrator.js'
 import type { SpecManifest, SpecManifestScreen } from '../spec/types.js'
 
 const VIRTUAL_MANIFEST = 'virtual:spec-manifest'
-const VIRTUAL_MOCK_PREFIX = 'virtual:spec-mock:'
 const RESOLVED_PREFIX = '\0'
 
 interface SpecPreviewOptions {
@@ -53,9 +52,32 @@ function normalizeSourceFiles(screens: SpecManifestScreen[], specsDir: string, c
   })
 }
 
+/**
+ * Build screenEntries using enriched per-hook regions when available,
+ * falling back to the original specToScreenEntry for non-enriched screens.
+ */
+function buildScreenEntries(
+  manifest: SpecManifest,
+  enrichedScreens: EnrichedScreen[],
+) {
+  const enrichedMap = new Map(enrichedScreens.map((s) => [s.id, s]))
+
+  return manifest.screens.map((s) => {
+    const enriched = enrichedMap.get(s.id)
+    if (enriched && Object.keys(enriched.enrichedRegions).length > 0) {
+      return {
+        route: s.id,
+        regions: enriched.enrichedRegions,
+        ...(s.routeParams ? { routeParams: s.routeParams } : {}),
+      }
+    }
+    return specToScreenEntry(s)
+  })
+}
+
 export function createSpecPreviewPlugin(options: SpecPreviewOptions): VitePlugin {
   let manifest: SpecManifest = { screens: [], flows: [] }
-  let aliasManifest: Record<string, string> = {}
+  let enrichedScreens: EnrichedScreen[] = []
 
   return {
     name: 'spec-preview',
@@ -64,40 +86,30 @@ export function createSpecPreviewPlugin(options: SpecPreviewOptions): VitePlugin
     async buildStart() {
       manifest = await loadSpecs(options.specsDir)
       manifest = { ...manifest, screens: normalizeSourceFiles(manifest.screens, options.specsDir, options.cwd) }
-      aliasManifest = generateAliasManifest(manifest.screens)
+      // Run pipeline to get enriched regions (mock files already written by dev command)
+      try {
+        const result = await runSpecPipeline(manifest.screens, options.cwd, options.specsDir)
+        enrichedScreens = result.enrichedScreens
+      } catch {
+        enrichedScreens = []
+      }
     },
 
     resolveId(id: string) {
       if (id === VIRTUAL_MANIFEST) {
         return RESOLVED_PREFIX + VIRTUAL_MANIFEST
       }
-      if (id.startsWith(VIRTUAL_MOCK_PREFIX)) {
-        return RESOLVED_PREFIX + id
-      }
-      if (aliasManifest[id]) {
-        return RESOLVED_PREFIX + aliasManifest[id]
-      }
+      // Mock module resolution removed — mocks are now physical files
+      // resolved via alias-manifest.json in create-vite-config.ts
       return undefined
     },
 
     load(id: string) {
       if (id === RESOLVED_PREFIX + VIRTUAL_MANIFEST) {
-        const screenEntries = manifest.screens.map((s) => specToScreenEntry(s))
+        const screenEntries = buildScreenEntries(manifest, enrichedScreens)
         return `export const screens = ${JSON.stringify(manifest.screens, null, 2)};
 export const flows = ${JSON.stringify(manifest.flows, null, 2)};
 export const screenEntries = ${JSON.stringify(screenEntries, null, 2)};`
-      }
-
-      if (id.startsWith(RESOLVED_PREFIX + VIRTUAL_MOCK_PREFIX)) {
-        const modulePath = id.slice((RESOLVED_PREFIX + VIRTUAL_MOCK_PREFIX).length)
-        for (const screen of manifest.screens) {
-          for (const dep of screen.dataDeps) {
-            if (dep.module === modulePath) {
-              return generateMockCode(screen, dep)
-            }
-          }
-        }
-        return `// No spec found for module: ${modulePath}`
       }
 
       return undefined
@@ -109,7 +121,12 @@ export const screenEntries = ${JSON.stringify(screenEntries, null, 2)};`
         if (file.startsWith(options.specsDir)) {
           manifest = await loadSpecs(options.specsDir)
           manifest = { ...manifest, screens: normalizeSourceFiles(manifest.screens, options.specsDir, options.cwd) }
-          aliasManifest = generateAliasManifest(manifest.screens)
+          try {
+            const result = await runSpecPipeline(manifest.screens, options.cwd, options.specsDir)
+            enrichedScreens = result.enrichedScreens
+          } catch {
+            enrichedScreens = []
+          }
           const mod = server.moduleGraph.getModuleById(
             RESOLVED_PREFIX + VIRTUAL_MANIFEST
           )

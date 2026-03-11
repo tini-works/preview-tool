@@ -40,6 +40,7 @@ export const SpecScreenSchema = z.object({
   status: z.string().optional(),
   states: z.array(SpecStateSchema).default([]),
   data_deps: z.array(SpecDataDepSchema).default([]),
+  route_params: z.record(z.string(), z.string()).optional(),
   capabilities: z.array(z.string()).optional(),
   conventions: z.array(z.string()).optional(),
 })
@@ -98,6 +99,7 @@ export interface SpecManifestScreen {
   defaultState: string | null
   stateData: Record<string, Record<string, unknown>>
   dataDeps: SpecDataDep[]
+  routeParams: Record<string, string> | null
 }
 
 export interface SpecManifestFlow {

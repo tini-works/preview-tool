@@ -119,6 +119,7 @@ export async function loadSpecs(specsDir: string): Promise<SpecManifest> {
       defaultState: stateNames[0] ?? null,
       stateData,
       dataDeps: screen.data_deps,
+      routeParams: screen.route_params ?? null,
     })
   }
 

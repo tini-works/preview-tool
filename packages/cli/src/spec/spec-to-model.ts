@@ -19,6 +19,7 @@ export interface ScreenEntryLike {
   route: string
   regions: RegionsMap
   flags?: Record<string, { label: string; default: boolean }>
+  routeParams?: Record<string, string>
 }
 
 export function specToRegions(screen: SpecManifestScreen): RegionsMap {
@@ -45,5 +46,6 @@ export function specToScreenEntry(screen: SpecManifestScreen): ScreenEntryLike {
   return {
     route: screen.id,
     regions: specToRegions(screen),
+    ...(screen.routeParams ? { routeParams: screen.routeParams } : {}),
   }
 }

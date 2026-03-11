@@ -9,6 +9,8 @@ import { createViteConfig } from '../server/create-vite-config.js'
 import { generateEntryFiles } from '../server/generate-entry.js'
 import { detectFramework } from '../resolver/detect-framework.js'
 import { syncWrapperProviders, generateWrapperCode } from '../resolver/generate-wrapper.js'
+import { loadSpecs } from '../spec/spec-loader.js'
+import { runSpecPipeline, toSafeFileName } from '../spec/spec-pipeline-orchestrator.js'
 
 export const devCommand = new Command('dev')
   .description('Start preview dev server')
@@ -55,6 +57,34 @@ export const devCommand = new Command('dev')
           console.log(chalk.yellow(`  Add them manually: ${wrapperPath}`))
         }
       }
+    }
+
+    // Run spec pipeline: AST analysis + mock generation
+    if (config.specsDir) {
+      const manifest = await loadSpecs(config.specsDir)
+      const previewDir = join(cwd, PREVIEW_DIR)
+      const pipelineResult = await runSpecPipeline(manifest.screens, cwd, config.specsDir)
+
+      // Write physical mock files
+      const mocksDir = join(previewDir, 'mocks')
+      await mkdir(mocksDir, { recursive: true })
+      for (const [importPath, code] of pipelineResult.mockFiles) {
+        const safeName = toSafeFileName(importPath)
+        await writeFile(join(mocksDir, `${safeName}.ts`), code, 'utf-8')
+      }
+
+      // Write alias manifest
+      await writeFile(
+        join(previewDir, 'alias-manifest.json'),
+        JSON.stringify(pipelineResult.aliasManifest, null, 2),
+        'utf-8'
+      )
+
+      const hookCount = pipelineResult.mockFiles.size
+      const regionCount = pipelineResult.enrichedScreens.reduce(
+        (sum, s) => sum + Object.keys(s.enrichedRegions).length, 0
+      )
+      console.log(chalk.dim(`  Generated ${hookCount} mock modules, ${regionCount} regions`))
     }
 
     // Generate entry files (index.html + main.tsx)

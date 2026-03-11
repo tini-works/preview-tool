@@ -16,6 +16,7 @@ const SCREEN: SpecManifestScreen = {
   dataDeps: [
     { hook: 'useRooms', module: '@/hooks/useRooms', provides: ['rooms', 'isLoading', 'error'] },
   ],
+  routeParams: null,
 }
 
 describe('specToRegions', () => {

@@ -43,6 +43,19 @@ describe('loadSpecs', () => {
     expect(manifest.screens.every((s) => s.sourceFile !== undefined)).toBe(true)
   })
 
+  it('parses route_params from spec YAML', async () => {
+    const manifest = await loadSpecs(FIXTURES_DIR)
+    const detail = manifest.screens.find((s) => s.id === 'scr-detail')
+    expect(detail).toBeDefined()
+    expect(detail!.routeParams).toEqual({ roomId: 'room-123' })
+  })
+
+  it('returns null routeParams when not specified', async () => {
+    const manifest = await loadSpecs(FIXTURES_DIR)
+    const home = manifest.screens.find((s) => s.id === 'scr-home')
+    expect(home!.routeParams).toBeNull()
+  })
+
   it('returns empty manifest for non-existent directory', async () => {
     const manifest = await loadSpecs('/tmp/does-not-exist-specs')
     expect(manifest.screens).toEqual([])

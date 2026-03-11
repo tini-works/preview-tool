@@ -17,6 +17,7 @@ const SCREEN: SpecManifestScreen = {
     { hook: 'useItems', module: '@/hooks/useItems', provides: ['items', 'isLoading', 'error'] },
     { hook: 'useBookingStore', module: '@/stores/booking', provides: ['selected', 'setSelected'] },
   ],
+  routeParams: null,
 }
 
 describe('generateMockCode', () => {

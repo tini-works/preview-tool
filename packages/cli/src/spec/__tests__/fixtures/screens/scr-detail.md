@@ -13,6 +13,8 @@ data_deps:
     module: "@/hooks/useRoom"
     provides:
       - room
+route_params:
+  roomId: "room-123"
 ---
 
 # Room Detail

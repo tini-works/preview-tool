@@ -19,13 +19,13 @@ describe('createSpecPreviewPlugin', () => {
     expect(resolved).toBe('\0virtual:spec-manifest')
   })
 
-  it('resolves virtual:spec-mock: prefixed module IDs', () => {
+  it('does not resolve virtual:spec-mock: IDs (mocks are now physical files)', () => {
     const plugin = createSpecPreviewPlugin({
       specsDir: '/tmp/test-specs',
       cwd: '/tmp/test-project',
     })
     const resolved = (plugin.resolveId as Function)('virtual:spec-mock:@/hooks/useItems')
-    expect(resolved).toBe('\0virtual:spec-mock:@/hooks/useItems')
+    expect(resolved).toBeUndefined()
   })
 
   it('does not resolve non-virtual module IDs', () => {
