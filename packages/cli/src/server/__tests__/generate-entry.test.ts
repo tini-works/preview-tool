@@ -136,32 +136,42 @@ describe('generateMainTsx', () => {
 })
 
 describe('generateSpecMainTsx', () => {
+  const MOCK_SCREENS = [
+    { id: 'scr-home', sourceFile: 'src/routes/index.tsx' },
+    { id: 'scr-detail', sourceFile: 'src/routes/detail.tsx' },
+    { id: 'scr-empty', sourceFile: null },
+  ]
+
   it('imports from virtual:spec-manifest', () => {
-    const code = generateSpecMainTsx()
+    const code = generateSpecMainTsx(MOCK_SCREENS)
     expect(code).toContain("from 'virtual:spec-manifest'")
   })
 
   it('imports PreviewShell from runtime', () => {
-    const code = generateSpecMainTsx()
+    const code = generateSpecMainTsx(MOCK_SCREENS)
     expect(code).toContain("from '@preview-tool/runtime'")
     expect(code).toContain('PreviewShell')
   })
 
-  it('builds entries from screenEntries', () => {
-    const code = generateSpecMainTsx()
-    expect(code).toContain('screenEntries')
-    expect(code).toContain('entries')
+  it('generates static import map with correct paths', () => {
+    const code = generateSpecMainTsx(MOCK_SCREENS)
+    expect(code).toContain("'scr-home': () => import('../src/routes/index.tsx')")
+    expect(code).toContain("'scr-detail': () => import('../src/routes/detail.tsx')")
+    expect(code).not.toContain('scr-empty')
   })
 
   it('uses spec mode when specsDir is set in config', async () => {
     const dir = join(TMP, `proj-spec-${Date.now()}`)
     mkdirSync(join(dir, '.preview'), { recursive: true })
+    // Create a minimal .specs structure
+    const specsDir = join(dir, '.specs')
+    mkdirSync(join(specsDir, 'screens'), { recursive: true })
 
     await generateEntryFiles(dir, {
       screenGlob: 'src/**/*.tsx',
       port: 6100,
       title: 'Spec Test',
-      specsDir: '/tmp/fake-specs',
+      specsDir,
     })
 
     const mainTsx = readFileSync(join(dir, '.preview', 'main.tsx'), 'utf-8')
