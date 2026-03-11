@@ -1,7 +1,9 @@
+import { resolve, relative } from 'node:path'
+import { existsSync } from 'node:fs'
 import { loadSpecs } from '../spec/spec-loader.js'
 import { generateMockCode, generateAliasManifest } from '../spec/spec-to-mocks.js'
 import { specToScreenEntry } from '../spec/spec-to-model.js'
-import type { SpecManifest } from '../spec/types.js'
+import type { SpecManifest, SpecManifestScreen } from '../spec/types.js'
 
 const VIRTUAL_MANIFEST = 'virtual:spec-manifest'
 const VIRTUAL_MOCK_PREFIX = 'virtual:spec-mock:'
@@ -22,6 +24,35 @@ interface VitePlugin {
   configureServer?: (server: any) => void
 }
 
+/**
+ * Normalize sourceFile paths from code-map to be relative to cwd.
+ * Handles monorepos where code-map paths are relative to the repo root
+ * but cwd points to a sub-package (e.g., packages/web/).
+ */
+function normalizeSourceFiles(screens: SpecManifestScreen[], specsDir: string, cwd: string): SpecManifestScreen[] {
+  return screens.map((screen) => {
+    if (!screen.sourceFile) return screen
+
+    // Already absolute — make relative to cwd
+    if (screen.sourceFile.startsWith('/')) {
+      return { ...screen, sourceFile: relative(cwd, screen.sourceFile) }
+    }
+
+    // If the path resolves directly from cwd, keep it
+    if (existsSync(resolve(cwd, screen.sourceFile))) {
+      return screen
+    }
+
+    // Try resolving from specsDir parent (monorepo root) and make relative to cwd
+    const fromSpecsRoot = resolve(specsDir, '..', screen.sourceFile)
+    if (existsSync(fromSpecsRoot)) {
+      return { ...screen, sourceFile: relative(cwd, fromSpecsRoot) }
+    }
+
+    return screen
+  })
+}
+
 export function createSpecPreviewPlugin(options: SpecPreviewOptions): VitePlugin {
   let manifest: SpecManifest = { screens: [], flows: [] }
   let aliasManifest: Record<string, string> = {}
@@ -32,6 +63,7 @@ export function createSpecPreviewPlugin(options: SpecPreviewOptions): VitePlugin
 
     async buildStart() {
       manifest = await loadSpecs(options.specsDir)
+      manifest = { ...manifest, screens: normalizeSourceFiles(manifest.screens, options.specsDir, options.cwd) }
       aliasManifest = generateAliasManifest(manifest.screens)
     },
 
@@ -76,6 +108,7 @@ export const screenEntries = ${JSON.stringify(screenEntries, null, 2)};`
       server.watcher.on('change', async (file: string) => {
         if (file.startsWith(options.specsDir)) {
           manifest = await loadSpecs(options.specsDir)
+          manifest = { ...manifest, screens: normalizeSourceFiles(manifest.screens, options.specsDir, options.cwd) }
           aliasManifest = generateAliasManifest(manifest.screens)
           const mod = server.moduleGraph.getModuleById(
             RESOLVED_PREFIX + VIRTUAL_MANIFEST

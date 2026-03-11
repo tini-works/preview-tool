@@ -260,17 +260,20 @@ import type { ScreenEntry } from '@preview-tool/runtime'
 import { screens, screenEntries } from 'virtual:spec-manifest'
 import './preview.css'
 
+// Map screen sourceFile paths to dynamic import functions.
+// Uses @host alias (resolved to cwd/src by Vite) so paths work at runtime.
+function createImporter(sourceFile: string | null) {
+  if (!sourceFile) return () => Promise.resolve({ default: () => null })
+  // sourceFile is relative to cwd (e.g. "src/routes/index.tsx")
+  // Strip leading "src/" and use @host/ alias which Vite resolves to cwd/src/
+  const aliased = sourceFile.replace(/^src\\//, '@host/')
+  return () => import(/* @vite-ignore */ aliased)
+}
+
 // Build screen entries from spec manifest
 const entries: ScreenEntry[] = screenEntries.map((entry: any, i: number) => ({
   route: entry.route,
-  module: () => {
-    const screen = screens[i]
-    if (!screen?.sourceFile) {
-      return Promise.resolve({ default: () => null })
-    }
-    // Dynamic import resolved by Vite at build time via code-map sourceFile
-    return import(/* @vite-ignore */ screen.sourceFile)
-  },
+  module: createImporter(screens[i]?.sourceFile ?? null),
   regions: entry.regions,
 }))
 
