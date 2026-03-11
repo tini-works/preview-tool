@@ -9,6 +9,55 @@ import { createPreviewStatePlugin } from './vite-plugin-preview-state.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 /**
+ * Vite plugin that shims Node.js built-in modules for browser compatibility.
+ * Packages like @tanstack/react-start import node:async_hooks which is Node-only.
+ * This provides minimal no-op implementations so the preview can render in the browser.
+ */
+function nodeBuiltinShimsPlugin(): { name: string; resolveId: (id: string) => string | null; load: (id: string) => string | null } {
+  const SHIM_PREFIX = '\0node-shim:'
+  const SHIMMED_MODULES: Record<string, string> = {
+    'node:async_hooks': `
+class AsyncLocalStorage {
+  constructor() { this._store = undefined }
+  getStore() { return this._store }
+  run(store, callback, ...args) {
+    const prev = this._store
+    this._store = store
+    try { return callback(...args) }
+    finally { this._store = prev }
+  }
+  enterWith(store) { this._store = store }
+  disable() { this._store = undefined }
+}
+class AsyncResource {
+  constructor() {}
+  runInAsyncScope(fn, thisArg, ...args) { return fn.apply(thisArg, args) }
+  emitDestroy() {}
+  asyncId() { return 0 }
+  triggerAsyncId() { return 0 }
+}
+export { AsyncLocalStorage, AsyncResource }
+export default { AsyncLocalStorage, AsyncResource }
+`,
+  }
+
+  return {
+    name: 'preview-tool:node-shims',
+    resolveId(id: string) {
+      if (id in SHIMMED_MODULES) return SHIM_PREFIX + id
+      return null
+    },
+    load(id: string) {
+      if (id.startsWith(SHIM_PREFIX)) {
+        const moduleId = id.slice(SHIM_PREFIX.length)
+        return SHIMMED_MODULES[moduleId] ?? null
+      }
+      return null
+    },
+  }
+}
+
+/**
  * Resolve the @preview-tool/runtime package root.
  */
 function resolveRuntimePath(): string {
@@ -93,6 +142,7 @@ export async function createViteConfig(
   }
 
   const plugins = [
+    nodeBuiltinShimsPlugin(),
     ...(specPlugin ? [specPlugin] : []),
     ...(previewStatePlugin ? [previewStatePlugin] : []),
     ...(tailwindPlugin ? [tailwindPlugin] : []),
