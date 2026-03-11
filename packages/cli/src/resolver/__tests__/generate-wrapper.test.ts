@@ -101,7 +101,7 @@ describe('generateWrapperCode', () => {
   // -----------------------------------------------------------------------
 
   it('uses MemoryRouter with initialEntries when route is provided', () => {
-    const code = generateWrapperCode(['react-router-dom'], '/register')
+    const code = generateWrapperCode(['react-router-dom'], { route: '/register' })
     expect(code).toContain("initialEntries={['/register']}")
     expect(code).toContain('MemoryRouter')
   })
@@ -113,9 +113,30 @@ describe('generateWrapperCode', () => {
   })
 
   it('route parameter does not affect non-router providers', () => {
-    const code = generateWrapperCode(['@tanstack/react-query'], '/some-route')
+    const code = generateWrapperCode(['@tanstack/react-query'], { route: '/some-route' })
     expect(code).not.toContain('initialEntries')
     expect(code).toContain('QueryClientProvider')
+  })
+
+  // -----------------------------------------------------------------------
+  // i18n path resolution
+  // -----------------------------------------------------------------------
+
+  it('uses detected i18n path in import', () => {
+    const code = generateWrapperCode(['react-i18next'], { i18nPath: 'src/lib/i18n.ts' })
+    expect(code).toContain("from '@host/lib/i18n'")
+    expect(code).not.toContain("from '@host/i18n'")
+  })
+
+  it('falls back to @host/i18n when no i18nPath', () => {
+    const code = generateWrapperCode(['react-i18next'])
+    expect(code).toContain("from '@host/i18n'")
+  })
+
+  it('handles i18n path in index file', () => {
+    const code = generateWrapperCode(['react-i18next'], { i18nPath: 'src/i18n/index.ts' })
+    expect(code).toContain("from '@host/i18n/index'")
+    expect(code).not.toContain("from '@host/i18n'")
   })
 
   // -----------------------------------------------------------------------

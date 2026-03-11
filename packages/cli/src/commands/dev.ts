@@ -39,7 +39,7 @@ export const devCommand = new Command('dev')
       await mkdir(previewDir, { recursive: true })
       const wrapperPath = join(previewDir, 'wrapper.tsx')
       if (!existsSync(wrapperPath)) {
-        await writeFile(wrapperPath, generateWrapperCode(framework.providers), 'utf-8')
+        await writeFile(wrapperPath, generateWrapperCode(framework.providers, { i18nPath: framework.i18nPath }), 'utf-8')
         console.log(chalk.dim(`Generated wrapper with providers: ${framework.providers.join(', ') || 'none'}`))
       } else {
         const result = syncWrapperProviders(wrapperPath, framework.providers)

@@ -24,6 +24,7 @@ export interface DetectedFramework {
   bundler: 'vite' | 'webpack' | 'next' | 'unknown'
   pagePattern: string
   providers: string[]
+  i18nPath: string | null
   devToolStorePath: string | null
   devToolConfig: DevToolConfig | null
 }
@@ -67,12 +68,13 @@ export async function detectFramework(cwd: string): Promise<DetectedFramework> {
   const bundler = detectBundler(allDeps, cwd)
   const pagePattern = await detectPagePattern(cwd)
   const providers = KNOWN_PROVIDERS.filter((p) => p in allDeps)
+  const i18nPath = await detectI18nPath(cwd, [...providers])
   const devToolStorePath = await detectDevToolStore(cwd)
   const devToolConfig = devToolStorePath
     ? await parseDevToolConfig(cwd, devToolStorePath)
     : null
 
-  return { name, bundler, pagePattern, providers: [...providers], devToolStorePath, devToolConfig }
+  return { name, bundler, pagePattern, providers: [...providers], i18nPath, devToolStorePath, devToolConfig }
 }
 
 function detectFrameworkName(deps: Record<string, string>): DetectedFramework['name'] {
@@ -99,6 +101,30 @@ async function detectPagePattern(cwd: string): Promise<string> {
     }
   }
   return 'src/**/*.tsx'
+}
+
+const I18N_CANDIDATES = [
+  'src/i18n.ts', 'src/i18n.tsx', 'src/i18n/index.ts', 'src/i18n/index.tsx',
+  'src/lib/i18n.ts', 'src/lib/i18n.tsx', 'src/config/i18n.ts', 'src/config/i18n.tsx',
+] as const
+
+async function detectI18nPath(cwd: string, providers: string[]): Promise<string | null> {
+  if (!providers.includes('react-i18next')) return null
+
+  for (const candidate of I18N_CANDIDATES) {
+    if (existsSync(join(cwd, candidate))) return candidate
+  }
+
+  // Fallback: glob for files containing i18next setup
+  const matches = await glob('src/**/i18n*.{ts,tsx}', { cwd, absolute: false })
+  for (const match of matches) {
+    try {
+      const content = await readFile(join(cwd, match), 'utf-8')
+      if (content.includes('i18next') || content.includes('initReactI18next')) return match
+    } catch { /* skip */ }
+  }
+
+  return null
 }
 
 const DEV_TOOL_STORE_GLOBS = [

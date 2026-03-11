@@ -52,6 +52,41 @@ describe('detectFramework', () => {
     expect(result.providers).toContain('react-i18next')
   })
 
+  it('detects i18n config at non-standard path', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'test-'))
+    await writeFile(join(dir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^19.0.0', 'react-i18next': '^15.0.0' },
+      devDependencies: { vite: '^6.0.0' },
+    }))
+    await mkdir(join(dir, 'src', 'lib'), { recursive: true })
+    await writeFile(join(dir, 'src', 'lib', 'i18n.ts'), `
+import i18next from 'i18next'
+import { initReactI18next } from 'react-i18next'
+i18next.use(initReactI18next).init({ fallbackLng: 'en' })
+export default i18next
+`)
+    await mkdir(join(dir, 'src', 'pages'), { recursive: true })
+    await writeFile(join(dir, 'src', 'pages', 'home.tsx'), '')
+
+    const result = await detectFramework(dir)
+
+    expect(result.i18nPath).toBe('src/lib/i18n.ts')
+  })
+
+  it('returns null i18nPath when react-i18next is not present', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'test-'))
+    await writeFile(join(dir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^19.0.0' },
+      devDependencies: { vite: '^6.0.0' },
+    }))
+    await mkdir(join(dir, 'src', 'pages'), { recursive: true })
+    await writeFile(join(dir, 'src', 'pages', 'home.tsx'), '')
+
+    const result = await detectFramework(dir)
+
+    expect(result.i18nPath).toBeNull()
+  })
+
   it('throws when no package.json', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'test-'))
     await expect(detectFramework(dir)).rejects.toThrow('No package.json')

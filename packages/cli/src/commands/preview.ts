@@ -74,7 +74,7 @@ export const previewCommand = new Command('preview')
         ...DEFAULT_CONFIG,
         screenGlob: framework.pagePattern,
       }
-      const wrapperCode = generateWrapperCode(framework.providers)
+      const wrapperCode = generateWrapperCode(framework.providers, { i18nPath: framework.i18nPath })
       await initPreview(resolved.cwd, config, wrapperCode)
     }
 

@@ -63,7 +63,7 @@ export const buildCommand = new Command('build')
         ...DEFAULT_CONFIG,
         screenGlob: framework.pagePattern,
       }
-      const wrapperCode = generateWrapperCode(framework.providers)
+      const wrapperCode = generateWrapperCode(framework.providers, { i18nPath: framework.i18nPath })
       await initPreview(resolved.cwd, initConfig, wrapperCode)
     }
 
