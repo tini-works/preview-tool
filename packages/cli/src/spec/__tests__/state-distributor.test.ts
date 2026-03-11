@@ -30,6 +30,10 @@ describe('classifyField', () => {
   it('classifies setSelected as setter', () => {
     expect(classifyField('setSelected', 'function')).toBe('setter')
   })
+
+  it('classifies isError (boolean) as error-indicator', () => {
+    expect(classifyField('isError', 'boolean')).toBe('error-indicator')
+  })
 })
 
 describe('distributeByState', () => {
@@ -97,6 +101,24 @@ describe('distributeByState', () => {
     expect(result.populated.rooms.length).toBeGreaterThan(0)
     expect(result.empty.rooms).toEqual([])
     expect(result.error.error).toBeTruthy()
+  })
+
+  it('handles boolean isError field correctly per state', () => {
+    const typeWithIsError: TypeShapeInfo = {
+      shape: { items: [], isLoading: false, isError: false },
+      confidence: 'full',
+      methods: [],
+      properties: ['items', 'isLoading', 'isError'],
+    }
+    const kinds: Record<string, string> = {
+      items: 'array',
+      isLoading: 'boolean',
+      isError: 'boolean',
+    }
+    const result = distributeByState(['loading', 'populated', 'error'], typeWithIsError, kinds)
+    expect(result.error.isError).toBe(true)
+    expect(result.loading.isError).toBe(false)
+    expect(result.populated.isError).toBe(false)
   })
 
   it('includes NOOP for method fields', () => {

@@ -37,7 +37,7 @@ function categorizeStateName(stateName: string): StateCategory {
 
 const LOADING_FIELD_PATTERNS =
   /^(is_?loading|is_?fetching|is_?pending|loading|fetching|pending)$/i
-const ERROR_FIELD_PATTERNS = /^(error|error_?message|err)$/i
+const ERROR_FIELD_PATTERNS = /^(error|error_?message|err|is_?error)$/i
 const SETTER_PATTERNS = /^(set[A-Z]|toggle[A-Z]|reset[A-Z]|on[A-Z])/
 
 export function classifyField(
@@ -85,6 +85,9 @@ function getFieldValueForState(
       return stateCategory === 'loading' || stateCategory === 'submitting'
 
     case 'error-indicator':
+      if (typeof shapeValue === 'boolean') {
+        return stateCategory === 'error'
+      }
       return stateCategory === 'error' ? 'Something went wrong' : null
 
     case 'data-array': {
