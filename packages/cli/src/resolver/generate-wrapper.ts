@@ -137,22 +137,22 @@ ${jsx.trimEnd()}
 `
 }
 
-export function syncWrapperProviders(wrapperPath: string, providers: string[]): boolean {
+export interface SyncResult {
+  created: boolean
+  missingProviders: string[]
+}
+
+export function syncWrapperProviders(wrapperPath: string, providers: string[]): SyncResult {
   const matched = PROVIDER_DEFS.filter((d) => providers.includes(d.dependency))
 
   if (!existsSync(wrapperPath)) {
     writeFileSync(wrapperPath, generateWrapperCode(providers), 'utf-8')
-    return true
+    return { created: true, missingProviders: [] }
   }
 
   const existing = readFileSync(wrapperPath, 'utf-8')
-
-  // Check if each detected provider's dependency import is present
   const missing = matched.filter((def) => !existing.includes(def.dependency))
 
-  if (missing.length === 0) return false
-
-  // Regenerate with all detected providers
-  writeFileSync(wrapperPath, generateWrapperCode(providers), 'utf-8')
-  return true
+  // Never overwrite user-maintained file
+  return { created: false, missingProviders: missing.map((d) => d.dependency) }
 }

@@ -138,8 +138,9 @@ describe('syncWrapperProviders', () => {
   })
 
   it('creates wrapper if file is missing', () => {
-    const updated = syncWrapperProviders(wrapperPath, ['react-router-dom'])
-    expect(updated).toBe(true)
+    const result = syncWrapperProviders(wrapperPath, ['react-router-dom'])
+    expect(result.created).toBe(true)
+    expect(result.missingProviders).toEqual([])
     expect(existsSync(wrapperPath)).toBe(true)
     const content = readFileSync(wrapperPath, 'utf-8')
     expect(content).toContain('MemoryRouter')
@@ -149,26 +150,28 @@ describe('syncWrapperProviders', () => {
     const initial = generateWrapperCode(['react-router-dom', '@tanstack/react-query'])
     writeFileSync(wrapperPath, initial, 'utf-8')
 
-    const updated = syncWrapperProviders(wrapperPath, ['react-router-dom', '@tanstack/react-query'])
-    expect(updated).toBe(false)
+    const result = syncWrapperProviders(wrapperPath, ['react-router-dom', '@tanstack/react-query'])
+    expect(result.created).toBe(false)
+    expect(result.missingProviders).toEqual([])
   })
 
-  it('updates wrapper when new provider detected', () => {
+  it('reports missing providers without modifying existing file', () => {
     const initial = generateWrapperCode(['react-router-dom'])
     writeFileSync(wrapperPath, initial, 'utf-8')
 
-    const updated = syncWrapperProviders(wrapperPath, ['react-router-dom', '@tanstack/react-query'])
-    expect(updated).toBe(true)
+    const result = syncWrapperProviders(wrapperPath, ['react-router-dom', '@tanstack/react-query'])
+    expect(result.created).toBe(false)
+    expect(result.missingProviders).toEqual(['@tanstack/react-query'])
     const content = readFileSync(wrapperPath, 'utf-8')
-    expect(content).toContain('MemoryRouter')
-    expect(content).toContain('QueryClientProvider')
+    expect(content).toBe(initial)  // File unchanged
   })
 
-  it('returns false when providers list is empty', () => {
+  it('returns empty missingProviders when providers list is empty', () => {
     const initial = generateWrapperCode([])
     writeFileSync(wrapperPath, initial, 'utf-8')
 
-    const updated = syncWrapperProviders(wrapperPath, [])
-    expect(updated).toBe(false)
+    const result = syncWrapperProviders(wrapperPath, [])
+    expect(result.created).toBe(false)
+    expect(result.missingProviders).toEqual([])
   })
 })

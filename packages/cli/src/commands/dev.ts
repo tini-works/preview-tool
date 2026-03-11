@@ -42,9 +42,10 @@ export const devCommand = new Command('dev')
         await writeFile(wrapperPath, generateWrapperCode(framework.providers), 'utf-8')
         console.log(chalk.dim(`Generated wrapper with providers: ${framework.providers.join(', ') || 'none'}`))
       } else {
-        const updated = syncWrapperProviders(wrapperPath, framework.providers)
-        if (updated) {
-          console.log(chalk.dim(`Updated wrapper with new providers: ${framework.providers.join(', ')}`))
+        const result = syncWrapperProviders(wrapperPath, framework.providers)
+        if (result.missingProviders.length > 0) {
+          console.log(chalk.yellow(`  Missing providers in wrapper.tsx: ${result.missingProviders.join(', ')}`))
+          console.log(chalk.yellow(`  Add them manually: ${wrapperPath}`))
         }
       }
     }

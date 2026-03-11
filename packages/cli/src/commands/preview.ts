@@ -80,8 +80,10 @@ export const previewCommand = new Command('preview')
 
     // Step 4b: Sync wrapper.tsx with detected providers
     const wrapperPath = join(previewDir, 'wrapper.tsx')
-    if (syncWrapperProviders(wrapperPath, framework.providers)) {
-      console.log(chalk.dim('  Updated wrapper.tsx with detected providers'))
+    const syncResult = syncWrapperProviders(wrapperPath, framework.providers)
+    if (syncResult.missingProviders.length > 0) {
+      console.log(chalk.yellow(`  Missing providers in wrapper.tsx: ${syncResult.missingProviders.join(', ')}`))
+      console.log(chalk.yellow(`  Add them manually: ${wrapperPath}`))
     }
 
     // Step 5: Generate MVC files

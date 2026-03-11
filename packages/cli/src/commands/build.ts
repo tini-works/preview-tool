@@ -69,8 +69,10 @@ export const buildCommand = new Command('build')
 
     // Step 4b: Sync wrapper providers
     const wrapperPath = join(previewDir, 'wrapper.tsx')
-    if (syncWrapperProviders(wrapperPath, framework.providers)) {
-      console.log(chalk.dim('  Updated wrapper.tsx with detected providers'))
+    const syncResult = syncWrapperProviders(wrapperPath, framework.providers)
+    if (syncResult.missingProviders.length > 0) {
+      console.log(chalk.yellow(`  Missing providers in wrapper.tsx: ${syncResult.missingProviders.join(', ')}`))
+      console.log(chalk.yellow(`  Add them manually: ${wrapperPath}`))
     }
 
     // Step 5: Run V2 analysis + generation pipeline
