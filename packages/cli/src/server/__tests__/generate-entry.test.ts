@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { detectCssEntry, generateEntryFiles } from '../generate-entry.js'
+import { detectCssEntry, generateEntryFiles, generateSpecMainTsx } from '../generate-entry.js'
 import { mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -132,5 +132,40 @@ describe('generateMainTsx', () => {
     // Should use replacement: override.regions takes over entirely, not shallow merge
     expect(mainTsx).toContain('override.regions ?? base.regions')
     expect(mainTsx).not.toContain('...base.regions, ...(override.regions')
+  })
+})
+
+describe('generateSpecMainTsx', () => {
+  it('imports from virtual:spec-manifest', () => {
+    const code = generateSpecMainTsx()
+    expect(code).toContain("from 'virtual:spec-manifest'")
+  })
+
+  it('imports PreviewShell from runtime', () => {
+    const code = generateSpecMainTsx()
+    expect(code).toContain("from '@preview-tool/runtime'")
+    expect(code).toContain('PreviewShell')
+  })
+
+  it('builds entries from screenEntries', () => {
+    const code = generateSpecMainTsx()
+    expect(code).toContain('screenEntries')
+    expect(code).toContain('entries')
+  })
+
+  it('uses spec mode when specsDir is set in config', async () => {
+    const dir = join(TMP, `proj-spec-${Date.now()}`)
+    mkdirSync(join(dir, '.preview'), { recursive: true })
+
+    await generateEntryFiles(dir, {
+      screenGlob: 'src/**/*.tsx',
+      port: 6100,
+      title: 'Spec Test',
+      specsDir: '/tmp/fake-specs',
+    })
+
+    const mainTsx = readFileSync(join(dir, '.preview', 'main.tsx'), 'utf-8')
+    expect(mainTsx).toContain("from 'virtual:spec-manifest'")
+    expect(mainTsx).not.toContain("import.meta.glob('./screens/*/adapter.tsx')")
   })
 })
