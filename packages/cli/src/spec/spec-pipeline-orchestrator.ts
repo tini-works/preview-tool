@@ -373,6 +373,74 @@ export function generateContextShim(hook: HookFact, importPath: string): string 
 }
 
 // ---------------------------------------------------------------------------
+// Server function import detection and stubbing (Layer 4)
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true if the import path looks like a server-functions or actions module.
+ * These typically crash at module eval time (e.g. `createServerFn` from @tanstack/react-start).
+ */
+export function isServerFunctionImport(path: string): boolean {
+  return /server[-_]?functions?/i.test(path) || /\/actions\/?/i.test(path)
+}
+
+/**
+ * Scan a source file's import declarations for server function imports.
+ * Returns the module specifiers that need stubs (excluding already-mocked paths).
+ */
+export function discoverServerFunctionImports(
+  sf: SourceFile,
+  alreadyMocked: Set<string>,
+): Array<{ modulePath: string; namedExports: string[] }> {
+  const results: Array<{ modulePath: string; namedExports: string[] }> = []
+
+  for (const decl of sf.getImportDeclarations()) {
+    const moduleSpec = decl.getModuleSpecifierValue()
+    if (!isServerFunctionImport(moduleSpec)) continue
+    if (alreadyMocked.has(moduleSpec)) continue
+
+    const namedExports: string[] = []
+    for (const named of decl.getNamedImports()) {
+      namedExports.push(named.getName())
+    }
+    const defaultImport = decl.getDefaultImport()
+    if (defaultImport) {
+      namedExports.push(defaultImport.getText())
+    }
+
+    if (namedExports.length > 0) {
+      results.push({ modulePath: moduleSpec, namedExports })
+    }
+  }
+
+  return results
+}
+
+/**
+ * Generate a safe no-op stub for a server function module.
+ * Does NOT re-export from `__real:` because that would re-import the crashy module.
+ */
+export function generateServerFunctionStub(importPath: string, exportNames: string[]): string {
+  const lines = [
+    `// Auto-generated server function stub for ${importPath}`,
+    `// Prevents module-eval crashes (e.g. createServerFn accessing isServer)`,
+    '',
+  ]
+
+  for (const name of exportNames) {
+    lines.push(
+      `// eslint-disable-next-line @typescript-eslint/no-explicit-any`,
+      `export function ${name}(..._args: any[]) {`,
+      `  return Promise.resolve(undefined)`,
+      `}`,
+      '',
+    )
+  }
+
+  return lines.join('\n')
+}
+
+// ---------------------------------------------------------------------------
 // Main orchestrator
 // ---------------------------------------------------------------------------
 
@@ -548,6 +616,22 @@ export async function runSpecPipeline(
       mockFiles.set(importPath, combined + additional.join(''))
     } else {
       mockFiles.set(importPath, combined)
+    }
+  }
+
+  // Detect and stub server function imports (Layer 4)
+  // These crash at module eval time (e.g. createServerFn accessing isServer)
+  const alreadyMocked = new Set(mockFiles.keys())
+  for (const screen of screens) {
+    const absPath = resolveSourceFilePath(screen, cwd, specsDir)
+    const sf = absPath ? sourceFileMap.get(absPath) : undefined
+    if (!sf) continue
+
+    const serverImports = discoverServerFunctionImports(sf, alreadyMocked)
+    for (const { modulePath, namedExports } of serverImports) {
+      if (mockFiles.has(modulePath)) continue
+      mockFiles.set(modulePath, generateServerFunctionStub(modulePath, namedExports))
+      alreadyMocked.add(modulePath)
     }
   }
 
