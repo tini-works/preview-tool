@@ -32,6 +32,13 @@ export const devCommand = new Command('dev')
       config.specsDir = resolve(options.specs)
     }
 
+    // Validate specs directory exists
+    if (config.specsDir && !existsSync(config.specsDir)) {
+      console.error(chalk.red(`Specs directory not found: ${config.specsDir}`))
+      console.error(chalk.dim('Create the directory or check the --specs path.'))
+      process.exit(1)
+    }
+
     // Auto-detect providers and generate wrapper in spec mode
     if (config.specsDir) {
       const framework = await detectFramework(cwd)

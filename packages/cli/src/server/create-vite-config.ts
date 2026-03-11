@@ -1,5 +1,5 @@
 import { join, dirname } from 'node:path'
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import type { PreviewConfig } from '../lib/config.js'
@@ -40,12 +40,22 @@ export default { AsyncLocalStorage, AsyncResource }
  * Returns alias entries that redirect `node:X` → the physical shim file.
  * Using resolve.alias (not a plugin) ensures esbuild pre-bundling picks it up.
  */
-function writeNodeShims(previewDir: string): Array<{ find: string; replacement: string }> {
+function writeNodeShims(previewDir: string, cwd: string): Array<{ find: string; replacement: string }> {
   const shimsDir = join(previewDir, 'shims')
   if (!existsSync(shimsDir)) mkdirSync(shimsDir, { recursive: true })
 
   const shimPath = join(shimsDir, 'async-hooks.mjs')
+
+  // Check if shim content changed — if so, clear Vite's dep cache
+  let existing = ''
+  try { existing = readFileSync(shimPath, 'utf-8') } catch { /* first run */ }
   writeFileSync(shimPath, ASYNC_HOOKS_SHIM, 'utf-8')
+  if (existing && existing !== ASYNC_HOOKS_SHIM) {
+    const viteCacheDir = join(cwd, 'node_modules', '.vite')
+    if (existsSync(viteCacheDir)) {
+      rmSync(viteCacheDir, { recursive: true, force: true })
+    }
+  }
 
   return [
     { find: 'node:async_hooks', replacement: shimPath },
@@ -191,7 +201,7 @@ export async function createViteConfig(
   }
 
   // Write browser-safe shims for Node.js built-ins (e.g. node:async_hooks)
-  const nodeShimAliases = writeNodeShims(previewDir)
+  const nodeShimAliases = writeNodeShims(previewDir, cwd)
 
   // Use array format to guarantee ordering: shims first, then __real: aliases,
   // then mock aliases, then React deduplication, then general @/ alias last.
@@ -215,6 +225,16 @@ export async function createViteConfig(
     { find: '@', replacement: join(cwd, 'src') },
   ]
 
+  // Only include packages that the host project actually depends on
+  const optimizeDepsInclude = ['react', 'react-dom']
+  try {
+    const hostPkg = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf-8'))
+    const allDeps = { ...hostPkg.dependencies, ...hostPkg.devDependencies }
+    if (allDeps['zustand']) optimizeDepsInclude.push('zustand')
+  } catch {
+    // package.json unreadable — stick with react/react-dom
+  }
+
   return {
     root: previewDir,
     server: {
@@ -230,7 +250,7 @@ export async function createViteConfig(
     },
     plugins,
     optimizeDeps: {
-      include: ['react', 'react-dom', 'zustand'],
+      include: optimizeDepsInclude,
     },
   }
 }
