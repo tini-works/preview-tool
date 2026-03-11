@@ -1,5 +1,5 @@
 import { join, dirname } from 'node:path'
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import type { PreviewConfig } from '../lib/config.js'
@@ -8,15 +8,10 @@ import { createPreviewStatePlugin } from './vite-plugin-preview-state.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-/**
- * Vite plugin that shims Node.js built-in modules for browser compatibility.
- * Packages like @tanstack/react-start import node:async_hooks which is Node-only.
- * This provides minimal no-op implementations so the preview can render in the browser.
- */
-function nodeBuiltinShimsPlugin(): { name: string; resolveId: (id: string) => string | null; load: (id: string) => string | null } {
-  const SHIM_PREFIX = '\0node-shim:'
-  const SHIMMED_MODULES: Record<string, string> = {
-    'node:async_hooks': `
+// Browser-safe shim for node:async_hooks.
+// Packages like @tanstack/react-start import AsyncLocalStorage which is Node-only.
+// Vite externalises it to a Proxy that throws on `new`, crashing the preview.
+const ASYNC_HOOKS_SHIM = `\
 class AsyncLocalStorage {
   constructor() { this._store = undefined }
   getStore() { return this._store }
@@ -38,23 +33,24 @@ class AsyncResource {
 }
 export { AsyncLocalStorage, AsyncResource }
 export default { AsyncLocalStorage, AsyncResource }
-`,
-  }
+`
 
-  return {
-    name: 'preview-tool:node-shims',
-    resolveId(id: string) {
-      if (id in SHIMMED_MODULES) return SHIM_PREFIX + id
-      return null
-    },
-    load(id: string) {
-      if (id.startsWith(SHIM_PREFIX)) {
-        const moduleId = id.slice(SHIM_PREFIX.length)
-        return SHIMMED_MODULES[moduleId] ?? null
-      }
-      return null
-    },
-  }
+/**
+ * Write browser-safe shims for Node.js built-ins into .preview/shims/.
+ * Returns alias entries that redirect `node:X` → the physical shim file.
+ * Using resolve.alias (not a plugin) ensures esbuild pre-bundling picks it up.
+ */
+function writeNodeShims(previewDir: string): Array<{ find: string; replacement: string }> {
+  const shimsDir = join(previewDir, 'shims')
+  if (!existsSync(shimsDir)) mkdirSync(shimsDir, { recursive: true })
+
+  const shimPath = join(shimsDir, 'async-hooks.mjs')
+  writeFileSync(shimPath, ASYNC_HOOKS_SHIM, 'utf-8')
+
+  return [
+    { find: 'node:async_hooks', replacement: shimPath },
+    { find: 'async_hooks', replacement: shimPath },
+  ]
 }
 
 /**
@@ -142,7 +138,6 @@ export async function createViteConfig(
   }
 
   const plugins = [
-    nodeBuiltinShimsPlugin(),
     ...(specPlugin ? [specPlugin] : []),
     ...(previewStatePlugin ? [previewStatePlugin] : []),
     ...(tailwindPlugin ? [tailwindPlugin] : []),
@@ -195,9 +190,14 @@ export async function createViteConfig(
     // No alias manifest — no mock hooks
   }
 
-  // Use array format to guarantee ordering: __real: aliases first (for mock re-exports),
+  // Write browser-safe shims for Node.js built-ins (e.g. node:async_hooks)
+  const nodeShimAliases = writeNodeShims(previewDir)
+
+  // Use array format to guarantee ordering: shims first, then __real: aliases,
   // then mock aliases, then React deduplication, then general @/ alias last.
   const aliasArray = [
+    // Node.js built-in shims (must be first so esbuild pre-bundling picks them up)
+    ...nodeShimAliases,
     // 0. Real module aliases (used by mocks to re-export non-hook exports)
     ...realModuleEntries,
     // 1. Mock aliases (redirect imports to mock files)
