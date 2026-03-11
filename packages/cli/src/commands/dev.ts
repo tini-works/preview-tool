@@ -2,9 +2,13 @@ import { Command } from 'commander'
 import chalk from 'chalk'
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
-import { readConfig } from '../lib/config.js'
+import { existsSync } from 'node:fs'
+import { mkdir, writeFile } from 'node:fs/promises'
+import { readConfig, PREVIEW_DIR } from '../lib/config.js'
 import { createViteConfig } from '../server/create-vite-config.js'
 import { generateEntryFiles } from '../server/generate-entry.js'
+import { detectFramework } from '../resolver/detect-framework.js'
+import { syncWrapperProviders, generateWrapperCode } from '../resolver/generate-wrapper.js'
 
 export const devCommand = new Command('dev')
   .description('Start preview dev server')
@@ -26,6 +30,23 @@ export const devCommand = new Command('dev')
     // Override specsDir from CLI flag if provided
     if (options.specs) {
       config.specsDir = resolve(options.specs)
+    }
+
+    // Auto-detect providers and generate wrapper in spec mode
+    if (config.specsDir) {
+      const framework = await detectFramework(cwd)
+      const previewDir = join(cwd, PREVIEW_DIR)
+      await mkdir(previewDir, { recursive: true })
+      const wrapperPath = join(previewDir, 'wrapper.tsx')
+      if (!existsSync(wrapperPath)) {
+        await writeFile(wrapperPath, generateWrapperCode(framework.providers), 'utf-8')
+        console.log(chalk.dim(`Generated wrapper with providers: ${framework.providers.join(', ') || 'none'}`))
+      } else {
+        const updated = syncWrapperProviders(wrapperPath, framework.providers)
+        if (updated) {
+          console.log(chalk.dim(`Updated wrapper with new providers: ${framework.providers.join(', ')}`))
+        }
+      }
     }
 
     // Generate entry files (index.html + main.tsx)
