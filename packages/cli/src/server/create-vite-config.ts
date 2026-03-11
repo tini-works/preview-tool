@@ -159,7 +159,8 @@ export async function createViteConfig(
     { find: '@preview-tool/runtime', replacement: join(runtimeRoot, 'src', 'index.ts') },
     { find: '@host', replacement: join(cwd, 'src') },
     { find: '@preview', replacement: previewDir },
-    // 4. General @/ alias (must be last — catches anything not matched above)
+    // 4. General path aliases (must be last — catches anything not matched above)
+    { find: '~/', replacement: join(cwd, 'src') + '/' },
     { find: '@/', replacement: join(cwd, 'src') + '/' },
     { find: '@', replacement: join(cwd, 'src') },
   ]
