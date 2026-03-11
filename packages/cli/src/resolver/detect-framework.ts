@@ -32,14 +32,10 @@ const KNOWN_PROVIDERS = [
   '@tanstack/react-query',
   '@tanstack/react-router',
   'react-router-dom',
+  'react-hook-form',
   'react-i18next',
   '@chakra-ui/react',
   '@mui/material',
-  '@emotion/react',
-  'styled-components',
-  'zustand',
-  'redux',
-  '@reduxjs/toolkit',
 ] as const
 
 const PAGE_PATTERNS = [

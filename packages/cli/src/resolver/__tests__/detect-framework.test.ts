@@ -143,6 +143,36 @@ export const devToolPages = {
     expect(result.devToolConfig!.pages[1].sections[1].id).toBe('upcoming')
   })
 
+  it('detects react-hook-form as a provider', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'test-'))
+    await writeFile(join(dir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^19.0.0', 'react-hook-form': '^7.0.0' },
+      devDependencies: { vite: '^6.0.0' },
+    }))
+    await mkdir(join(dir, 'src', 'pages'), { recursive: true })
+    await writeFile(join(dir, 'src', 'pages', 'home.tsx'), '')
+
+    const result = await detectFramework(dir)
+
+    expect(result.providers).toContain('react-hook-form')
+  })
+
+  it('does not detect zustand or redux as providers', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'test-'))
+    await writeFile(join(dir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^19.0.0', zustand: '^5.0.0', redux: '^5.0.0', '@reduxjs/toolkit': '^2.0.0' },
+      devDependencies: { vite: '^6.0.0' },
+    }))
+    await mkdir(join(dir, 'src', 'pages'), { recursive: true })
+    await writeFile(join(dir, 'src', 'pages', 'home.tsx'), '')
+
+    const result = await detectFramework(dir)
+
+    expect(result.providers).not.toContain('zustand')
+    expect(result.providers).not.toContain('redux')
+    expect(result.providers).not.toContain('@reduxjs/toolkit')
+  })
+
   it('skips DevToolStore without setSectionState', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'test-'))
     await writeFile(join(dir, 'package.json'), JSON.stringify({
