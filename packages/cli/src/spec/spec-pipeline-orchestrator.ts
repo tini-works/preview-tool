@@ -1,12 +1,14 @@
 import { resolve } from 'node:path'
 import { existsSync } from 'node:fs'
-import { Project, type SourceFile } from 'ts-morph'
+import { Project, SyntaxKind, type SourceFile } from 'ts-morph'
 import { extractHookFacts } from '../analyzer/collect-facts.js'
 import { findTsConfig } from '../analyzer/collect-facts.js'
+import { extractHookReturnType } from '../analyzer/extract-types.js'
 import { classifyHook } from '../lib/hook-classifier.js'
 import { REACT_IMPORT_PATHS, REACT_BUILTIN_HOOKS } from '../lib/hook-binding.js'
 import { PROVIDER_PACKAGES } from '../lib/hook-classifier.js'
-import type { HookFact } from '../analyzer/types.js'
+import { distributeByState } from './state-distributor.js'
+import type { HookFact, TypeShapeInfo } from '../analyzer/types.js'
 import type { SpecManifestScreen, SpecDataDep } from './types.js'
 import type { RegionsMap, RegionDef } from './spec-to-model.js'
 
@@ -21,6 +23,8 @@ export interface MergedHookDep {
   /** Origin: 'spec' if from spec data_deps, 'ast' if discovered via AST */
   origin: 'spec' | 'ast'
   mappingType?: string
+  /** Resolved return type from TypeChecker (when available) */
+  resolvedType?: TypeShapeInfo
 }
 
 export interface SpecPipelineResult {
@@ -181,10 +185,21 @@ export function specToPerHookRegions(
 
   for (const dep of allHookDeps) {
     const regionKey = hookToRegionKey(dep.hook)
+
+    let states: Record<string, Record<string, unknown>>
+
+    if (dep.resolvedType && dep.resolvedType.confidence !== 'none') {
+      // Use type-aware state distribution
+      states = distributeByState(screen.states, dep.resolvedType)
+    } else {
+      // Fallback: existing behavior (distribute from stateData)
+      states = distributeStateData(screen.stateData, dep.provides)
+    }
+
     const region: RegionDef = {
       label: dep.hook,
       defaultState: screen.defaultState ?? screen.states[0] ?? 'default',
-      states: distributeStateData(screen.stateData, dep.provides),
+      states,
       hookMapping: {
         type: dep.mappingType ?? 'custom-hook',
         hookName: dep.hook,
@@ -398,26 +413,60 @@ export async function runSpecPipeline(
     const astHooks = sf ? discoverHooksFromSource(sf) : []
     allAstHooks.push(...astHooks)
 
+    // Resolve hook return types via TypeChecker
+    const resolvedTypes = new Map<string, TypeShapeInfo>()
+    if (sf && project) {
+      const typeChecker = project.getTypeChecker()
+      const callExprs = sf.getDescendantsOfKind(SyntaxKind.CallExpression)
+      for (const call of callExprs) {
+        const callText = call.getExpression().getText()
+        if (!callText.startsWith('use')) continue
+        try {
+          const resolved = extractHookReturnType(call, typeChecker)
+          if (resolved && resolved.confidence !== 'none') {
+            resolvedTypes.set(callText, resolved)
+          }
+        } catch {
+          // Type extraction failed for this hook — skip
+        }
+      }
+    }
+
     // Merge spec deps with AST hooks
     const mergedDeps = mergeHookDeps(screen.dataDeps, astHooks)
 
+    // Enrich merged deps with resolved types
+    const enrichedDeps = mergedDeps.map((dep) => {
+      const resolved = resolvedTypes.get(dep.hook)
+      if (!resolved) return dep
+      return {
+        ...dep,
+        resolvedType: resolved,
+        // Auto-populate provides from resolved type if empty
+        provides:
+          dep.provides.length > 0
+            ? dep.provides
+            : [...resolved.properties, ...resolved.methods],
+      }
+    })
+
     // Track data hook keys
-    for (const dep of mergedDeps) {
+    for (const dep of enrichedDeps) {
       allDataHookKeys.add(`${dep.module}::${dep.hook}`)
     }
 
     // Generate per-hook regions
-    const enrichedRegions = specToPerHookRegions(screen, mergedDeps)
+    const enrichedRegions = specToPerHookRegions(screen, enrichedDeps)
 
     enrichedScreens.push({
       ...screen,
-      mergedDeps,
+      mergedDeps: enrichedDeps,
       enrichedRegions,
     })
 
     // Group hooks by import path for mock file generation
     const hooksByImport = new Map<string, MergedHookDep[]>()
-    for (const dep of mergedDeps) {
+    for (const dep of enrichedDeps) {
       const existing = hooksByImport.get(dep.module) ?? []
       // Deduplicate by hook name
       if (!existing.some((h) => h.hook === dep.hook)) {
