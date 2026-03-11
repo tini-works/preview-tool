@@ -30,6 +30,7 @@ export interface DetectedFramework {
 
 const KNOWN_PROVIDERS = [
   '@tanstack/react-query',
+  '@tanstack/react-router',
   'react-router-dom',
   'react-i18next',
   '@chakra-ui/react',

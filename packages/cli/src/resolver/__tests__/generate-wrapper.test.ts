@@ -57,6 +57,18 @@ describe('generateWrapperCode', () => {
     expect(routerIdx).toBeLessThan(i18nIdx)
   })
 
+  it('wraps with TanStackRouterWrapper for @tanstack/react-router', () => {
+    const code = generateWrapperCode(['@tanstack/react-router'])
+    expect(code).toContain('RouterProvider')
+    expect(code).toContain('createRouter')
+    expect(code).toContain('createRootRoute')
+    expect(code).toContain('createMemoryHistory')
+    expect(code).toContain("from '@tanstack/react-router'")
+    expect(code).toContain('TanStackRouterWrapper')
+    expect(code).toContain('<TanStackRouterWrapper>')
+    expect(code).toContain('</TanStackRouterWrapper>')
+  })
+
   it('ignores unknown providers', () => {
     const code = generateWrapperCode(['zustand', 'some-unknown-lib'])
     expect(code).toContain('export function Wrapper')

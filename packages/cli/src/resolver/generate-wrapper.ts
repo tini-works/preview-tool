@@ -17,6 +17,22 @@ const PROVIDER_DEFS: ProviderDef[] = [
     close: '</QueryClientProvider>',
   },
   {
+    dependency: '@tanstack/react-router',
+    imports: [
+      "import { createRouter, createRootRoute, createMemoryHistory, RouterProvider } from '@tanstack/react-router'",
+    ].join('\n'),
+    setup: [
+      'const rootRoute = createRootRoute({ component: ({ children }: { children?: ReactNode }) => <>{children}</> })',
+      'const memoryHistory = createMemoryHistory({ initialEntries: ["/"] })',
+      'const previewRouter = createRouter({ routeTree: rootRoute, history: memoryHistory })',
+      'function TanStackRouterWrapper({ children }: { children: ReactNode }) {',
+      '  return <><RouterProvider router={previewRouter} />{children}</>',
+      '}',
+    ].join('\n'),
+    open: '<TanStackRouterWrapper>',
+    close: '</TanStackRouterWrapper>',
+  },
+  {
     dependency: 'react-router-dom',
     imports: "import { MemoryRouter } from 'react-router-dom'",
     open: (route?: string) => {
