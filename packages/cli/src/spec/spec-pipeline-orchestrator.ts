@@ -267,16 +267,34 @@ function generateMockFileForImportPath(
 
   for (const dep of hooks) {
     const regionKey = hookToRegionKey(dep.hook)
-    const dataFields = dep.provides.filter((f) => !isLikelySetter(f))
-    const fnFields = dep.provides.filter((f) => isLikelySetter(f))
-    const fnList = fnFields.map((f) => `'${f}'`).join(', ')
+
+    // Use resolved type info when available for richer field lists
+    const dataFields = dep.resolvedType
+      ? dep.resolvedType.properties.filter((f) => !isLikelySetter(f))
+      : dep.provides.filter((f) => !isLikelySetter(f))
+    const fnFields = dep.resolvedType
+      ? [
+          ...dep.resolvedType.methods,
+          ...dep.provides.filter(isLikelySetter),
+        ]
+      : dep.provides.filter(isLikelySetter)
+    // Deduplicate fn fields
+    const uniqueFnFields = [...new Set(fnFields)]
+
+    const fnList = uniqueFnFields.map((f) => `'${f}'`).join(', ')
     const dataList = dataFields.map((f) => `'${f}'`).join(', ')
+
+    // Build default shape from resolved type (provides non-null defaults)
+    const defaultShape = dep.resolvedType?.shape ?? {}
+    const defaultShapeJson = JSON.stringify(defaultShape)
 
     lines.push(
       `// eslint-disable-next-line @typescript-eslint/no-explicit-any`,
       `export function ${dep.hook}(..._args: any[]) {`,
       `  const data = useRegionDataForHook('${regionKey}')`,
-      `  const state = data ? resolveStoreState(data as Record<string, any>, [${fnList}], [${dataList}]) : resolveStoreState({}, [${fnList}], [${dataList}])`,
+      `  const defaults = ${defaultShapeJson}`,
+      `  const merged = data ? { ...defaults, ...(data as Record<string, any>) } : defaults`,
+      `  const state = resolveStoreState(merged, [${fnList}], [${dataList}])`,
       `  // Support Zustand selector pattern: useStore((s) => s.field)`,
       `  if (typeof _args[0] === 'function') { try { return _args[0](state) } catch { return state } }`,
       `  return state`,
