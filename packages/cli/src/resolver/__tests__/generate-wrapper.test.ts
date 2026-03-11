@@ -117,6 +117,22 @@ describe('generateWrapperCode', () => {
     expect(code).not.toContain('initialEntries')
     expect(code).toContain('QueryClientProvider')
   })
+
+  // -----------------------------------------------------------------------
+  // Competing routers
+  // -----------------------------------------------------------------------
+
+  it('excludes react-router-dom when both routers detected', () => {
+    const code = generateWrapperCode(['@tanstack/react-router', 'react-router-dom'])
+    expect(code).toContain('TanStackRouterWrapper')
+    expect(code).not.toContain('MemoryRouter')
+  })
+
+  it('keeps react-router-dom when TanStack Router is not present', () => {
+    const code = generateWrapperCode(['react-router-dom'])
+    expect(code).toContain('MemoryRouter')
+    expect(code).not.toContain('TanStackRouterWrapper')
+  })
 })
 
 // ---------------------------------------------------------------------------

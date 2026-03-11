@@ -85,7 +85,12 @@ const PROVIDER_DEFS: ProviderDef[] = [
 ]
 
 export function generateWrapperCode(providers: string[], route?: string): string {
-  const matched = PROVIDER_DEFS.filter((d) => providers.includes(d.dependency))
+  // Deduplicate routers — prefer TanStack Router if both detected
+  let filteredProviders = [...providers]
+  if (filteredProviders.includes('@tanstack/react-router') && filteredProviders.includes('react-router-dom')) {
+    filteredProviders = filteredProviders.filter((p) => p !== 'react-router-dom')
+  }
+  const matched = PROVIDER_DEFS.filter((d) => filteredProviders.includes(d.dependency))
 
   const imports = [
     "import type { ReactNode } from 'react'",
