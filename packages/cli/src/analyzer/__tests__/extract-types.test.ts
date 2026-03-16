@@ -100,6 +100,35 @@ describe('extractHookReturnType', () => {
     expect(info!.properties).toContain('name')
     expect(info!.properties).toContain('email')
   })
+
+  it('tracks nullable fields in nullableFields array', () => {
+    const { call, typeChecker } = getFirstCallExpression(`
+      interface Doctor { name: string; email: string }
+      interface TimeSlot { start: string; end: string }
+      function useStore(): { doctor: Doctor | null; timeSlot: TimeSlot | null; isLoading: boolean } {
+        return { doctor: null, timeSlot: null, isLoading: false }
+      }
+      const result = useStore()
+    `)
+    const info = extractHookReturnType(call, typeChecker)
+    expect(info).not.toBeNull()
+    expect(info!.nullableFields).toBeDefined()
+    expect(info!.nullableFields).toContain('doctor')
+    expect(info!.nullableFields).toContain('timeSlot')
+    expect(info!.nullableFields).not.toContain('isLoading')
+  })
+
+  it('returns empty nullableFields when no nullable properties exist', () => {
+    const { call, typeChecker } = getFirstCallExpression(`
+      function useStore(): { name: string; count: number } {
+        return { name: '', count: 0 }
+      }
+      const result = useStore()
+    `)
+    const info = extractHookReturnType(call, typeChecker)
+    expect(info).not.toBeNull()
+    expect(info!.nullableFields).toEqual([])
+  })
 })
 
 describe('extractUseStateType', () => {

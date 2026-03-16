@@ -30,6 +30,7 @@ describe('TypeCache', () => {
         confidence: 'full',
         methods: [],
         properties: ['rooms'],
+        nullableFields: [],
       },
     }
     await cache.set('scr-home', 'abc123', data)
@@ -44,6 +45,7 @@ describe('TypeCache', () => {
         confidence: 'full',
         methods: [],
         properties: ['rooms'],
+        nullableFields: [],
       },
     }
     await cache.set('scr-home', 'abc123', data)

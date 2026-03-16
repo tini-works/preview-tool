@@ -140,7 +140,7 @@ function serializeType(
 
   // Skip unresolvable types
   if (isUnresolvable(type)) {
-    return { shape: {}, confidence: 'none', methods: [], properties: [] }
+    return { shape: {}, confidence: 'none', methods: [], properties: [], nullableFields: [] }
   }
 
   // Handle union types at the top level: pick the most informative non-null branch
@@ -149,7 +149,7 @@ function serializeType(
       (t) => !t.isNull() && !t.isUndefined(),
     )
     if (nonNullTypes.length === 0) {
-      return { shape: {}, confidence: 'none', methods: [], properties: [] }
+      return { shape: {}, confidence: 'none', methods: [], properties: [], nullableFields: [] }
     }
     // Prefer object types in the union
     const objectType = nonNullTypes.find((t) => t.isObject() && !t.isArray())
@@ -159,6 +159,7 @@ function serializeType(
 
   const properties: string[] = []
   const methods: string[] = []
+  const nullableFields: string[] = []
   const shape: Record<string, unknown> = {}
   let hasPartial = false
 
@@ -181,6 +182,16 @@ function serializeType(
       continue
     }
 
+    // Detect nullable fields: properties whose type is a union including null or undefined
+    if (memberType.isUnion()) {
+      const hasNull = memberType.getUnionTypes().some(
+        (t) => t.isNull() || t.isUndefined(),
+      )
+      if (hasNull) {
+        nullableFields.push(name)
+      }
+    }
+
     if (isCallableType(memberType)) {
       methods.push(name)
     } else {
@@ -196,17 +207,17 @@ function serializeType(
 
   // If we got nothing meaningful, confidence is 'none'
   if (properties.length === 0 && methods.length === 0) {
-    return { shape: {}, confidence: 'none', methods: [], properties: [] }
+    return { shape: {}, confidence: 'none', methods: [], properties: [], nullableFields: [] }
   }
 
   // Methods-only objects (no data properties) get 'none' confidence so callers
   // fall back to leaf inference rather than using an empty shape
   if (properties.length === 0) {
-    return { shape: {}, confidence: 'none', methods, properties: [] }
+    return { shape: {}, confidence: 'none', methods, properties: [], nullableFields: [] }
   }
 
   const confidence = hasPartial ? 'partial' : 'full'
-  return { shape, confidence, methods, properties }
+  return { shape, confidence, methods, properties, nullableFields }
 }
 
 // ---------------------------------------------------------------------------

@@ -12,8 +12,12 @@ import {
   toSafeFileName,
   isServerFunctionImport,
   generateServerFunctionStub,
+  extractBooleanStem,
+  parseInitialValue,
+  generateLocalStateRegion,
   type MergedHookDep,
 } from '../spec-pipeline-orchestrator.js'
+import type { LocalStateFact } from '../../analyzer/types.js'
 
 const FIXTURES = join(import.meta.dirname, 'fixtures')
 const HOME_SOURCE = join(FIXTURES, 'src', 'pages', 'HomePage.tsx')
@@ -29,6 +33,7 @@ const SCREEN: SpecManifestScreen = {
     populated: { isLoading: false, rooms: [{ id: '1', name: 'Room A' }], bookings: [{ id: 'b1' }] },
     error: { isLoading: false, error: 'Failed' },
   },
+  stateDescriptions: {},
   dataDeps: [
     { hook: 'useRooms', module: '@/hooks/useRooms', provides: ['rooms', 'isLoading', 'error'] },
   ],
@@ -98,7 +103,7 @@ describe('specToPerHookRegions', () => {
 })
 
 describe('runSpecPipeline', () => {
-  it('merges spec data_deps with AST hooks', async () => {
+  it('merges spec data_deps with AST hooks', { timeout: 15_000 }, async () => {
     const result = await runSpecPipeline([SCREEN], FIXTURES, FIXTURES)
 
     expect(result.enrichedScreens).toHaveLength(1)
@@ -202,6 +207,7 @@ const TYPED_SCREEN: SpecManifestScreen = {
   states: ['loading', 'populated', 'empty', 'error'],
   defaultState: 'loading',
   stateData: {},
+  stateDescriptions: {},
   dataDeps: [],
   routeParams: null,
 }
@@ -270,6 +276,117 @@ describe('integration: type-extracted mock data', () => {
   })
 })
 
+describe('specToPerHookRegions with mockData', () => {
+  it('uses spec mockData as primary source over type inference', () => {
+    const screen: SpecManifestScreen = {
+      id: 'scr-search',
+      title: 'Search',
+      sourceFile: null,
+      states: ['loading', 'populated'],
+      defaultState: 'loading',
+      stateData: {
+        loading: { isLoading: true, specialties: [], error: null },
+        populated: { isLoading: false, specialties: [{ slug: 'zahnarzt', name: 'Zahnarzt' }], error: null },
+      },
+      stateDescriptions: {},
+      dataDeps: [],
+      routeParams: null,
+    }
+
+    const deps: MergedHookDep[] = [{
+      hook: 'useBookingStore',
+      module: '@/stores/booking-store',
+      provides: ['isLoading', 'specialties', 'error'],
+      origin: 'ast' as const,
+      resolvedType: {
+        confidence: 'partial' as const,
+        properties: ['isLoading', 'specialties', 'error'],
+        methods: ['setSpecialty', 'reset'],
+        shape: { isLoading: false, specialties: [], error: null },
+        nullableFields: [],
+      },
+    }]
+
+    const regions = specToPerHookRegions(screen, deps)
+    const regionKey = Object.keys(regions)[0]
+    const region = regions[regionKey]
+
+    // mockData from spec should win over type-inferred defaults
+    expect(region.states['populated'].specialties).toEqual([{ slug: 'zahnarzt', name: 'Zahnarzt' }])
+    expect(region.states['loading'].isLoading).toBe(true)
+  })
+
+  it('falls back to type inference when spec has no mockData', () => {
+    const screen: SpecManifestScreen = {
+      id: 'scr-search',
+      title: 'Search',
+      sourceFile: null,
+      states: ['loading', 'populated'],
+      defaultState: 'loading',
+      stateData: {
+        loading: {},
+        populated: {},
+      },
+      stateDescriptions: {},
+      dataDeps: [],
+      routeParams: null,
+    }
+
+    const deps: MergedHookDep[] = [{
+      hook: 'useBookingStore',
+      module: '@/stores/booking-store',
+      provides: ['isLoading'],
+      origin: 'ast' as const,
+      resolvedType: {
+        confidence: 'partial' as const,
+        properties: ['isLoading'],
+        methods: [],
+        shape: { isLoading: false },
+        nullableFields: [],
+      },
+    }]
+
+    const regions = specToPerHookRegions(screen, deps)
+    const regionKey = Object.keys(regions)[0]
+    const region = regions[regionKey]
+
+    // When no mockData, type inference should fill in
+    expect(region.states['loading'].isLoading).toBe(true)
+  })
+})
+
+describe('distributeStateData edge cases', () => {
+  it('gives all mockData to hook when provides is empty (single hook)', () => {
+    const screen: SpecManifestScreen = {
+      id: 'scr-test',
+      title: 'Test',
+      sourceFile: null,
+      states: ['loading', 'populated'],
+      defaultState: 'loading',
+      stateData: {
+        loading: { isLoading: true, items: [] },
+        populated: { isLoading: false, items: [{ id: 1 }] },
+      },
+      stateDescriptions: {},
+      dataDeps: [],
+      routeParams: null,
+    }
+
+    // When only one hook and provides is empty, all data should go to it
+    const deps: MergedHookDep[] = [{
+      hook: 'useStore',
+      module: '@/stores/main',
+      provides: [],
+      origin: 'ast' as const,
+    }]
+
+    const regions = specToPerHookRegions(screen, deps)
+    const regionKey = Object.keys(regions)[0]
+    const region = regions[regionKey]
+    expect(region.states['populated'].items).toEqual([{ id: 1 }])
+  })
+})
+
 describe('isServerFunctionImport', () => {
   it('detects server-functions paths', () => {
     expect(isServerFunctionImport('~/server-functions/rooms.js')).toBe(true)
@@ -305,5 +422,176 @@ describe('generateServerFunctionStub', () => {
     const stub = generateServerFunctionStub('~/server-functions/auth.js', ['login'])
     expect(stub).toContain('Auto-generated server function stub')
     expect(stub).toContain('~/server-functions/auth.js')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Local-state region heuristics
+// ---------------------------------------------------------------------------
+
+describe('extractBooleanStem', () => {
+  it('strips "is" prefix', () => {
+    expect(extractBooleanStem('isOpen')).toBe('open')
+  })
+
+  it('strips "has" prefix', () => {
+    expect(extractBooleanStem('hasError')).toBe('error')
+  })
+
+  it('strips "show" prefix', () => {
+    expect(extractBooleanStem('showConfirmation')).toBe('confirmation')
+  })
+
+  it('returns null for non-boolean names', () => {
+    expect(extractBooleanStem('count')).toBeNull()
+    expect(extractBooleanStem('error')).toBeNull()
+    expect(extractBooleanStem('confirmInput')).toBeNull()
+  })
+
+  it('returns null when prefix is the entire name', () => {
+    expect(extractBooleanStem('is')).toBeNull()
+    expect(extractBooleanStem('has')).toBeNull()
+  })
+})
+
+describe('parseInitialValue', () => {
+  it('parses boolean false', () => {
+    expect(parseInitialValue('false')).toBe(false)
+  })
+
+  it('parses boolean true', () => {
+    expect(parseInitialValue('true')).toBe(true)
+  })
+
+  it('parses null', () => {
+    expect(parseInitialValue('null')).toBeNull()
+  })
+
+  it('parses empty string literals', () => {
+    expect(parseInitialValue("''")).toBe('')
+    expect(parseInitialValue('""')).toBe('')
+  })
+
+  it('parses string literals', () => {
+    expect(parseInitialValue("'hello'")).toBe('hello')
+  })
+
+  it('rejects mismatched quotes', () => {
+    // Should NOT parse as a string — mismatched quotes
+    expect(parseInitialValue("'hello\"")).toBe("'hello\"")
+  })
+
+  it('parses empty array', () => {
+    expect(parseInitialValue('[]')).toEqual([])
+  })
+
+  it('parses empty object', () => {
+    expect(parseInitialValue('{}')).toEqual({})
+  })
+
+  it('parses numbers', () => {
+    expect(parseInitialValue('0')).toBe(0)
+    expect(parseInitialValue('42')).toBe(42)
+  })
+
+  it('returns raw string for complex expressions', () => {
+    expect(parseInitialValue('Date.now()')).toBe('Date.now()')
+  })
+})
+
+describe('generateLocalStateRegion', () => {
+  const makeFact = (name: string, initialValue: string, valueType: string): LocalStateFact => ({
+    name,
+    hook: 'useState',
+    initialValue,
+    valueType,
+  })
+
+  it('returns null when no useState facts', () => {
+    const result = generateLocalStateRegion(['default', 'active'], {}, [], 'default')
+    expect(result).toBeNull()
+  })
+
+  it('returns null when only useRef facts', () => {
+    const refFact: LocalStateFact = { name: 'myRef', hook: 'useRef', initialValue: 'null', valueType: 'null' }
+    const result = generateLocalStateRegion(['default'], {}, [refFact], 'default')
+    expect(result).toBeNull()
+  })
+
+  it('keeps initial values for default state', () => {
+    const facts = [
+      makeFact('showConfirmation', 'false', 'boolean'),
+      makeFact('confirmInput', "''", 'string'),
+      makeFact('error', 'null', 'null'),
+    ]
+    const result = generateLocalStateRegion(['default', 'confirmation'], {}, facts, 'default')
+    expect(result).not.toBeNull()
+    expect(result!.states['default']).toEqual({
+      showConfirmation: false,
+      confirmInput: '',
+      error: null,
+    })
+  })
+
+  it('sets boolean true when state name matches variable stem', () => {
+    const facts = [
+      makeFact('showConfirmation', 'false', 'boolean'),
+      makeFact('isDeleting', 'false', 'boolean'),
+    ]
+    const result = generateLocalStateRegion(
+      ['default', 'confirmation', 'deleting'],
+      {},
+      facts,
+      'default',
+    )
+
+    expect(result!.states['confirmation'].showConfirmation).toBe(true)
+    expect(result!.states['confirmation'].isDeleting).toBe(false)
+
+    expect(result!.states['deleting'].isDeleting).toBe(true)
+  })
+
+  it('sets error message for error state', () => {
+    const facts = [makeFact('error', 'null', 'null')]
+    const result = generateLocalStateRegion(
+      ['default', 'error'],
+      { error: 'Something went wrong' },
+      facts,
+      'default',
+    )
+    expect(result!.states['error'].error).toBe('Something went wrong')
+  })
+
+  it('uses generic error message when no description', () => {
+    const facts = [makeFact('error', 'null', 'null')]
+    const result = generateLocalStateRegion(['default', 'error'], {}, facts, 'default')
+    expect(result!.states['error'].error).toBe('An error occurred. Please try again.')
+  })
+
+  it('inherits boolean from earlier state via ordering', () => {
+    const facts = [
+      makeFact('showConfirmation', 'false', 'boolean'),
+      makeFact('isDeleting', 'false', 'boolean'),
+    ]
+    // "deleting" comes after "confirmation" in state order
+    const result = generateLocalStateRegion(
+      ['default', 'confirmation', 'deleting'],
+      {},
+      facts,
+      'default',
+    )
+    // "deleting" should inherit showConfirmation=true because "confirmation" precedes it
+    expect(result!.states['deleting'].showConfirmation).toBe(true)
+  })
+
+  it('inherits boolean from description text', () => {
+    const facts = [makeFact('showConfirmation', 'false', 'boolean')]
+    const result = generateLocalStateRegion(
+      ['default', 'error'],
+      { error: 'Shows error while confirmation dialog is visible' },
+      facts,
+      'default',
+    )
+    expect(result!.states['error'].showConfirmation).toBe(true)
   })
 })

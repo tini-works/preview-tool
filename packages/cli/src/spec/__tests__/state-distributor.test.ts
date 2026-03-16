@@ -46,6 +46,7 @@ describe('distributeByState', () => {
     confidence: 'full',
     methods: ['refetch'],
     properties: ['rooms', 'isLoading', 'error'],
+    nullableFields: [],
   }
 
   const fieldKinds: Record<string, string> = {
@@ -109,6 +110,7 @@ describe('distributeByState', () => {
       confidence: 'full',
       methods: [],
       properties: ['items', 'isLoading', 'isError'],
+      nullableFields: [],
     }
     const kinds: Record<string, string> = {
       items: 'array',
