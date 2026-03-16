@@ -67,6 +67,10 @@ function resolveSourceFile(
   const entry = codeMap[screenId]
   if (!entry) return null
 
+  if (typeof entry === 'string') {
+    return entry
+  }
+
   if (Array.isArray(entry)) {
     return entry[0] ?? null
   }
@@ -106,9 +110,13 @@ export async function loadSpecs(specsDir: string): Promise<SpecManifest> {
     const screen = parsed.data
     const stateNames = screen.states.map(getStateName)
     const stateData: Record<string, Record<string, unknown>> = {}
+    const stateDescriptions: Record<string, string> = {}
     for (const state of screen.states) {
       const name = getStateName(state)
       stateData[name] = (state.mockData as Record<string, unknown>) ?? {}
+      if (typeof state.description === 'string' && state.description) {
+        stateDescriptions[name] = state.description
+      }
     }
 
     screens.push({
@@ -118,8 +126,12 @@ export async function loadSpecs(specsDir: string): Promise<SpecManifest> {
       states: stateNames,
       defaultState: stateNames[0] ?? null,
       stateData,
+      stateDescriptions,
       dataDeps: screen.data_deps,
       routeParams: screen.route_params ?? null,
+      apiClient: screen.api_client
+        ? { module: screen.api_client.module, export: screen.api_client.export }
+        : null,
     })
   }
 

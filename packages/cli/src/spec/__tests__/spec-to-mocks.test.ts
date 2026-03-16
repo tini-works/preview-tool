@@ -13,11 +13,13 @@ const SCREEN: SpecManifestScreen = {
     results: { isLoading: false, items: [{ id: '1' }] },
     error: { isLoading: false, error: 'Failed' },
   },
+  stateDescriptions: {},
   dataDeps: [
     { hook: 'useItems', module: '@/hooks/useItems', provides: ['items', 'isLoading', 'error'] },
     { hook: 'useBookingStore', module: '@/stores/booking', provides: ['selected', 'setSelected'] },
   ],
   routeParams: null,
+  apiClient: null,
 }
 
 describe('generateMockCode', () => {

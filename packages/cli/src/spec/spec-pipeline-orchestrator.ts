@@ -717,6 +717,98 @@ export function generateServerFunctionStub(importPath: string, exportNames: stri
 }
 
 // ---------------------------------------------------------------------------
+// API client detection and stubbing
+// ---------------------------------------------------------------------------
+
+const API_CLIENT_PATH_PATTERNS = [
+  /\/lib\/api$/,
+  /\/lib\/http[-_]?client$/,
+  /\/services\/api$/,
+  /\/utils\/http$/,
+  /\/api[-_]?client$/,
+]
+
+const API_CLIENT_EXPORT_NAMES = new Set([
+  'api', 'apiClient', 'httpClient', 'http', 'client',
+  'Api', 'ApiClient', 'HttpClient',
+])
+
+export function isApiClientImport(
+  importPath: string,
+  importedNames: string[],
+): boolean {
+  for (const pattern of API_CLIENT_PATH_PATTERNS) {
+    if (pattern.test(importPath)) return true
+  }
+  if (/\/(api|http)/i.test(importPath)) {
+    for (const name of importedNames) {
+      if (API_CLIENT_EXPORT_NAMES.has(name)) return true
+    }
+  }
+  return false
+}
+
+export function discoverApiClientImports(
+  sf: SourceFile,
+  alreadyMocked: Set<string>,
+): Array<{ modulePath: string; importedNames: string[] }> {
+  const results: Array<{ modulePath: string; importedNames: string[] }> = []
+
+  for (const decl of sf.getImportDeclarations()) {
+    const moduleSpec = decl.getModuleSpecifierValue()
+    if (alreadyMocked.has(moduleSpec)) continue
+
+    const importedNames: string[] = []
+    for (const named of decl.getNamedImports()) {
+      importedNames.push(named.getName())
+    }
+    const defaultImport = decl.getDefaultImport()
+    if (defaultImport) {
+      importedNames.push(defaultImport.getText())
+    }
+
+    if (importedNames.length > 0 && isApiClientImport(moduleSpec, importedNames)) {
+      results.push({ modulePath: moduleSpec, importedNames })
+    }
+  }
+
+  return results
+}
+
+export function generateApiClientStub(
+  importPath: string,
+  importedNames: string[],
+): string {
+  const lines = [
+    `// Auto-generated API client stub for ${importPath}`,
+    `// All HTTP methods resolve with no-op response — usePreviewState provides real data`,
+    '',
+    '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
+    'const noopResponse: any = { success: true, data: undefined, error: undefined }',
+    '',
+    'const stub = {',
+    '  get: () => Promise.resolve(noopResponse),',
+    '  post: () => Promise.resolve(noopResponse),',
+    '  put: () => Promise.resolve(noopResponse),',
+    '  patch: () => Promise.resolve(noopResponse),',
+    '  delete: () => Promise.resolve(noopResponse),',
+    '  request: () => Promise.resolve(noopResponse),',
+    '}',
+    '',
+  ]
+
+  for (const name of importedNames) {
+    lines.push(`export const ${name} = stub`)
+  }
+
+  lines.push('')
+  lines.push('export default stub')
+  lines.push('')
+
+  return lines.join('\n')
+}
+
+// ---------------------------------------------------------------------------
 // Main orchestrator
 // ---------------------------------------------------------------------------
 
@@ -984,10 +1076,42 @@ export async function runSpecPipeline(
     }
   }
 
-  // Generate stubs
+  // Generate server function stubs
   for (const [modulePath, exportNames] of serverFnExports) {
     if (mockFiles.has(modulePath)) continue
     mockFiles.set(modulePath, generateServerFunctionStub(modulePath, [...exportNames]))
+  }
+
+  // API client detection (from component source + spec declaration)
+  const apiClientModules = new Map<string, string[]>()
+
+  for (const { screen, absPath } of screensWithSource) {
+    if (screen.apiClient) {
+      const mod = screen.apiClient.module
+      if (!apiClientModules.has(mod)) {
+        apiClientModules.set(mod, [screen.apiClient.export ?? 'api'])
+      }
+    }
+
+    const sf = sourceFileMap.get(absPath)
+    if (sf) {
+      const apiImports = discoverApiClientImports(sf, new Set(mockFiles.keys()))
+      for (const { modulePath, importedNames } of apiImports) {
+        if (apiClientModules.has(modulePath)) {
+          const existing = apiClientModules.get(modulePath)!
+          for (const n of importedNames) {
+            if (!existing.includes(n)) existing.push(n)
+          }
+        } else {
+          apiClientModules.set(modulePath, [...importedNames])
+        }
+      }
+    }
+  }
+
+  for (const [modulePath, importedNames] of apiClientModules) {
+    if (mockFiles.has(modulePath)) continue
+    mockFiles.set(modulePath, generateApiClientStub(modulePath, importedNames))
   }
 
   // Build alias manifest

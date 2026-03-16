@@ -43,6 +43,10 @@ export const SpecScreenSchema = z.object({
   route_params: z.record(z.string(), z.string()).optional(),
   capabilities: z.array(z.string()).optional(),
   conventions: z.array(z.string()).optional(),
+  api_client: z.object({
+    module: z.string(),
+    export: z.string().optional(),
+  }).optional(),
 })
 
 export type SpecScreen = z.infer<typeof SpecScreenSchema>
@@ -81,6 +85,7 @@ export type SpecFlow = z.infer<typeof SpecFlowSchema>
 // 2. Structured: { "scr-home": { route: "src/routes/index.tsx", components: [...] } }
 
 const CodeMapEntrySchema = z.union([
+  z.string(),
   z.array(z.string()),
   z.record(z.string(), z.union([z.string(), z.array(z.string())])),
 ])
@@ -98,8 +103,10 @@ export interface SpecManifestScreen {
   states: string[]
   defaultState: string | null
   stateData: Record<string, Record<string, unknown>>
+  stateDescriptions: Record<string, string>
   dataDeps: SpecDataDep[]
   routeParams: Record<string, string> | null
+  apiClient: { module: string; export?: string } | null
 }
 
 export interface SpecManifestFlow {

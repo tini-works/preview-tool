@@ -12,6 +12,8 @@ import {
   toSafeFileName,
   isServerFunctionImport,
   generateServerFunctionStub,
+  isApiClientImport,
+  generateApiClientStub,
   extractBooleanStem,
   parseInitialValue,
   generateLocalStateRegion,
@@ -38,6 +40,7 @@ const SCREEN: SpecManifestScreen = {
     { hook: 'useRooms', module: '@/hooks/useRooms', provides: ['rooms', 'isLoading', 'error'] },
   ],
   routeParams: null,
+  apiClient: null,
 }
 
 describe('AST hook discovery', () => {
@@ -210,6 +213,7 @@ const TYPED_SCREEN: SpecManifestScreen = {
   stateDescriptions: {},
   dataDeps: [],
   routeParams: null,
+  apiClient: null,
 }
 
 describe('integration: type-extracted mock data', () => {
@@ -291,6 +295,7 @@ describe('specToPerHookRegions with mockData', () => {
       stateDescriptions: {},
       dataDeps: [],
       routeParams: null,
+  apiClient: null,
     }
 
     const deps: MergedHookDep[] = [{
@@ -330,6 +335,7 @@ describe('specToPerHookRegions with mockData', () => {
       stateDescriptions: {},
       dataDeps: [],
       routeParams: null,
+  apiClient: null,
     }
 
     const deps: MergedHookDep[] = [{
@@ -370,6 +376,7 @@ describe('distributeStateData edge cases', () => {
       stateDescriptions: {},
       dataDeps: [],
       routeParams: null,
+  apiClient: null,
     }
 
     // When only one hook and provides is empty, all data should go to it
@@ -593,5 +600,54 @@ describe('generateLocalStateRegion', () => {
       'default',
     )
     expect(result!.states['error'].showConfirmation).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// API client detection
+// ---------------------------------------------------------------------------
+
+describe('isApiClientImport', () => {
+  it('detects @/lib/api', () => {
+    expect(isApiClientImport('@/lib/api', ['api'])).toBe(true)
+  })
+
+  it('detects @/services/api', () => {
+    expect(isApiClientImport('@/services/api', ['apiClient'])).toBe(true)
+  })
+
+  it('detects @/lib/http-client', () => {
+    expect(isApiClientImport('@/lib/http-client', ['httpClient'])).toBe(true)
+  })
+
+  it('detects fuzzy path with known export name', () => {
+    expect(isApiClientImport('@/utils/api-helpers', ['api'])).toBe(true)
+  })
+
+  it('rejects non-API imports', () => {
+    expect(isApiClientImport('@/stores/auth-store', ['useAuthStore'])).toBe(false)
+  })
+
+  it('rejects path with /api but unknown export names', () => {
+    expect(isApiClientImport('@/hooks/use-api-data', ['useApiData'])).toBe(false)
+  })
+})
+
+describe('generateApiClientStub', () => {
+  it('generates stub with all HTTP methods', () => {
+    const stub = generateApiClientStub('@/lib/api', ['api'])
+    expect(stub).toContain('get: () => Promise.resolve(noopResponse)')
+    expect(stub).toContain('post: () => Promise.resolve(noopResponse)')
+    expect(stub).toContain('put: () => Promise.resolve(noopResponse)')
+    expect(stub).toContain('patch: () => Promise.resolve(noopResponse)')
+    expect(stub).toContain('delete: () => Promise.resolve(noopResponse)')
+    expect(stub).toContain('export const api = stub')
+    expect(stub).toContain('export default stub')
+  })
+
+  it('exports all imported names', () => {
+    const stub = generateApiClientStub('@/lib/api', ['api', 'apiClient'])
+    expect(stub).toContain('export const api = stub')
+    expect(stub).toContain('export const apiClient = stub')
   })
 })

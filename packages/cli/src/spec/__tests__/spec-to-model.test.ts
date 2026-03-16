@@ -13,10 +13,12 @@ const SCREEN: SpecManifestScreen = {
     populated: { isLoading: false, rooms: [{ id: '1', name: 'Room A' }] },
     error: { isLoading: false, error: 'Failed' },
   },
+  stateDescriptions: {},
   dataDeps: [
     { hook: 'useRooms', module: '@/hooks/useRooms', provides: ['rooms', 'isLoading', 'error'] },
   ],
   routeParams: null,
+  apiClient: null,
 }
 
 describe('specToRegions', () => {
