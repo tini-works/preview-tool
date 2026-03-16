@@ -127,9 +127,16 @@ function inferFieldKind(
   fieldName: string,
   shapeValue: unknown,
   methods: string[],
+  nullableFields: string[],
 ): string {
   if (methods.includes(fieldName)) return 'function'
   if (Array.isArray(shapeValue)) return 'array'
+  if (nullableFields.includes(fieldName)) {
+    if (typeof shapeValue === 'object' && shapeValue !== null) return 'object-nullable'
+    if (typeof shapeValue === 'string') return 'string-nullable'
+    if (typeof shapeValue === 'number') return 'number-nullable'
+    return 'object-nullable'
+  }
   if (shapeValue === null) return 'object-nullable'
   if (typeof shapeValue === 'boolean') return 'boolean'
   if (typeof shapeValue === 'string') return 'string'
@@ -158,7 +165,7 @@ export function distributeByState(
       const shapeValue = resolvedType.shape[field] ?? null
       const kind =
         fieldKinds?.[field] ??
-        inferFieldKind(field, shapeValue, resolvedType.methods)
+        inferFieldKind(field, shapeValue, resolvedType.methods, resolvedType.nullableFields ?? [])
       const category = classifyField(field, kind)
       stateData[field] = getFieldValueForState(
         field,

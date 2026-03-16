@@ -128,4 +128,56 @@ describe('distributeByState', () => {
     expect(typeof result.default.refetch).toBe('string')
     expect(result.default.refetch).toBe('NOOP')
   })
+
+  it('nulls nullable fields in loading/error/empty states', () => {
+    const storeType: TypeShapeInfo = {
+      shape: {
+        doctor: { id: '1', name: 'Dr. Smith', email: 'dr@example.com' },
+        timeSlot: { start: '09:00', end: '10:00' },
+        isLoading: false,
+      },
+      confidence: 'full',
+      methods: ['setDoctor', 'setTimeSlot'],
+      properties: ['doctor', 'timeSlot', 'isLoading'],
+      nullableFields: ['doctor', 'timeSlot'],
+    }
+
+    const result = distributeByState(
+      ['loading', 'populated', 'error'],
+      storeType,
+    )
+
+    // loading: nullable fields should be null
+    expect(result.loading.doctor).toBeNull()
+    expect(result.loading.timeSlot).toBeNull()
+    expect(result.loading.isLoading).toBe(true)
+
+    // populated: nullable fields should have data
+    expect(result.populated.doctor).toEqual({ id: '1', name: 'Dr. Smith', email: 'dr@example.com' })
+    expect(result.populated.timeSlot).toEqual({ start: '09:00', end: '10:00' })
+    expect(result.populated.isLoading).toBe(false)
+
+    // error: nullable fields should be null
+    expect(result.error.doctor).toBeNull()
+    expect(result.error.timeSlot).toBeNull()
+    expect(result.error.isLoading).toBe(false)
+  })
+
+  it('does not null non-nullable fields in loading state', () => {
+    const type: TypeShapeInfo = {
+      shape: {
+        title: 'Page Title',
+        items: [{ id: '1' }],
+        isLoading: false,
+      },
+      confidence: 'full',
+      methods: [],
+      properties: ['title', 'items', 'isLoading'],
+      nullableFields: [],
+    }
+
+    const result = distributeByState(['loading'], type)
+    // title is a data-value, not nullable — should keep its value even in loading
+    expect(result.loading.title).toBe('Page Title')
+  })
 })
