@@ -90,7 +90,8 @@ export function createSpecPreviewPlugin(options: SpecPreviewOptions): VitePlugin
       try {
         const result = await runSpecPipeline(manifest.screens, options.cwd, options.specsDir)
         enrichedScreens = result.enrichedScreens
-      } catch {
+      } catch (err) {
+        console.warn('[preview-tool] Spec pipeline failed during build, falling back to basic mode:', err)
         enrichedScreens = []
       }
     },
@@ -124,7 +125,8 @@ export const screenEntries = ${JSON.stringify(screenEntries, null, 2)};`
           try {
             const result = await runSpecPipeline(manifest.screens, options.cwd, options.specsDir)
             enrichedScreens = result.enrichedScreens
-          } catch {
+          } catch (err) {
+            console.warn('[preview-tool] Spec pipeline failed during reload, falling back to basic mode:', err)
             enrichedScreens = []
           }
           const mod = server.moduleGraph.getModuleById(

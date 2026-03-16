@@ -1089,19 +1089,28 @@ it('syncs regionData to window.__previewMockData', async () => {
 
 **Step 3: Implement**
 
-Add to `ScreenRenderer.tsx` after the `regionData` computation (around line 170), before the return statement:
+Add to `ScreenRenderer.tsx` **before the early returns** (around line 90, alongside other hooks). React's Rules of Hooks require all hooks to be called unconditionally — placing a `useEffect` after conditional returns will crash:
 
 ```typescript
 // Sync region data to window.__previewMockData for fetch interceptor
+// MUST be before early returns to satisfy Rules of Hooks
+const currentEntry = modules.find((m) => m.route === route)
+const currentRegions = currentEntry?.regions
 useEffect(() => {
-  const flatData: Record<string, unknown> = {}
-  for (const [, entry] of Object.entries(regionData)) {
-    if (entry?.stateData) {
-      Object.assign(flatData, entry.stateData)
+  if (!currentRegions) return
+  try {
+    const rd = computeRegionData(currentRegions, regionStates, regionListCounts)
+    const flatData: Record<string, unknown> = {}
+    for (const [, regionEntry] of Object.entries(rd)) {
+      if (regionEntry?.stateData) {
+        Object.assign(flatData, regionEntry.stateData)
+      }
     }
+    ;(window as any).__previewMockData = flatData
+  } catch {
+    // Ignore — sync is best-effort
   }
-  ;(window as any).__previewMockData = flatData
-}, [regionData])
+}, [currentRegions, regionStates, regionListCounts])
 ```
 
 **Step 4: Run test — should pass**

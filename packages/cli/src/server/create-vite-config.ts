@@ -136,6 +136,14 @@ export async function createViteConfig(
     // No screens directory — skip plugin
   }
 
+  // Spec-mode fallback: read screen source paths from pipeline output
+  if (screenFilePaths.length === 0) {
+    try {
+      const raw = readFileSync(join(previewDir, 'screen-source-paths.json'), 'utf-8')
+      screenFilePaths.push(...JSON.parse(raw))
+    } catch { /* no spec-mode paths */ }
+  }
+
   const previewStatePlugin = screenFilePaths.length > 0
     ? createPreviewStatePlugin(screenFilePaths)
     : null

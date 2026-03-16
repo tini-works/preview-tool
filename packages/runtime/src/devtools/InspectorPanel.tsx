@@ -144,7 +144,16 @@ export function InspectorPanel({ onLanguageChange }: InspectorPanelProps = {}) {
                   defaultCount={region.defaultCount}
                   activeState={regionStates[key] ?? region.defaultState}
                   listCount={regionListCounts[key]}
-                  onStateChange={(state) => setRegionState(key, state)}
+                  onStateChange={(state) => {
+                    // Sync all sibling regions to the same state — in spec mode all
+                    // regions share the same screen-level states.
+                    for (const regionKey of Object.keys(regions!)) {
+                      if (regionKey !== key && regions![regionKey].states[state]) {
+                        setRegionState(regionKey, state)
+                      }
+                    }
+                    setRegionState(key, state)
+                  }}
                   onListCountChange={(count) => setRegionListCount(key, count)}
                 />
               ))}

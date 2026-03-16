@@ -40,7 +40,9 @@ export function createPreviewStatePlugin(screenFilePaths: readonly string[]) {
     name: 'preview-state-transform',
     enforce: 'pre' as const,
     transform(code: string, id: string) {
-      if (!screenSet.has(id)) return undefined
+      // Strip query/hash suffix Vite may append (e.g. ?v=xxx)
+      const cleanId = id.replace(/[?#].*$/, '')
+      if (!screenSet.has(cleanId)) return undefined
 
       const transformed = transformUseState(code)
       if (transformed === code) return undefined

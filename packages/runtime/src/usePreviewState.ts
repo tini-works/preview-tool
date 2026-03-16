@@ -16,9 +16,15 @@ export function usePreviewState<T>(
   const [state, setState] = useState(initialValue)
   const ctx = useContext(RegionDataContext)
 
+  // Primary: unified local-state region
+  const localRegion = ctx?.regionData?.['local-state']
+  if (localRegion?.stateData && name in localRegion.stateData) {
+    return [localRegion.stateData[name] as T, setState]
+  }
+
+  // Fallback: per-variable region (backward compat)
   const regionKey = camelToKebab(name)
   const regionEntry = ctx?.regionData?.[regionKey]
-
   if (regionEntry?.stateData && name in regionEntry.stateData) {
     return [regionEntry.stateData[name] as T, setState]
   }

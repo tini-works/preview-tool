@@ -76,6 +76,21 @@ Dependencies flow: `CLI → Runtime` (unidirectional). Runtime has no CLI depend
 - Keep the CLI as a Node.js tool — no browser dependencies in `packages/cli/`
 - Runtime is a React library — browser-only, consumed by generated preview apps
 - Test fixtures must be self-contained (no imports from CLI or runtime)
+- **Do NOT guess.** When something doesn't work, trace the actual data flow end-to-end before proposing a fix. Read the real target app code (API clients, components, stores) to understand exact formats, patterns, and assumptions. Never assume a response format, URL shape, or data structure — verify it first.
+
+## Debugging: Verified Root Causes
+
+Lessons from past bugs — always check these before writing fixes:
+
+1. **React Rules of Hooks:** Never place `useEffect`/`useState`/any hook after conditional `return` statements. All hooks must be called unconditionally on every render. Trace the full function to verify no early returns precede new hooks.
+
+2. **useEffect timing (parent vs child):** React fires child effects BEFORE parent effects. If a parent's `useEffect` sets data that a child's `useEffect` reads, the child will read stale data. Solution: set shared data synchronously during render, not in `useEffect`.
+
+3. **API response format:** Target apps wrap API responses differently (`{ success: true, data: [...] }` vs raw arrays vs other envelopes). The fetch interceptor MUST return data in the format the app's API client expects. Always read the actual API client code (`lib/api.ts` or equivalent) before generating interceptors.
+
+4. **URL matching:** Target apps prepend baseURLs to API paths (e.g., `fetch('/specialties')` becomes `fetch('http://localhost:3001/api/specialties')`). Interceptors must match by suffix, not exact string.
+
+5. **Mock data completeness:** mockData must include ALL fields the component uses (including `id` for React keys). Read the component's JSX to verify which fields are accessed before writing mockData.
 
 # Specs
 

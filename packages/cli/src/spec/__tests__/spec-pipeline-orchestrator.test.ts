@@ -624,6 +624,10 @@ describe('isApiClientImport', () => {
     expect(isApiClientImport('@/utils/api-helpers', ['api'])).toBe(true)
   })
 
+  it('detects @/lib/admin-api with known export name', () => {
+    expect(isApiClientImport('@/lib/admin-api', ['adminApi'])).toBe(true)
+  })
+
   it('rejects non-API imports', () => {
     expect(isApiClientImport('@/stores/auth-store', ['useAuthStore'])).toBe(false)
   })

@@ -286,6 +286,7 @@ function shouldInheritBoolean(
 
 /**
  * Generate a `local-state` region from discovered useState variables.
+ * Merges explicit spec mockData with heuristic values (spec data wins).
  * Returns null if no useState variables are found.
  */
 export function generateLocalStateRegion(
@@ -293,6 +294,7 @@ export function generateLocalStateRegion(
   descriptions: Record<string, string>,
   localStateFacts: LocalStateFact[],
   defaultState: string | null,
+  stateData?: Record<string, Record<string, unknown>>,
 ): RegionDef | null {
   // Only process useState facts (skip useRef)
   const useStateFacts = localStateFacts.filter((f) => f.hook === 'useState')
@@ -331,6 +333,14 @@ export function generateLocalStateRegion(
             stateValues[fact.name] = true
           }
         }
+      }
+    }
+
+    // Merge explicit spec mockData on top of heuristic values (spec wins)
+    const specMock = stateData?.[stateName]
+    if (specMock && typeof specMock === 'object') {
+      for (const [key, value] of Object.entries(specMock)) {
+        stateValues[key] = value
       }
     }
 
@@ -731,6 +741,7 @@ const API_CLIENT_PATH_PATTERNS = [
 const API_CLIENT_EXPORT_NAMES = new Set([
   'api', 'apiClient', 'httpClient', 'http', 'client',
   'Api', 'ApiClient', 'HttpClient',
+  'adminApi', 'AdminApi',
 ])
 
 export function isApiClientImport(
@@ -740,7 +751,7 @@ export function isApiClientImport(
   for (const pattern of API_CLIENT_PATH_PATTERNS) {
     if (pattern.test(importPath)) return true
   }
-  if (/\/(api|http)/i.test(importPath)) {
+  if (/[/\-_](api|http)/i.test(importPath)) {
     for (const name of importedNames) {
       if (API_CLIENT_EXPORT_NAMES.has(name)) return true
     }
@@ -940,6 +951,7 @@ export async function runSpecPipeline(
       screen.stateDescriptions ?? {},
       localStateFacts,
       screen.defaultState,
+      screen.stateData,
     )
     const enrichedRegions = localStateRegion
       ? { ...hookRegions, 'local-state': localStateRegion }
