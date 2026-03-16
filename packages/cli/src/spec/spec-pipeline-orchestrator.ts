@@ -1050,19 +1050,16 @@ export async function runSpecPipeline(
       const mod = decl.getModuleSpecifierValue()
       if (mod === '@tanstack/react-router' && !mockFiles.has(mod)) {
         const names = decl.getNamedImports().map((n) => n.getName())
-        if (names.includes('createFileRoute') || names.includes('createRootRoute')) {
+        if (names.includes('createFileRoute')) {
           mockFiles.set(mod, [
             `// Auto-generated shim for @tanstack/react-router`,
             `export * from '__real:@tanstack/react-router'`,
             ``,
             `// Stub createFileRoute — runs at module scope in route files`,
+            `// Real createFileRoute requires router context; this returns a safe object`,
+            `// that preserves the component reference at .options.component`,
             `export function createFileRoute(_path: string) {`,
             `  return (opts: any) => ({ options: opts, path: _path })`,
-            `}`,
-            ``,
-            `// Stub createRootRoute — runs at module scope in __root.tsx`,
-            `export function createRootRoute(opts?: any) {`,
-            `  return { options: opts ?? {} }`,
             `}`,
           ].join('\n'))
           break
