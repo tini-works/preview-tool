@@ -1,4 +1,4 @@
-import { resolve, join } from 'node:path'
+import { resolve, join, dirname, relative } from 'node:path'
 import { existsSync } from 'node:fs'
 import { Project, SyntaxKind, type SourceFile } from 'ts-morph'
 import { extractHookFacts, extractLocalStateFacts } from '../analyzer/collect-facts.js'
@@ -96,6 +96,27 @@ function resolveSourceFilePath(screen: SpecManifestScreen, cwd: string, specsDir
 
 function discoverHooksFromSource(sourceFile: SourceFile): HookFact[] {
   return extractHookFacts(sourceFile)
+}
+
+/**
+ * Normalize relative import paths (./foo, ../bar) to ~/... paths
+ * so they work as Vite alias keys regardless of which file imports them.
+ */
+function normalizeHookImportPaths(hooks: HookFact[], sourceAbsPath: string, cwd: string): HookFact[] {
+  const srcDir = join(cwd, 'src')
+  const fileDir = dirname(sourceAbsPath)
+
+  return hooks.map((h) => {
+    if (!h.importPath.startsWith('./') && !h.importPath.startsWith('../')) return h
+    // Resolve relative to the importing file's directory
+    const abs = resolve(fileDir, h.importPath)
+    // Convert to ~/ path relative to src/
+    if (abs.startsWith(srcDir)) {
+      const rel = relative(srcDir, abs)
+      return { ...h, importPath: `~/${rel}` }
+    }
+    return h
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -878,8 +899,9 @@ export async function runSpecPipeline(
     const absPath = resolveSourceFilePath(screen, cwd, specsDir)
     const sf = absPath ? sourceFileMap.get(absPath) : undefined
 
-    // Discover hooks from AST
-    const astHooks = sf ? discoverHooksFromSource(sf) : []
+    // Discover hooks from AST (normalize relative imports to ~/ paths)
+    const rawAstHooks = sf ? discoverHooksFromSource(sf) : []
+    const astHooks = absPath ? normalizeHookImportPaths(rawAstHooks, absPath, cwd) : rawAstHooks
     allAstHooks.push(...astHooks)
 
     // Resolve hook return types via TypeChecker (with caching)
@@ -1017,6 +1039,37 @@ export async function runSpecPipeline(
     } else {
       mockFiles.set(importPath, combined)
     }
+  }
+
+  // Detect framework-specific module-scope shims (e.g. TanStack Router's createFileRoute)
+  // These run at import time and crash without the full framework context
+  for (const { absPath } of screensWithSource) {
+    const sf = sourceFileMap.get(absPath)
+    if (!sf) continue
+    for (const decl of sf.getImportDeclarations()) {
+      const mod = decl.getModuleSpecifierValue()
+      if (mod === '@tanstack/react-router' && !mockFiles.has(mod)) {
+        const names = decl.getNamedImports().map((n) => n.getName())
+        if (names.includes('createFileRoute') || names.includes('createRootRoute')) {
+          mockFiles.set(mod, [
+            `// Auto-generated shim for @tanstack/react-router`,
+            `export * from '__real:@tanstack/react-router'`,
+            ``,
+            `// Stub createFileRoute — runs at module scope in route files`,
+            `export function createFileRoute(_path: string) {`,
+            `  return (opts: any) => ({ options: opts, path: _path })`,
+            `}`,
+            ``,
+            `// Stub createRootRoute — runs at module scope in __root.tsx`,
+            `export function createRootRoute(opts?: any) {`,
+            `  return { options: opts ?? {} }`,
+            `}`,
+          ].join('\n'))
+          break
+        }
+      }
+    }
+    if (mockFiles.has('@tanstack/react-router')) break
   }
 
   // Detect and stub server function imports (Layer 4)

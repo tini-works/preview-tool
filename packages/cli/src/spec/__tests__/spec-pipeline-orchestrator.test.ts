@@ -271,7 +271,7 @@ describe('integration: type-extracted mock data', () => {
 
   it('generates mock code with default shapes from resolved types', async () => {
     const result = await runSpecPipeline([TYPED_SCREEN], TYPED_FIXTURES)
-    const mockCode = result.mockFiles.get('../hooks/useRooms')
+    const mockCode = result.mockFiles.get('~/hooks/useRooms')
     expect(mockCode).toBeDefined()
     expect(mockCode).toContain('export function useRooms')
     expect(mockCode).toContain('useRegionDataForHook')
