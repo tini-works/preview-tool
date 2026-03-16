@@ -80,6 +80,15 @@ export const devCommand = new Command('dev')
         'utf-8'
       )
 
+      // Write screen source paths for Vite useState transform
+      if (pipelineResult.screenSourcePaths.length > 0) {
+        await writeFile(
+          join(previewDir, 'screen-source-paths.json'),
+          JSON.stringify(pipelineResult.screenSourcePaths, null, 2),
+          'utf-8'
+        )
+      }
+
       const hookCount = pipelineResult.mockFiles.size
       const regionCount = pipelineResult.enrichedScreens.reduce(
         (sum, s) => sum + Object.keys(s.enrichedRegions).length, 0

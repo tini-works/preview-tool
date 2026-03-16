@@ -2,6 +2,7 @@ import { useEffect, useState, type ComponentType } from 'react'
 import { FlowProvider } from './flow/FlowProvider.tsx'
 import { NetworkSimulationLayer } from './devtools/NetworkSimulationLayer.tsx'
 import { ScreenErrorBoundary } from './ErrorBoundary.tsx'
+import { RegionDataProvider } from './RegionDataContext.tsx'
 import { useDevToolsStore } from './store/useDevToolsStore.ts'
 import { getScreenEntries } from './ScreenRegistry.ts'
 import type { ScreenModule, RegionsMap, FlagDefinition, RegionDataMap } from './types.ts'
@@ -95,7 +96,13 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
 
     let cancelled = false
     setLoadError(null)
-    entry.module()
+
+    const LOAD_TIMEOUT_MS = 10_000
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout loading screen "${route}" after ${LOAD_TIMEOUT_MS / 1000}s`)), LOAD_TIMEOUT_MS)
+    )
+
+    Promise.race([entry.module(), timeout])
       .then((mod: ScreenModule) => {
         if (!cancelled) {
           if (!mod.default) {
@@ -153,16 +160,24 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
   const { Component } = loaded
   const regions = entry.regions
   const resolvedFlags = resolveFlags(entry.flags, featureFlags)
-  const regionData = regions
-    ? computeRegionData(regions, regionStates, regionListCounts)
-    : {}
+
+  let regionData: RegionDataMap = {}
+  try {
+    regionData = regions
+      ? computeRegionData(regions, regionStates, regionListCounts)
+      : {}
+  } catch (e) {
+    console.warn('[preview-tool] Failed to compute region data:', e)
+  }
 
   return (
     <NetworkSimulationLayer key={route}>
       <div style={{ zoom: fontScale }} className="h-full">
         <ScreenErrorBoundary key={route}>
           <FlowProvider>
-            <Component regionData={regionData} flags={resolvedFlags} />
+            <RegionDataProvider regions={regions ?? {}} regionData={regionData}>
+              <Component key={JSON.stringify(regionStates)} regionData={regionData} flags={resolvedFlags} />
+            </RegionDataProvider>
           </FlowProvider>
         </ScreenErrorBoundary>
       </div>

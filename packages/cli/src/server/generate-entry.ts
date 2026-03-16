@@ -131,7 +131,7 @@ export function detectExportType(filePath: string): { type: 'default' | 'named' 
  */
 export async function generateEntryFiles(
   cwd: string,
-  config: PreviewConfig
+  config: PreviewConfig,
 ): Promise<void> {
   const previewDir = join(cwd, PREVIEW_DIR)
   await mkdir(previewDir, { recursive: true })

@@ -1,7 +1,7 @@
 import { resolve, join } from 'node:path'
 import { existsSync } from 'node:fs'
 import { Project, SyntaxKind, type SourceFile } from 'ts-morph'
-import { extractHookFacts } from '../analyzer/collect-facts.js'
+import { extractHookFacts, extractLocalStateFacts } from '../analyzer/collect-facts.js'
 import { findTsConfig } from '../analyzer/collect-facts.js'
 import { extractHookReturnType } from '../analyzer/extract-types.js'
 import { classifyHook } from '../lib/hook-classifier.js'
@@ -9,7 +9,7 @@ import { REACT_IMPORT_PATHS, REACT_BUILTIN_HOOKS } from '../lib/hook-binding.js'
 import { PROVIDER_PACKAGES } from '../lib/hook-classifier.js'
 import { distributeByState } from './state-distributor.js'
 import { TypeCache, hashContent } from './type-cache.js'
-import type { HookFact, TypeShapeInfo } from '../analyzer/types.js'
+import type { HookFact, TypeShapeInfo, LocalStateFact } from '../analyzer/types.js'
 import type { SpecManifestScreen, SpecDataDep } from './types.js'
 import type { RegionsMap, RegionDef } from './spec-to-model.js'
 
@@ -32,6 +32,7 @@ export interface SpecPipelineResult {
   enrichedScreens: EnrichedScreen[]
   mockFiles: Map<string, string>
   aliasManifest: Record<string, string>
+  screenSourcePaths: string[]
 }
 
 export interface EnrichedScreen extends SpecManifestScreen {
@@ -184,16 +185,24 @@ export function specToPerHookRegions(
 ): RegionsMap {
   const regions: RegionsMap = {}
 
+  // Check if any state has non-empty mockData from the spec
+  const hasSpecMockData = Object.values(screen.stateData).some(
+    (data) => Object.keys(data).length > 0
+  )
+
   for (const dep of allHookDeps) {
     const regionKey = hookToRegionKey(dep.hook)
 
     let states: Record<string, Record<string, unknown>>
 
-    if (dep.resolvedType && dep.resolvedType.confidence !== 'none') {
-      // Use type-aware state distribution
+    if (hasSpecMockData) {
+      // Primary: use spec mockData directly
+      states = distributeStateData(screen.stateData, dep.provides)
+    } else if (dep.resolvedType && dep.resolvedType.confidence !== 'none') {
+      // Fallback: use type-aware state distribution
       states = distributeByState(screen.states, dep.resolvedType)
     } else {
-      // Fallback: existing behavior (distribute from stateData)
+      // Last resort: distribute from stateData (may be empty)
       states = distributeStateData(screen.stateData, dep.provides)
     }
 
@@ -212,6 +221,127 @@ export function specToPerHookRegions(
   }
 
   return regions
+}
+
+// ---------------------------------------------------------------------------
+// Local-state region generation (heuristic)
+// ---------------------------------------------------------------------------
+
+const BOOLEAN_PREFIXES = /^(is|has|show|are|was|should|can|will|did)/
+
+/** Strip common boolean prefixes to get the semantic stem. */
+export function extractBooleanStem(varName: string): string | null {
+  const match = varName.match(BOOLEAN_PREFIXES)
+  if (!match) return null
+  const rest = varName.slice(match[0].length)
+  if (!rest) return null
+  return rest[0].toLowerCase() + rest.slice(1)
+}
+
+/** Convert an AST initial-value string to a runtime JS value. */
+export function parseInitialValue(raw: string): unknown {
+  if (raw === 'false') return false
+  if (raw === 'true') return true
+  if (raw === 'null') return null
+  if (raw === 'undefined') return undefined
+  if (raw === "''") return ''
+  if (raw === '""') return ''
+  if (raw === '``') return ''
+  const quotedMatch = raw.match(/^(['"`])(.*)\1$/)
+  if (quotedMatch) return quotedMatch[2]
+  if (raw === '[]') return []
+  if (raw === '{}') return ({})
+  if (raw === '0') return 0
+  const num = Number(raw)
+  if (!Number.isNaN(num)) return num
+  return raw // keep as-is for complex expressions
+}
+
+/** Does `stateName` match a boolean variable stem? */
+function stateMatchesBooleanVar(stateName: string, stem: string): boolean {
+  const lower = stateName.toLowerCase()
+  const stemLower = stem.toLowerCase()
+  return lower === stemLower || lower.endsWith(stemLower) || lower.startsWith(stemLower)
+}
+
+/** Should a boolean variable inherit `true` in a given state? */
+function shouldInheritBoolean(
+  stateName: string,
+  varStem: string,
+  descriptions: Record<string, string>,
+  stateNames: string[],
+): boolean {
+  // Check description text for references to the variable's stem
+  const desc = descriptions[stateName]
+  if (desc) {
+    const descLower = desc.toLowerCase()
+    if (descLower.includes(varStem.toLowerCase())) return true
+  }
+  // Ordering heuristic: if the stem's own state precedes this state, inherit
+  const stemStateIdx = stateNames.findIndex((s) => stateMatchesBooleanVar(s, varStem))
+  const currentIdx = stateNames.indexOf(stateName)
+  if (stemStateIdx >= 0 && currentIdx > stemStateIdx) return true
+  return false
+}
+
+/**
+ * Generate a `local-state` region from discovered useState variables.
+ * Returns null if no useState variables are found.
+ */
+export function generateLocalStateRegion(
+  stateNames: string[],
+  descriptions: Record<string, string>,
+  localStateFacts: LocalStateFact[],
+  defaultState: string | null,
+): RegionDef | null {
+  // Only process useState facts (skip useRef)
+  const useStateFacts = localStateFacts.filter((f) => f.hook === 'useState')
+  if (useStateFacts.length === 0) return null
+
+  // Build base values from initial values
+  const baseValues: Record<string, unknown> = {}
+  for (const fact of useStateFacts) {
+    baseValues[fact.name] = parseInitialValue(fact.initialValue)
+  }
+
+  const states: Record<string, Record<string, unknown>> = {}
+
+  for (const stateName of stateNames) {
+    const stateValues = { ...baseValues }
+    const isDefault = stateName === defaultState
+
+    if (!isDefault) {
+      for (const fact of useStateFacts) {
+        const stem = extractBooleanStem(fact.name)
+
+        // Rule 1: Boolean match — state name matches variable stem
+        if (stem && fact.valueType === 'boolean' && stateMatchesBooleanVar(stateName, stem)) {
+          stateValues[fact.name] = true
+        }
+
+        // Rule 2: Error match — state is "error" and variable is "error"
+        if (stateName.toLowerCase() === 'error' && fact.name === 'error') {
+          const desc = descriptions[stateName]
+          stateValues[fact.name] = desc || 'An error occurred. Please try again.'
+        }
+
+        // Rule 3: Inheritance — boolean inherits true from earlier state
+        if (stem && fact.valueType === 'boolean' && !stateMatchesBooleanVar(stateName, stem)) {
+          if (shouldInheritBoolean(stateName, stem, descriptions, stateNames)) {
+            stateValues[fact.name] = true
+          }
+        }
+      }
+    }
+
+    states[stateName] = stateValues
+  }
+
+  return {
+    label: 'Local State',
+    defaultState: defaultState ?? stateNames[0] ?? 'default',
+    states,
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -269,7 +399,8 @@ function generateMockFileForImportPath(
     '',
     '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
     'function resolveStoreState(stateData: Record<string, any>, fnFields?: string[], dataFields?: string[]) {',
-    '  const result: Record<string, any> = { ...stateData }',
+    '  const safe = (stateData && typeof stateData === "object" && !Array.isArray(stateData)) ? stateData : {}',
+    '  const result: Record<string, any> = { ...safe }',
     '  if (fnFields) { for (const f of fnFields) { if (!(f in result)) result[f] = NOOP } }',
     '  if (dataFields) { for (const f of dataFields) { if (!(f in result)) result[f] = null } }',
     '  return result',
@@ -303,13 +434,24 @@ function generateMockFileForImportPath(
     lines.push(
       `// eslint-disable-next-line @typescript-eslint/no-explicit-any`,
       `export function ${dep.hook}(..._args: any[]) {`,
-      `  const data = useRegionDataForHook('${regionKey}')`,
-      `  const defaults = ${defaultShapeJson}`,
-      `  const merged = data ? { ...defaults, ...(data as Record<string, any>) } : defaults`,
-      `  const state = resolveStoreState(merged, [${fnList}], [${dataList}])`,
-      `  // Support Zustand selector pattern: useStore((s) => s.field)`,
-      `  if (typeof _args[0] === 'function') { try { return _args[0](state) } catch { return state } }`,
-      `  return state`,
+      `  try {`,
+      `    const data = useRegionDataForHook('${regionKey}')`,
+      `    const defaults = ${defaultShapeJson}`,
+      `    const merged = data ? { ...defaults, ...(data as Record<string, any>) } : defaults`,
+      `    const state = resolveStoreState(merged, [${fnList}], [${dataList}])`,
+      `    // Support Zustand selector pattern: useStore((s) => s.field)`,
+      `    // Proxy returns NOOP for any missing property (actions/setters not in mockData)`,
+      `    if (typeof _args[0] === 'function') {`,
+      `      try {`,
+      `        const p = new Proxy(state, { get(t: any, k: string | symbol) { return (typeof k === 'symbol' || k in t) ? t[k] : NOOP } })`,
+      `        return _args[0](p)`,
+      `      } catch { return state }`,
+      `    }`,
+      `    return state`,
+      `  } catch (e) {`,
+      `    console.warn('[preview-tool] Mock hook ${dep.hook} failed:', e)`,
+      `    return ${defaultShapeJson}`,
+      `  }`,
       `}`,
       '',
     )
@@ -697,7 +839,19 @@ export async function runSpecPipeline(
     }
 
     // Generate per-hook regions
-    const enrichedRegions = specToPerHookRegions(screen, enrichedDeps)
+    const hookRegions = specToPerHookRegions(screen, enrichedDeps)
+
+    // Generate local-state region from useState variables
+    const localStateFacts = sf ? extractLocalStateFacts(sf) : []
+    const localStateRegion = generateLocalStateRegion(
+      screen.states,
+      screen.stateDescriptions ?? {},
+      localStateFacts,
+      screen.defaultState,
+    )
+    const enrichedRegions = localStateRegion
+      ? { ...hookRegions, 'local-state': localStateRegion }
+      : hookRegions
 
     enrichedScreens.push({
       ...screen,
@@ -842,5 +996,7 @@ export async function runSpecPipeline(
     aliasManifest[importPath] = `./mocks/${safeName}.ts`
   }
 
-  return { enrichedScreens, mockFiles, aliasManifest }
+  const screenSourcePaths = screensWithSource.map(({ absPath }) => absPath)
+
+  return { enrichedScreens, mockFiles, aliasManifest, screenSourcePaths }
 }
