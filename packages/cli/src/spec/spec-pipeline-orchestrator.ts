@@ -258,6 +258,84 @@ export function specToPerHookRegions(
 }
 
 // ---------------------------------------------------------------------------
+// Screen-level region merge
+// ---------------------------------------------------------------------------
+
+/**
+ * Merge multiple per-hook regions into a single screen-level region.
+ *
+ * Instead of showing separate "useBookingStore" and "local-state" regions
+ * in the sidebar, the user sees ONE region with combined states. Each state
+ * (loading, populated, error, etc.) merges data from ALL hooks + local state.
+ *
+ * The screen's spec title is used as the region label.
+ */
+function mergeIntoScreenRegion(
+  screen: SpecManifestScreen,
+  perHookRegions: RegionsMap,
+): RegionsMap {
+  const regionEntries = Object.entries(perHookRegions)
+  if (regionEntries.length === 0) return {}
+  if (regionEntries.length === 1) {
+    // Only one region — use it directly but with a better label
+    const [key, region] = regionEntries[0]
+    return { [key]: { ...region, label: screen.title } }
+  }
+
+  // Collect all state names across all regions
+  const allStateNames = new Set<string>()
+  let defaultState = 'default'
+  for (const [, region] of regionEntries) {
+    for (const stateName of Object.keys(region.states)) {
+      allStateNames.add(stateName)
+    }
+    if (region.defaultState) defaultState = region.defaultState
+  }
+
+  // For each state, merge data from all regions
+  const mergedStates: Record<string, Record<string, unknown>> = {}
+  for (const stateName of allStateNames) {
+    let merged: Record<string, unknown> = {}
+    for (const [, region] of regionEntries) {
+      const stateData = region.states[stateName] ?? region.states[region.defaultState] ?? {}
+      merged = { ...merged, ...stateData }
+    }
+    mergedStates[stateName] = merged
+  }
+
+  // Find list region properties (isList, mockItems, defaultCount)
+  let isList: boolean | undefined
+  let mockItems: unknown[] | undefined
+  let defaultCount: number | undefined
+  for (const [, region] of regionEntries) {
+    if (region.isList) {
+      isList = true
+      mockItems = region.mockItems
+      defaultCount = region.defaultCount
+      break
+    }
+  }
+
+  // Create ONE merged region for the sidebar display.
+  // Use the first hook's region key as the primary key.
+  // Additional hook keys are stored as aliases so mock hooks
+  // can still look up data via useRegionDataForHook('auth-store').
+  const primaryKey = regionEntries[0][0]
+  const aliasKeys = regionEntries.slice(1).map(([key]) => key)
+
+  const mergedRegion: RegionDef = {
+    label: screen.title,
+    defaultState,
+    states: mergedStates,
+    ...(isList ? { isList, mockItems, defaultCount } : {}),
+    // Store alias keys so runtime can duplicate data for all hooks
+    regionAliases: aliasKeys.length > 0 ? aliasKeys : undefined,
+  }
+
+  return { [primaryKey]: mergedRegion }
+}
+
+// ---------------------------------------------------------------------------
 // Local-state region generation (heuristic)
 // ---------------------------------------------------------------------------
 
@@ -942,10 +1020,8 @@ export async function runSpecPipeline(
       allDataHookKeys.add(`${dep.module}::${dep.hook}`)
     }
 
-    // Generate per-hook regions
+    // Generate per-hook regions and local-state region
     const hookRegions = specToPerHookRegions(screen, enrichedDeps)
-
-    // Generate local-state region from useState variables
     const localStateFacts = sf ? extractLocalStateFacts(sf) : []
     const localStateRegion = generateLocalStateRegion(
       screen.states,
@@ -954,9 +1030,14 @@ export async function runSpecPipeline(
       screen.defaultState,
       screen.stateData,
     )
-    const enrichedRegions = localStateRegion
+
+    // Merge ALL regions into a single screen-level region.
+    // The user sees one set of states (loading/populated/error/empty),
+    // not separate regions per data source.
+    const allRegions = localStateRegion
       ? { ...hookRegions, 'local-state': localStateRegion }
       : hookRegions
+    const enrichedRegions = mergeIntoScreenRegion(screen, allRegions)
 
     enrichedScreens.push({
       ...screen,

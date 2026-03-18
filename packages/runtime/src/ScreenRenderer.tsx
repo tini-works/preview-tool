@@ -75,7 +75,15 @@ export function computeRegionData(
       stateData = { ...stateData, ...region.translations[language] }
     }
 
-    result[key] = { activeState, stateData }
+    const entry = { activeState, stateData }
+    result[key] = entry
+
+    // Duplicate data for alias keys so mock hooks can find it
+    if (region.regionAliases) {
+      for (const alias of region.regionAliases) {
+        result[alias] = entry
+      }
+    }
   }
 
   return result

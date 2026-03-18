@@ -5,6 +5,8 @@ export interface RegionDef {
   states: Record<string, Record<string, unknown>>
   defaultState: string
   isList?: boolean
+  mockItems?: unknown[]
+  defaultCount?: number
   hookMapping?: {
     type: string
     hookName: string
@@ -12,6 +14,7 @@ export interface RegionDef {
     importPath: string
   }
   translations?: Record<string, Record<string, unknown>>
+  regionAliases?: string[]
 }
 
 export type RegionsMap = Record<string, RegionDef>
