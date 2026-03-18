@@ -361,23 +361,6 @@ import { Wrapper } from './wrapper'
 import { screenEntries } from 'virtual:spec-manifest'
 import './preview.css'
 
-// Global fetch interceptor — prevents real network requests in preview mode.
-// Returns a mock JSON response so components using direct fetch() don't crash.
-const __realFetch = window.fetch
-window.fetch = async (input, init) => {
-  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
-  // Allow Vite HMR, module requests, and localhost:6100 (preview server)
-  if (url.startsWith('/') || url.includes('localhost:6100') || url.includes('/@')) {
-    return __realFetch(input, init)
-  }
-  // Mock all external API calls
-  console.debug('[preview-tool] Intercepted fetch:', url)
-  return new Response(JSON.stringify({ success: true, data: null }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  })
-}
-
 // Static import map — Vite resolves these at compile time
 const screenModules: Record<string, () => Promise<any>> = {
 ${importEntries}
@@ -389,6 +372,57 @@ const entries: ScreenEntry[] = screenEntries.map((entry: any) => ({
   module: screenModules[entry.route] ?? (() => Promise.resolve({ default: () => null })),
   regions: entry.regions,
 }))
+
+// ---------------------------------------------------------------------------
+// Smart fetch interceptor — returns region mock data instead of real API calls.
+//
+// When a component's useEffect calls fetch(), this interceptor:
+// 1. Reads the current screen + active region state from the Zustand store
+// 2. Returns the mock data for that state as the fetch response
+// 3. The component processes it naturally (sets state, renders)
+//
+// When the user switches states in the sidebar, the component re-fetches
+// (via a store subscription that triggers re-render) and gets new mock data.
+// ---------------------------------------------------------------------------
+import { useDevToolsStore } from '@preview-tool/runtime'
+
+function __getRegionMockData(): Record<string, unknown> | null {
+  const store = useDevToolsStore.getState()
+  const route = store.selectedRoute
+  if (!route) return null
+
+  const entry = entries.find((e) => e.route === route)
+  if (!entry?.regions) return null
+
+  // Merge all region state data into one object (same as what mock hooks return)
+  let merged: Record<string, unknown> = {}
+  for (const [key, region] of Object.entries(entry.regions as Record<string, any>)) {
+    const activeState = store.regionStates[key] ?? region.defaultState
+    const stateData = region.states[activeState] ?? region.states[region.defaultState] ?? {}
+    merged = { ...merged, ...stateData }
+  }
+  return merged
+}
+
+const __realFetch = window.fetch
+window.fetch = async (input, init) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+
+  // Allow Vite HMR, module requests, and preview server through
+  if (url.startsWith('/') || url.includes('localhost:6100') || url.includes('/@')) {
+    return __realFetch(input, init)
+  }
+
+  // Get the active region mock data
+  const mockData = __getRegionMockData()
+  console.debug('[preview-tool] Intercepted fetch:', url, '→ returning region data')
+
+  // Return mock data in standard API response format
+  return new Response(JSON.stringify({ success: true, data: mockData }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
 
 // Render
 const root = document.getElementById('root')
