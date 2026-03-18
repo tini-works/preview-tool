@@ -87,26 +87,6 @@ function readHead(filePath: string, lines: number): string {
   }
 }
 
-/**
- * Build a map of screen file name → useState variable names.
- * Used by the preview override to match variables by call order.
- * Key is the file name without extension (e.g., "AppointmentListPage").
- */
-function buildStateVarMapByFileName(
-  screens: SpecScreenImport[],
-  stateVars: Record<string, string[]>
-): Record<string, string[]> {
-  const result: Record<string, string[]> = {}
-  for (const [absPath, vars] of Object.entries(stateVars)) {
-    // Extract file name without extension
-    const fileName = absPath.split('/').pop()?.replace(/\.[jt]sx?$/, '') ?? ''
-    if (fileName && vars.length > 0) {
-      result[fileName] = vars
-    }
-  }
-  return result
-}
-
 export interface SpecScreenImport {
   id: string
   sourceFile: string | null
@@ -152,18 +132,9 @@ export function detectExportType(filePath: string): { type: 'default' | 'named' 
 export async function generateEntryFiles(
   cwd: string,
   config: PreviewConfig,
-  screenStateVars?: Record<string, string[]>,
 ): Promise<void> {
   const previewDir = join(cwd, PREVIEW_DIR)
   await mkdir(previewDir, { recursive: true })
-  await mkdir(join(previewDir, 'shims'), { recursive: true })
-
-  // Generate React shim that overrides useState/useEffect for screen components
-  await writeFile(
-    join(previewDir, 'shims', 'react-preview.ts'),
-    generateReactShim(screenStateVars ?? {}),
-    'utf-8'
-  )
 
   await writeFile(
     join(previewDir, 'index.html'),
@@ -211,7 +182,7 @@ export async function generateEntryFiles(
         exportName: exportInfo.name,
       }
     })
-    await writeFile(join(previewDir, 'main.tsx'), generateSpecMainTsx(screens, screenStateVars), 'utf-8')
+    await writeFile(join(previewDir, 'main.tsx'), generateSpecMainTsx(screens), 'utf-8')
   } else {
     await writeFile(join(previewDir, 'main.tsx'), generateMainTsx(), 'utf-8')
   }
@@ -364,7 +335,7 @@ if (root) {
 `
 }
 
-export function generateSpecMainTsx(screens: SpecScreenImport[], screenStateVars?: Record<string, string[]>): string {
+export function generateSpecMainTsx(screens: SpecScreenImport[]): string {
   // Generate static import map so Vite can resolve paths at compile time
   const importEntries = screens
     .filter((s) => s.sourceFile)
@@ -388,37 +359,11 @@ import { PreviewShell } from '@preview-tool/runtime'
 import type { ScreenEntry } from '@preview-tool/runtime'
 import { Wrapper } from './wrapper'
 import { screenEntries } from 'virtual:spec-manifest'
-import { __activatePreviewState, __deactivatePreviewState } from 'react'
 import './preview.css'
 
 // Static import map — Vite resolves these at compile time
 const screenModules: Record<string, () => Promise<any>> = {
 ${importEntries}
-}
-
-// Wrap screen imports to activate/deactivate the React shim during render.
-// When active, useState returns mock data from the region state machine,
-// and useEffect is a no-op. Library components (buttons, cards, etc.)
-// are NOT affected — only the screen component itself.
-for (const [route, importFn] of Object.entries(screenModules)) {
-  screenModules[route] = async () => {
-    const mod = await importFn()
-    if (!mod.default) return mod
-    const OriginalComponent = mod.default
-    // Extract file name from the import path for matching
-    const sourceScreen = screenEntries.find((e: any) => e.route === route)
-    const screenFileName = sourceScreen?.sourceFile?.split('/').pop()?.replace(/\\.[jt]sx?$/, '') ?? ''
-    return {
-      default: function PreviewScreenWrapper(props: any) {
-        __activatePreviewState(screenFileName)
-        try {
-          return React.createElement(OriginalComponent, props)
-        } finally {
-          __deactivatePreviewState()
-        }
-      }
-    }
-  }
 }
 
 // Build screen entries from spec manifest
@@ -428,13 +373,15 @@ const entries: ScreenEntry[] = screenEntries.map((entry: any) => ({
   regions: entry.regions,
 }))
 
-// Global fetch interceptor — catches direct fetch() calls
+// Global fetch interceptor — catches direct fetch() calls.
+// Prevents real network requests in preview mode.
 const __realFetch = window.fetch
 window.fetch = async (input: any, init: any) => {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
   if (url.startsWith('/') || url.includes('localhost:6100') || url.includes('/@')) {
     return __realFetch(input, init)
   }
+  console.debug('[preview-tool] Intercepted fetch:', url)
   return new Response(JSON.stringify({ success: true, data: null }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },
@@ -451,104 +398,6 @@ if (root) {
       </Wrapper>
     </React.StrictMode>
   )
-}
-`
-}
-
-/**
- * Generate a React shim module that overrides useState and useEffect.
- * Screen files import from this shim (via Vite alias) instead of real React.
- *
- * useState → returns mock data from the region state machine
- * useEffect → no-op (all data comes from mock state)
- *
- * This is NOT a source transform. Production code is untouched.
- * The shim lives in .preview/shims/react-preview.ts (generated code).
- */
-function generateReactShim(stateVars: Record<string, string[]>): string {
-  const stateVarMap = JSON.stringify(
-    Object.fromEntries(
-      Object.entries(stateVars).map(([absPath, vars]) => {
-        const fileName = absPath.split('/').pop()?.replace(/\.[jt]sx?$/, '') ?? ''
-        return [fileName, vars]
-      })
-    )
-  )
-
-  return `// Auto-generated React shim for preview mode.
-// Overrides useState and useEffect for screen components.
-// Production code is NOT modified — this shim is loaded via Vite alias.
-
-import * as RealReact from '__real:react'
-
-// Re-export everything from real React
-export * from '__real:react'
-export default RealReact
-
-// State variable map: screen file name → ordered useState variable names
-const __stateVarMap: Record<string, string[]> = ${stateVarMap}
-
-// Active screen tracking
-let __activeScreenVars: string[] = []
-let __useStateIndex = 0
-
-// Called by the screen wrapper in main.tsx before/after rendering
-export function __activatePreviewState(screenFileName: string) {
-  __activeScreenVars = __stateVarMap[screenFileName] ?? []
-  __useStateIndex = 0
-}
-
-export function __deactivatePreviewState() {
-  __activeScreenVars = []
-  __useStateIndex = 0
-}
-
-export function __isPreviewActive() {
-  return __activeScreenVars.length > 0
-}
-
-// Import store for reading region data
-import { useDevToolsStore, getScreenEntries } from '@preview-tool/runtime'
-
-function __getRegionMockData(): Record<string, unknown> {
-  const store = useDevToolsStore.getState()
-  const route = store.selectedRoute
-  if (!route) return {}
-  const entries = getScreenEntries()
-  const entry = entries.find((e: any) => e.route === route)
-  if (!entry?.regions) return {}
-  let merged: Record<string, unknown> = {}
-  for (const [key, region] of Object.entries(entry.regions as Record<string, any>)) {
-    const activeState = store.regionStates[key] ?? region.defaultState
-    const stateData = region.states[activeState] ?? region.states[region.defaultState] ?? {}
-    merged = { ...merged, ...stateData }
-  }
-  return merged
-}
-
-// Override useState
-export function useState(initialValue: any) {
-  if (__activeScreenVars.length === 0) {
-    return RealReact.useState(initialValue)
-  }
-  const varName = __activeScreenVars[__useStateIndex] ?? null
-  __useStateIndex++
-  const regionData = __getRegionMockData()
-  const mockValue = (varName && varName in regionData) ? regionData[varName] : initialValue
-  // Controlled state: value from region, setter is no-op
-  return [mockValue, () => {}]
-}
-
-// Override useEffect — no-op for screen components
-export function useEffect(cb: any, deps?: any) {
-  if (__activeScreenVars.length > 0) return
-  return RealReact.useEffect(cb, deps)
-}
-
-// Override useLayoutEffect — same treatment as useEffect
-export function useLayoutEffect(cb: any, deps?: any) {
-  if (__activeScreenVars.length > 0) return
-  return RealReact.useLayoutEffect(cb, deps)
 }
 `
 }

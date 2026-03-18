@@ -81,6 +81,15 @@ export const devCommand = new Command('dev')
         'utf-8'
       )
 
+      // Write screen source paths (used by React shim plugin to target screen files)
+      if (pipelineResult.screenSourcePaths.length > 0) {
+        await writeFile(
+          join(previewDir, 'screen-source-paths.json'),
+          JSON.stringify(pipelineResult.screenSourcePaths, null, 2),
+          'utf-8'
+        )
+      }
+
       // Write screen state variable map for preview override
       if (Object.keys(pipelineResult.screenStateVars).length > 0) {
         await writeFile(
@@ -99,7 +108,7 @@ export const devCommand = new Command('dev')
 
     // Generate entry files (index.html + main.tsx)
     console.log(chalk.dim('Generating entry files...'))
-    await generateEntryFiles(cwd, config, pipelineResult?.screenStateVars)
+    await generateEntryFiles(cwd, config)
 
     // Create Vite config
     console.log(chalk.dim('Starting Vite dev server...'))

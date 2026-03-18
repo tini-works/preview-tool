@@ -119,8 +119,7 @@ export async function createViteConfig(
   }
 
   // Zero source transforms — screen files are loaded as-is.
-  // All mocking happens via Vite aliases (hook → mock file) and
-  // the global fetch interceptor (in main.tsx).
+  // Mocking happens via Vite aliases (hook → mock file) and fetch interceptor.
   const plugins = [
     ...(specPlugin ? [specPlugin] : []),
     ...(tailwindPlugin ? [tailwindPlugin] : []),
@@ -133,7 +132,6 @@ export async function createViteConfig(
   const hostRequire = createRequire(join(cwd, 'package.json'))
   const reactPath = dirname(hostRequire.resolve('react/package.json'))
   const reactDomPath = dirname(hostRequire.resolve('react-dom/package.json'))
-  const reactShimPath = join(previewDir, 'shims', 'react-preview.ts')
 
   // Load alias manifest for mock hook redirection
   const mockAliasEntries: Array<{ find: string | RegExp; replacement: string }> = []
@@ -186,11 +184,8 @@ export async function createViteConfig(
     ...realModuleEntries,
     // 1. Mock aliases (redirect imports to mock files)
     ...mockAliasEntries,
-    // 2. React shim (overrides useState/useEffect for screen components)
-    //    __real:react points to the actual React package for the shim to re-export
-    //    Exact match (/^react$/) so react/jsx-runtime etc. still resolve to real React
-    { find: '__real:react', replacement: reactPath },
-    { find: /^react$/, replacement: existsSync(reactShimPath) ? reactShimPath : reactPath },
+    // 2. React deduplication
+    { find: 'react', replacement: reactPath },
     { find: 'react-dom', replacement: reactDomPath },
     // 3. Runtime and host aliases
     { find: '@preview-tool/runtime', replacement: join(runtimeRoot, 'src', 'index.ts') },
@@ -228,6 +223,9 @@ export async function createViteConfig(
     plugins,
     optimizeDeps: {
       include: optimizeDepsInclude,
+      // Exclude react from pre-bundling when React shim is active.
+      // Pre-bundling caches react to .vite/deps/react.js which bypasses
+      // the resolveId plugin. Excluding it forces fresh resolution per request.
     },
   }
 }
