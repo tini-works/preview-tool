@@ -11,6 +11,7 @@ export interface RegionDef {
     identifier: string
     importPath: string
   }
+  translations?: Record<string, Record<string, unknown>>
 }
 
 export type RegionsMap = Record<string, RegionDef>
@@ -27,6 +28,10 @@ export function specToRegions(screen: SpecManifestScreen): RegionsMap {
     label: screen.title,
     defaultState: screen.defaultState ?? screen.states[0] ?? 'default',
     states: { ...screen.stateData },
+  }
+
+  if (screen.translations) {
+    region.translations = screen.translations
   }
 
   if (screen.dataDeps.length > 0) {

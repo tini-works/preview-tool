@@ -17,6 +17,7 @@ export interface RegionDefinition {
   mockItems?: unknown[]
   defaultCount?: number
   hookMapping?: HookMapping
+  translations?: Record<string, Record<string, unknown>>  // lang -> field overrides
 }
 
 export interface HookMapping {

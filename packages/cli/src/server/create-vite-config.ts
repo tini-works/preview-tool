@@ -150,13 +150,24 @@ export async function createViteConfig(
 
   // Spec-driven preview plugin (when specsDir is configured)
   let specPlugin: unknown = null
+  let i18nPlugin: unknown = null
   if (config.specsDir) {
     const { createSpecPreviewPlugin } = await import('./vite-plugin-spec-preview.js')
     specPlugin = createSpecPreviewPlugin({ specsDir: config.specsDir, cwd })
+
+    // i18n preview plugin — enables live language switching via Vite transforms
+    const { loadSpecs } = await import('../spec/spec-loader.js')
+    const { createI18nTransformPlugin } = await import('./vite-plugin-i18n-transform.js')
+    const manifest = await loadSpecs(config.specsDir)
+    const hasTranslations = manifest.screens.some((s) => s.translations && Object.keys(s.translations).length > 0)
+    if (hasTranslations) {
+      i18nPlugin = createI18nTransformPlugin({ manifest, screenFilePaths })
+    }
   }
 
   const plugins = [
     ...(specPlugin ? [specPlugin] : []),
+    ...(i18nPlugin ? [i18nPlugin] : []),
     ...(previewStatePlugin ? [previewStatePlugin] : []),
     ...(tailwindPlugin ? [tailwindPlugin] : []),
     ...(reactPlugin ? [reactPlugin] : []),

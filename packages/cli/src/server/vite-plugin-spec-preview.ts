@@ -65,9 +65,15 @@ function buildScreenEntries(
   return manifest.screens.map((s) => {
     const enriched = enrichedMap.get(s.id)
     if (enriched && Object.keys(enriched.enrichedRegions).length > 0) {
+      const regions = { ...enriched.enrichedRegions }
+      if (s.translations) {
+        for (const regionKey of Object.keys(regions)) {
+          regions[regionKey] = { ...regions[regionKey], translations: s.translations }
+        }
+      }
       return {
         route: s.id,
-        regions: enriched.enrichedRegions,
+        regions,
         ...(s.routeParams ? { routeParams: s.routeParams } : {}),
       }
     }

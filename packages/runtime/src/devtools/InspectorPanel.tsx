@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react'
 import type React from 'react'
 import { Moon, Sun, Monitor, PanelRightClose, PanelRight } from 'lucide-react'
 import { Button } from '../ui/button.tsx'
@@ -49,6 +50,33 @@ export function InspectorPanel({ onLanguageChange }: InspectorPanelProps = {}) {
   const currentModule = modules.find((m) => m.route === selectedRoute)
   const currentFlags = currentModule?.flags
   const regions = currentModule?.regions
+
+  const availableLanguages = useMemo(() => {
+    const translationLangs = new Set<string>()
+    if (regions) {
+      for (const region of Object.values(regions)) {
+        if (region.translations) {
+          for (const lang of Object.keys(region.translations)) {
+            translationLangs.add(lang)
+          }
+        }
+      }
+    }
+    if (translationLangs.size === 0) return ['en', 'de']
+    // Base language is inferred: if only 'en' translations exist, base is 'de' and vice versa
+    const baseLang = translationLangs.has('en') && !translationLangs.has('de') ? 'de'
+      : translationLangs.has('de') && !translationLangs.has('en') ? 'en'
+      : 'en'
+    return [baseLang, ...translationLangs].filter((v, i, a) => a.indexOf(v) === i)
+  }, [regions])
+
+  // Auto-set language to base (first available) when screen changes
+  const baseLanguage = availableLanguages[0]
+  useEffect(() => {
+    if (baseLanguage && language !== baseLanguage && !availableLanguages.includes(language)) {
+      setLanguage(baseLanguage)
+    }
+  }, [baseLanguage, selectedRoute])
 
   const device = getDevice(activeDevice)
   const displayWidth =
@@ -164,12 +192,16 @@ export function InspectorPanel({ onLanguageChange }: InspectorPanelProps = {}) {
         {/* Language section */}
         <Section title="Language">
           <div className="flex gap-1">
-            {['en', 'de'].map((lang) => (
+            {availableLanguages.map((lang) => (
               <button
                 key={lang}
                 onClick={() => {
                   setLanguage(lang)
                   onLanguageChange?.(lang)
+                  // Notify Vite server to re-transform with new language
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const hot = (import.meta as any).hot
+                  if (hot) hot.send('preview:set-language', { language: lang })
                 }}
                 className={
                   language === lang

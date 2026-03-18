@@ -43,6 +43,7 @@ export const SpecScreenSchema = z.object({
   route_params: z.record(z.string(), z.string()).optional(),
   capabilities: z.array(z.string()).optional(),
   conventions: z.array(z.string()).optional(),
+  translations: z.record(z.string(), z.record(z.string(), z.unknown())).optional(),
   api_client: z.object({
     module: z.string(),
     export: z.string().optional(),
@@ -106,6 +107,7 @@ export interface SpecManifestScreen {
   stateDescriptions: Record<string, string>
   dataDeps: SpecDataDep[]
   routeParams: Record<string, string> | null
+  translations: Record<string, Record<string, unknown>> | null
   apiClient: { module: string; export?: string } | null
 }
 

@@ -128,6 +128,7 @@ export async function loadSpecs(specsDir: string): Promise<SpecManifest> {
       stateData,
       stateDescriptions,
       dataDeps: screen.data_deps,
+      translations: screen.translations ?? null,
       routeParams: screen.route_params ?? null,
       apiClient: screen.api_client
         ? { module: screen.api_client.module, export: screen.api_client.export }

@@ -22,13 +22,19 @@ export function resolveFlags(
 export function assembleRegionData(
   regions: RegionsMap,
   regionStates: Record<string, string>,
-  regionListCounts: Record<string, number>
+  regionListCounts: Record<string, number>,
+  language?: string
 ): Record<string, unknown> {
   let data: Record<string, unknown> = {}
 
   for (const [key, region] of Object.entries(regions)) {
     const activeState = regionStates[key] ?? region.defaultState
-    const stateData = region.states[activeState] ?? region.states[region.defaultState] ?? {}
+    let stateData = { ...(region.states[activeState] ?? region.states[region.defaultState] ?? {}) }
+
+    if (language && region.translations?.[language]) {
+      stateData = { ...stateData, ...region.translations[language] }
+    }
+
     data = { ...data, ...stateData }
 
     if (region.isList && region.mockItems) {
@@ -48,7 +54,8 @@ export function assembleRegionData(
 export function computeRegionData(
   regions: RegionsMap,
   regionStates: Record<string, string>,
-  regionListCounts: Record<string, number>
+  regionListCounts: Record<string, number>,
+  language?: string
 ): RegionDataMap {
   const result: RegionDataMap = {}
 
@@ -62,6 +69,10 @@ export function computeRegionData(
         const count = regionListCounts[key] ?? region.defaultCount ?? region.mockItems.length
         stateData = { ...stateData, [listField]: region.mockItems.slice(0, count) }
       }
+    }
+
+    if (language && region.translations?.[language]) {
+      stateData = { ...stateData, ...region.translations[language] }
     }
 
     result[key] = { activeState, stateData }
@@ -85,6 +96,7 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
   const featureFlags = useDevToolsStore((s) => s.featureFlags)
   const regionStates = useDevToolsStore((s) => s.regionStates)
   const regionListCounts = useDevToolsStore((s) => s.regionListCounts)
+  const language = useDevToolsStore((s) => s.language)
   const [loaded, setLoaded] = useState<LoadedScreen | null>(null)
   const [loadError, setLoadError] = useState<Error | null>(null)
 
@@ -164,7 +176,7 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
   let regionData: RegionDataMap = {}
   try {
     regionData = regions
-      ? computeRegionData(regions, regionStates, regionListCounts)
+      ? computeRegionData(regions, regionStates, regionListCounts, language)
       : {}
   } catch (e) {
     console.warn('[preview-tool] Failed to compute region data:', e)
@@ -172,10 +184,10 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
 
   return (
     <NetworkSimulationLayer key={route}>
-      <div style={{ zoom: fontScale }} className="h-full">
+      <div style={{ zoom: fontScale }} lang={language} data-font-scale={fontScale} className="h-full">
         <ScreenErrorBoundary key={route}>
           <FlowProvider>
-            <RegionDataProvider regions={regions ?? {}} regionData={regionData}>
+            <RegionDataProvider regions={regions ?? {}} regionData={regionData} language={language}>
               <Component key={JSON.stringify(regionStates)} regionData={regionData} flags={resolvedFlags} />
             </RegionDataProvider>
           </FlowProvider>
