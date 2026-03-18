@@ -92,6 +92,46 @@ Lessons from past bugs — always check these before writing fixes:
 
 5. **Mock data completeness:** mockData must include ALL fields the component uses (including `id` for React keys). Read the component's JSX to verify which fields are accessed before writing mockData.
 
+## Delivery Rules
+
+**ALWAYS test before delivering.** Never tell the user "try it now" without verifying it works first. Specifically:
+
+1. **Build must pass:** `pnpm build` — no TypeScript errors
+2. **All tests must pass:** `cd packages/cli && npx vitest run` — no failures
+3. **Integration test with real app:** Start the preview server against the booking app (`cd ~/Desktop/booking/client && node ~/Desktop/preview-tool/packages/cli/dist/index.js dev --cwd . --specs ../.specs`) and verify screens render without crashes
+4. **Verify the actual output:** `curl` the served modules to confirm transforms/shims/aliases are applied correctly — don't assume they work
+
+If you can't verify something works, say so. Don't ship and hope.
+
+## Mistakes Log — Do Not Repeat
+
+Hard-won lessons from bugs introduced during development:
+
+### Source code transforms are fragile — avoid them
+- **Regex-based transforms on .tsx files always break.** They miss edge cases (import order, destructuring, HTML entities, multiline expressions). Every regex fix creates a new regex bug.
+- **Vite pre-bundling bypasses aliases for `react`.** You cannot alias `react` to a shim — Vite caches it to `.vite/deps/react.js` and the alias is ignored. `optimizeDeps.exclude: ['react']` causes esbuild errors. The `resolveId` plugin hook also doesn't intercept pre-bundled deps.
+- **ESM destructuring binds at import time.** `import { useState } from 'react'` captures the original function. Overriding `React.useState` at runtime has NO effect on already-destructured imports.
+- **Don't remove imports with regex.** Removing `useEffect` from `import { useState, useEffect, useCallback }` with regex broke `useCallback` (greedy match). If you must modify imports, parse the names as a comma-separated list and filter.
+
+### Vite plugin ordering matters
+- Plugins with `enforce: 'pre'` run in array order. If plugin A injects `from '@preview-tool/runtime'` and plugin B checks for that string to skip its own injection, plugin B won't inject. Check for the SPECIFIC import, not just any runtime import.
+- The i18n transform + preview-state transform conflicted because both injected runtime imports, and the import-exists check was too broad.
+
+### React hooks rules — check EVERY time
+- Any `useMemo`, `useEffect`, `useState` added to a component MUST be placed BEFORE all conditional `return` statements. This was violated twice (ScreenRenderer) causing "Rendered more hooks than during previous render" crashes.
+
+### Test against ALL screens, not just one
+- Fixes tested on scr-home but crashing on scr-login, scr-maintenance, scr-time-slot. Different screens have different patterns (direct fetch vs api client, useState vs hooks, .getState() calls). Always verify against multiple screens.
+
+### Don't add heuristics that guess data shapes
+- The API stub heuristic "extract first array from region data" crashed TimeSlotPage because it returned `slots[]` directly but the component expected `result.data.availableSlots` (nested). Return raw data and let the component's own error handling deal with mismatches.
+
+### The view-first principle
+- The VIEW (JSX) is the source of truth for what data a screen needs — not the hooks.
+- Don't classify hooks into patterns (zustand vs query vs context). Use ONE universal mock.
+- Hooks are just pipes. Mock them all the same way: return region data via Proxy.
+- PASSTHROUGH_PACKAGES (react-router-dom, react-hook-form, etc.) are the only exception — they use real providers via wrapper.tsx.
+
 # Specs
 
 This project uses `.specs/` for requirement tracking.
