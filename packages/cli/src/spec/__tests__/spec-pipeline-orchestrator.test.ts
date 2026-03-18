@@ -645,11 +645,12 @@ describe('isApiClientImport', () => {
 describe('generateApiClientStub', () => {
   it('generates stub with all HTTP methods', () => {
     const stub = generateApiClientStub('@/lib/api', ['api'])
-    expect(stub).toContain('get: () => Promise.resolve(noopResponse)')
-    expect(stub).toContain('post: () => Promise.resolve(noopResponse)')
-    expect(stub).toContain('put: () => Promise.resolve(noopResponse)')
-    expect(stub).toContain('patch: () => Promise.resolve(noopResponse)')
-    expect(stub).toContain('delete: () => Promise.resolve(noopResponse)')
+    expect(stub).toContain('get:')
+    expect(stub).toContain('post:')
+    expect(stub).toContain('put:')
+    expect(stub).toContain('patch:')
+    expect(stub).toContain('delete:')
+    expect(stub).toContain('__getResponseData')
     expect(stub).toContain('export const api = stub')
     expect(stub).toContain('export default stub')
   })

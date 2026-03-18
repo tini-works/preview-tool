@@ -46,6 +46,8 @@ export interface SpecPipelineResult {
   mockFiles: Map<string, string>
   aliasManifest: Record<string, string>
   screenSourcePaths: string[]
+  /** Map of screen source path → ordered useState variable names (for preview override) */
+  screenStateVars: Record<string, string[]>
 }
 
 export interface EnrichedScreen extends SpecManifestScreen {
@@ -979,6 +981,7 @@ export async function runSpecPipeline(
   // Global collections — filled during per-screen loop, used for mock generation after
   const hooksWithGetState = new Set<string>()
   const allHooksByImport = new Map<string, MergedHookDep[]>()
+  const screenStateVars: Record<string, string[]> = {}
 
   // Process each screen
   for (const screen of screens) {
@@ -1052,6 +1055,14 @@ export async function runSpecPipeline(
     // Generate per-hook regions and local-state region
     const hookRegions = specToPerHookRegions(screen, enrichedDeps)
     const localStateFacts = sf ? extractLocalStateFacts(sf) : []
+
+    // Collect useState variable names (in call order) for the preview override
+    if (absPath && localStateFacts.length > 0) {
+      screenStateVars[absPath] = localStateFacts
+        .filter((f) => f.hook === 'useState')
+        .map((f) => f.name)
+    }
+
     const localStateRegion = generateLocalStateRegion(
       screen.states,
       screen.stateDescriptions ?? {},
@@ -1281,5 +1292,5 @@ export async function runSpecPipeline(
 
   const screenSourcePaths = screensWithSource.map(({ absPath }) => absPath)
 
-  return { enrichedScreens, mockFiles, aliasManifest, screenSourcePaths }
+  return { enrichedScreens, mockFiles, aliasManifest, screenSourcePaths, screenStateVars }
 }

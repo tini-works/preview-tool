@@ -60,10 +60,11 @@ export const devCommand = new Command('dev')
     }
 
     // Run spec pipeline: AST analysis + mock generation
+    let pipelineResult: Awaited<ReturnType<typeof runSpecPipeline>> | null = null
     if (config.specsDir) {
       const manifest = await loadSpecs(config.specsDir)
       const previewDir = join(cwd, PREVIEW_DIR)
-      const pipelineResult = await runSpecPipeline(manifest.screens, cwd, config.specsDir)
+      pipelineResult = await runSpecPipeline(manifest.screens, cwd, config.specsDir)
 
       // Write physical mock files
       const mocksDir = join(previewDir, 'mocks')
@@ -80,11 +81,11 @@ export const devCommand = new Command('dev')
         'utf-8'
       )
 
-      // Write screen source paths for Vite useState transform
-      if (pipelineResult.screenSourcePaths.length > 0) {
+      // Write screen state variable map for preview override
+      if (Object.keys(pipelineResult.screenStateVars).length > 0) {
         await writeFile(
-          join(previewDir, 'screen-source-paths.json'),
-          JSON.stringify(pipelineResult.screenSourcePaths, null, 2),
+          join(previewDir, 'screen-state-vars.json'),
+          JSON.stringify(pipelineResult.screenStateVars, null, 2),
           'utf-8'
         )
       }
@@ -98,7 +99,7 @@ export const devCommand = new Command('dev')
 
     // Generate entry files (index.html + main.tsx)
     console.log(chalk.dim('Generating entry files...'))
-    await generateEntryFiles(cwd, config)
+    await generateEntryFiles(cwd, config, pipelineResult?.screenStateVars)
 
     // Create Vite config
     console.log(chalk.dim('Starting Vite dev server...'))
