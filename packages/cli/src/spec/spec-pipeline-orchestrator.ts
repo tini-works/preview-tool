@@ -866,7 +866,7 @@ export function generateApiClientStub(
 ): string {
   const lines = [
     `// Auto-generated API client stub for ${importPath}`,
-    `// All HTTP methods resolve with no-op response — usePreviewState provides real data`,
+    `// All HTTP methods resolve with no-op response — mock hooks provide real data`,
     '',
     '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
     'const noopResponse: any = { success: true, data: undefined, error: undefined }',

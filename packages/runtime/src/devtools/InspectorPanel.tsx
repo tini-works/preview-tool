@@ -198,10 +198,6 @@ export function InspectorPanel({ onLanguageChange }: InspectorPanelProps = {}) {
                 onClick={() => {
                   setLanguage(lang)
                   onLanguageChange?.(lang)
-                  // Notify Vite server to re-transform with new language
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const hot = (import.meta as any).hot
-                  if (hot) hot.send('preview:set-language', { language: lang })
                 }}
                 className={
                   language === lang

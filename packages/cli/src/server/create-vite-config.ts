@@ -4,8 +4,6 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import type { PreviewConfig } from '../lib/config.js'
 import { PREVIEW_DIR } from '../lib/config.js'
-import { createPreviewStatePlugin } from './vite-plugin-preview-state.js'
-
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // Browser-safe shim for node:async_hooks.
@@ -113,62 +111,18 @@ export async function createViteConfig(
     // Tailwind CSS v4 vite plugin not available
   }
 
-  // Load screen file paths for useState transform plugin
-  const screenFilePaths: string[] = []
-  try {
-    const screensDir = join(previewDir, 'screens')
-    const screenDirs = readdirSync(screensDir, { withFileTypes: true })
-      .filter((d) => d.isDirectory())
-      .map((d) => d.name)
-    for (const screenDir of screenDirs) {
-      try {
-        const modelPath = join(screensDir, screenDir, 'model.ts')
-        const modelContent = readFileSync(modelPath, 'utf-8')
-        const filePathMatch = modelContent.match(/filePath:\s*["']([^"']+)["']/)
-        if (filePathMatch) {
-          screenFilePaths.push(join(cwd, filePathMatch[1]))
-        }
-      } catch {
-        // Individual model file unreadable — skip this screen
-      }
-    }
-  } catch {
-    // No screens directory — skip plugin
-  }
-
-  // Spec-mode fallback: read screen source paths from pipeline output
-  if (screenFilePaths.length === 0) {
-    try {
-      const raw = readFileSync(join(previewDir, 'screen-source-paths.json'), 'utf-8')
-      screenFilePaths.push(...JSON.parse(raw))
-    } catch { /* no spec-mode paths */ }
-  }
-
-  const previewStatePlugin = screenFilePaths.length > 0
-    ? createPreviewStatePlugin(screenFilePaths)
-    : null
-
   // Spec-driven preview plugin (when specsDir is configured)
   let specPlugin: unknown = null
-  let i18nPlugin: unknown = null
   if (config.specsDir) {
     const { createSpecPreviewPlugin } = await import('./vite-plugin-spec-preview.js')
     specPlugin = createSpecPreviewPlugin({ specsDir: config.specsDir, cwd })
-
-    // i18n preview plugin — enables live language switching via Vite transforms
-    const { loadSpecs } = await import('../spec/spec-loader.js')
-    const { createI18nTransformPlugin } = await import('./vite-plugin-i18n-transform.js')
-    const manifest = await loadSpecs(config.specsDir)
-    const hasTranslations = manifest.screens.some((s) => s.translations && Object.keys(s.translations).length > 0)
-    if (hasTranslations) {
-      i18nPlugin = createI18nTransformPlugin({ manifest, screenFilePaths })
-    }
   }
 
+  // Zero source transforms — screen files are loaded as-is.
+  // All mocking happens via Vite aliases (hook → mock file) and
+  // the global fetch interceptor (in main.tsx).
   const plugins = [
     ...(specPlugin ? [specPlugin] : []),
-    ...(i18nPlugin ? [i18nPlugin] : []),
-    ...(previewStatePlugin ? [previewStatePlugin] : []),
     ...(tailwindPlugin ? [tailwindPlugin] : []),
     ...(reactPlugin ? [reactPlugin] : []),
   ]
