@@ -239,6 +239,20 @@ import type { ScreenEntry, AnyFlowAction } from '@preview-tool/runtime'
 import { Wrapper } from './wrapper'
 import './preview.css'
 
+// Global fetch interceptor — prevents real network requests in preview mode.
+const __realFetch = window.fetch
+window.fetch = async (input, init) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+  if (url.startsWith('/') || url.includes('localhost:6100') || url.includes('/@')) {
+    return __realFetch(input, init)
+  }
+  console.debug('[preview-tool] Intercepted fetch:', url)
+  return new Response(JSON.stringify({ success: true, data: null }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
+
 // Auto-discover from per-screen folders
 const screenModules = import.meta.glob('./screens/*/adapter.tsx')
 const modelModules = import.meta.glob('./screens/*/model.ts', { eager: true }) as Record<
@@ -346,6 +360,23 @@ import type { ScreenEntry } from '@preview-tool/runtime'
 import { Wrapper } from './wrapper'
 import { screenEntries } from 'virtual:spec-manifest'
 import './preview.css'
+
+// Global fetch interceptor — prevents real network requests in preview mode.
+// Returns a mock JSON response so components using direct fetch() don't crash.
+const __realFetch = window.fetch
+window.fetch = async (input, init) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+  // Allow Vite HMR, module requests, and localhost:6100 (preview server)
+  if (url.startsWith('/') || url.includes('localhost:6100') || url.includes('/@')) {
+    return __realFetch(input, init)
+  }
+  // Mock all external API calls
+  console.debug('[preview-tool] Intercepted fetch:', url)
+  return new Response(JSON.stringify({ success: true, data: null }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
 
 // Static import map — Vite resolves these at compile time
 const screenModules: Record<string, () => Promise<any>> = {
