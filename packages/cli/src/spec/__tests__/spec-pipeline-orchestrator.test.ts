@@ -41,6 +41,7 @@ const SCREEN: SpecManifestScreen = {
   ],
   routeParams: null,
   apiClient: null,
+  translations: null,
 }
 
 describe('AST hook discovery', () => {
@@ -214,6 +215,7 @@ const TYPED_SCREEN: SpecManifestScreen = {
   dataDeps: [],
   routeParams: null,
   apiClient: null,
+  translations: null,
 }
 
 describe('integration: type-extracted mock data', () => {
@@ -275,8 +277,8 @@ describe('integration: type-extracted mock data', () => {
     expect(mockCode).toBeDefined()
     expect(mockCode).toContain('export function useRooms')
     expect(mockCode).toContain('useRegionDataForHook')
-    // Should have non-empty defaults object (not just {})
-    expect(mockCode).toContain('const defaults =')
+    // Should use Proxy-based universal mock pattern
+    expect(mockCode).toContain('new Proxy')
   })
 })
 
@@ -296,6 +298,7 @@ describe('specToPerHookRegions with mockData', () => {
       dataDeps: [],
       routeParams: null,
   apiClient: null,
+  translations: null,
     }
 
     const deps: MergedHookDep[] = [{
@@ -336,6 +339,7 @@ describe('specToPerHookRegions with mockData', () => {
       dataDeps: [],
       routeParams: null,
   apiClient: null,
+  translations: null,
     }
 
     const deps: MergedHookDep[] = [{
@@ -377,6 +381,7 @@ describe('distributeStateData edge cases', () => {
       dataDeps: [],
       routeParams: null,
   apiClient: null,
+  translations: null,
     }
 
     // When only one hook and provides is empty, all data should go to it

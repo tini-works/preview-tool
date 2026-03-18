@@ -6,7 +6,21 @@ import { findTsConfig } from '../analyzer/collect-facts.js'
 import { extractHookReturnType } from '../analyzer/extract-types.js'
 import { classifyHook } from '../lib/hook-classifier.js'
 import { REACT_IMPORT_PATHS, REACT_BUILTIN_HOOKS } from '../lib/hook-binding.js'
-import { PROVIDER_PACKAGES } from '../lib/hook-classifier.js'
+import { generateUniversalMock } from '../generator/universal-mock.js'
+
+// ---------------------------------------------------------------------------
+// Passthrough packages: hooks from these packages are NOT mocked.
+// They are provided by real library providers in wrapper.tsx.
+// ---------------------------------------------------------------------------
+
+const PASSTHROUGH_PACKAGES = new Set([
+  'react-router-dom',
+  'react-hook-form',
+  'react-i18next',
+  '@tanstack/react-router',
+  'next/router',
+  'next/navigation',
+])
 import { distributeByState } from './state-distributor.js'
 import { TypeCache, hashContent } from './type-cache.js'
 import type { HookFact, TypeShapeInfo, LocalStateFact } from '../analyzer/types.js'
@@ -146,7 +160,7 @@ function mergeHookDeps(
   for (const hook of astHooks) {
     if (REACT_IMPORT_PATHS.has(hook.importPath)) continue
     if (REACT_BUILTIN_HOOKS.has(hook.name)) continue
-    if (classifyHook(hook.name, hook.importPath) !== 'data') continue
+    if (PASSTHROUGH_PACKAGES.has(hook.importPath)) continue
 
     const key = `${hook.importPath}::${hook.name}`
     if (seen.has(key)) continue
@@ -421,71 +435,33 @@ function generateMockFileForImportPath(
     '',
     "import { useRegionDataForHook } from '@preview-tool/runtime'",
     '',
-  )
-
-  // NOOP stub for setter/action fields
-  lines.push(
     '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
     'const NOOP = (() => {}) as any',
-    '',
-    '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
-    'function resolveStoreState(stateData: Record<string, any>, fnFields?: string[], dataFields?: string[]) {',
-    '  const safe = (stateData && typeof stateData === "object" && !Array.isArray(stateData)) ? stateData : {}',
-    '  const result: Record<string, any> = { ...safe }',
-    '  if (fnFields) { for (const f of fnFields) { if (!(f in result)) result[f] = NOOP } }',
-    '  if (dataFields) { for (const f of dataFields) { if (!(f in result)) result[f] = null } }',
-    '  return result',
-    '}',
     '',
   )
 
   for (const dep of hooks) {
     const regionKey = hookToRegionKey(dep.hook)
 
-    // Use resolved type info when available for richer field lists
-    const dataFields = dep.resolvedType
-      ? dep.resolvedType.properties.filter((f) => !isLikelySetter(f))
-      : dep.provides.filter((f) => !isLikelySetter(f))
-    const fnFields = dep.resolvedType
-      ? [
-          ...dep.resolvedType.methods,
-          ...dep.provides.filter(isLikelySetter),
-        ]
-      : dep.provides.filter(isLikelySetter)
-    // Deduplicate fn fields
-    const uniqueFnFields = [...new Set(fnFields)]
+    // Use generateUniversalMock for the Proxy-based hook body
+    const mockOutput = generateUniversalMock({
+      hookName: dep.hook,
+      regionKey,
+      importPath,
+      isBarrel,
+      hasStaticGetState: false,
+      returnStyle: 'object',
+    })
 
-    const fnList = uniqueFnFields.map((f) => `'${f}'`).join(', ')
-    const dataList = dataFields.map((f) => `'${f}'`).join(', ')
-
-    // Build default shape from resolved type (provides non-null defaults)
-    const defaultShape = dep.resolvedType?.shape ?? {}
-    const defaultShapeJson = JSON.stringify(defaultShape)
-
-    lines.push(
-      `// eslint-disable-next-line @typescript-eslint/no-explicit-any`,
-      `export function ${dep.hook}(..._args: any[]) {`,
-      `  try {`,
-      `    const data = useRegionDataForHook('${regionKey}')`,
-      `    const defaults = ${defaultShapeJson}`,
-      `    const merged = data ? { ...defaults, ...(data as Record<string, any>) } : defaults`,
-      `    const state = resolveStoreState(merged, [${fnList}], [${dataList}])`,
-      `    // Support Zustand selector pattern: useStore((s) => s.field)`,
-      `    // Proxy returns NOOP for any missing property (actions/setters not in mockData)`,
-      `    if (typeof _args[0] === 'function') {`,
-      `      try {`,
-      `        const p = new Proxy(state, { get(t: any, k: string | symbol) { return (typeof k === 'symbol' || k in t) ? t[k] : NOOP } })`,
-      `        return _args[0](p)`,
-      `      } catch { return state }`,
-      `    }`,
-      `    return state`,
-      `  } catch (e) {`,
-      `    console.warn('[preview-tool] Mock hook ${dep.hook} failed:', e)`,
-      `    return ${defaultShapeJson}`,
-      `  }`,
-      `}`,
-      '',
-    )
+    // Extract only the hook function from the universal mock output
+    // (skip the file-level header, re-export, imports, and NOOP — already emitted above)
+    const fnStart = mockOutput.indexOf(`export function ${dep.hook}`)
+    if (fnStart >= 0) {
+      // Find the closing brace of the function
+      const fnBody = mockOutput.slice(fnStart)
+      lines.push(fnBody.trimEnd())
+      lines.push('')
+    }
   }
 
   return lines.join('\n')
@@ -513,8 +489,8 @@ export function detectContextHooks(
     // Skip hooks already mocked as data hooks
     const key = `${h.importPath}::${h.name}`
     if (dataHookKeys.has(key)) return false
-    // Skip hooks from known provider packages (wrapper.tsx handles these)
-    if (PROVIDER_PACKAGES.has(h.importPath)) return false
+    // Skip hooks from passthrough packages (wrapper.tsx handles these)
+    if (PASSTHROUGH_PACKAGES.has(h.importPath)) return false
     // Only keep hooks classified as 'provider' from local/app-specific sources
     // These are the context hooks that need shims
     const category = classifyHook(h.name, h.importPath)

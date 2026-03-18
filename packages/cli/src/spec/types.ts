@@ -107,7 +107,7 @@ export interface SpecManifestScreen {
   stateDescriptions: Record<string, string>
   dataDeps: SpecDataDep[]
   routeParams: Record<string, string> | null
-  translations: Record<string, Record<string, unknown>> | null
+  translations?: Record<string, Record<string, unknown>> | null
   apiClient: { module: string; export?: string } | null
 }
 
