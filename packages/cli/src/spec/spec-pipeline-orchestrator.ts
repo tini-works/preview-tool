@@ -408,6 +408,7 @@ function generateMockFileForImportPath(
   hooks: MergedHookDep[],
   importPath: string,
   barrelReExports?: Array<{ names: string[]; fullModulePath: string }>,
+  hooksWithGetState?: Set<string>,
 ): string {
   const isBarrel = isLikelyBarrel(importPath)
   const lines: string[] = [
@@ -448,7 +449,7 @@ function generateMockFileForImportPath(
       regionKey,
       importPath,
       isBarrel,
-      hasStaticGetState: false,
+      hasStaticGetState: hooksWithGetState?.has(dep.hook) ?? false,
       returnStyle: 'object',
     })
 
@@ -868,6 +869,10 @@ export async function runSpecPipeline(
   // Type extraction cache for fast startup
   const typeCache = new TypeCache(join(cwd, '.preview', '.cache'))
 
+  // Global collections — filled during per-screen loop, used for mock generation after
+  const hooksWithGetState = new Set<string>()
+  const allHooksByImport = new Map<string, MergedHookDep[]>()
+
   // Process each screen
   for (const screen of screens) {
     const absPath = resolveSourceFilePath(screen, cwd, specsDir)
@@ -959,29 +964,37 @@ export async function runSpecPipeline(
       enrichedRegions,
     })
 
-    // Group hooks by import path for mock file generation
-    const hooksByImport = new Map<string, MergedHookDep[]>()
+    // Detect hooks that use .getState() (Zustand pattern) in this screen
+    if (sf) {
+      const sourceText = sf.getFullText()
+      for (const dep of enrichedDeps) {
+        if (sourceText.includes(`${dep.hook}.getState`)) {
+          hooksWithGetState.add(dep.hook)
+        }
+      }
+    }
+
+    // Collect hooks by import path (deferred — mock files generated after all screens)
     for (const dep of enrichedDeps) {
-      const existing = hooksByImport.get(dep.module) ?? []
-      // Deduplicate by hook name
+      const existing = allHooksByImport.get(dep.module) ?? []
       if (!existing.some((h) => h.hook === dep.hook)) {
         existing.push(dep)
       }
-      hooksByImport.set(dep.module, existing)
+      allHooksByImport.set(dep.module, existing)
     }
+  }
 
-    for (const [importPath, hooks] of hooksByImport) {
-      if (!mockFiles.has(importPath)) {
-        // For barrel files, resolve the barrel source and get re-exports
-        let barrelReExports: Array<{ names: string[]; fullModulePath: string }> | undefined
-        if (isLikelyBarrel(importPath) && project) {
-          const barrelAbsPath = resolveModulePath(importPath, cwd)
-          if (barrelAbsPath) {
-            barrelReExports = getBarrelReExports(project, barrelAbsPath, importPath)
-          }
+  // Generate mock files — deferred to after all screens so .getState() detection is complete
+  for (const [importPath, hooks] of allHooksByImport) {
+    if (!mockFiles.has(importPath)) {
+      let barrelReExports: Array<{ names: string[]; fullModulePath: string }> | undefined
+      if (isLikelyBarrel(importPath) && project) {
+        const barrelAbsPath = resolveModulePath(importPath, cwd)
+        if (barrelAbsPath) {
+          barrelReExports = getBarrelReExports(project, barrelAbsPath, importPath)
         }
-        mockFiles.set(importPath, generateMockFileForImportPath(hooks, importPath, barrelReExports))
       }
+      mockFiles.set(importPath, generateMockFileForImportPath(hooks, importPath, barrelReExports, hooksWithGetState))
     }
   }
 
