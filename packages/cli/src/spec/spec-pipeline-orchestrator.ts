@@ -4,7 +4,6 @@ import { Project, SyntaxKind, type SourceFile } from 'ts-morph'
 import { extractHookFacts, extractLocalStateFacts } from '../analyzer/collect-facts.js'
 import { findTsConfig } from '../analyzer/collect-facts.js'
 import { extractHookReturnType } from '../analyzer/extract-types.js'
-import { classifyHook } from '../lib/hook-classifier.js'
 import { REACT_IMPORT_PATHS, REACT_BUILTIN_HOOKS } from '../lib/hook-binding.js'
 import { generateUniversalMock } from '../generator/universal-mock.js'
 
@@ -491,10 +490,9 @@ export function detectContextHooks(
     if (dataHookKeys.has(key)) return false
     // Skip hooks from passthrough packages (wrapper.tsx handles these)
     if (PASSTHROUGH_PACKAGES.has(h.importPath)) return false
-    // Only keep hooks classified as 'provider' from local/app-specific sources
-    // These are the context hooks that need shims
-    const category = classifyHook(h.name, h.importPath)
-    return category === 'provider'
+    // Remaining hooks from local/app-specific sources that aren't data hooks
+    // are context hooks that need NOOP shims
+    return true
   })
 }
 
