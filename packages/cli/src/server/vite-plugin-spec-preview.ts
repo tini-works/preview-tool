@@ -74,6 +74,7 @@ function buildScreenEntries(
       return {
         route: s.id,
         regions,
+        ...(s.sourceFile ? { sourceFile: s.sourceFile } : {}),
         ...(s.routeParams ? { routeParams: s.routeParams } : {}),
       }
     }

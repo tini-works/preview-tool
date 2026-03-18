@@ -127,12 +127,13 @@ export async function createViteConfig(
     ...(reactPlugin ? [reactPlugin] : []),
   ]
 
-  // Deduplicate React — force all imports to resolve to the host project's copy.
-  // Without this, the runtime and host app load separate React instances,
-  // causing "Cannot read properties of null (reading 'useMemo')" errors.
+  // React shim: overrides useState/useEffect for preview mode.
+  // The shim re-exports everything from real React but intercepts useState/useEffect
+  // for screen components (activated by the screen wrapper in main.tsx).
   const hostRequire = createRequire(join(cwd, 'package.json'))
   const reactPath = dirname(hostRequire.resolve('react/package.json'))
   const reactDomPath = dirname(hostRequire.resolve('react-dom/package.json'))
+  const reactShimPath = join(previewDir, 'shims', 'react-preview.ts')
 
   // Load alias manifest for mock hook redirection
   const mockAliasEntries: Array<{ find: string | RegExp; replacement: string }> = []
@@ -185,8 +186,11 @@ export async function createViteConfig(
     ...realModuleEntries,
     // 1. Mock aliases (redirect imports to mock files)
     ...mockAliasEntries,
-    // 2. React deduplication
-    { find: 'react', replacement: reactPath },
+    // 2. React shim (overrides useState/useEffect for screen components)
+    //    __real:react points to the actual React package for the shim to re-export
+    //    Exact match (/^react$/) so react/jsx-runtime etc. still resolve to real React
+    { find: '__real:react', replacement: reactPath },
+    { find: /^react$/, replacement: existsSync(reactShimPath) ? reactShimPath : reactPath },
     { find: 'react-dom', replacement: reactDomPath },
     // 3. Runtime and host aliases
     { find: '@preview-tool/runtime', replacement: join(runtimeRoot, 'src', 'index.ts') },
