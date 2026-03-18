@@ -22,10 +22,9 @@ export function transformUseState(code: string): string {
   )
 
   if (hasReplacements) {
-    if (
-      !transformed.includes("from '@preview-tool/runtime'") ||
-      !transformed.includes('usePreviewState')
-    ) {
+    // Check for the specific usePreviewState import — not just any runtime import
+    // (the i18n plugin may have already added a different runtime import)
+    if (!transformed.includes('import { usePreviewState }')) {
       transformed = `import { usePreviewState } from '@preview-tool/runtime'\n${transformed}`
     }
   }

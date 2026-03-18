@@ -61,7 +61,8 @@ export function createI18nTransformPlugin(options: I18nTransformOptions) {
         })
 
         // Replace string literals in expressions: 'text' or "text" in ternaries, variables
-        const quotedRegex = new RegExp(`(['"])${escaped}\\1`, 'g')
+        // Negative lookbehind: skip strings already inside __pt("...")
+        const quotedRegex = new RegExp(`(?<!__pt\\()(['"])${escaped}\\1`, 'g')
         transformed = transformed.replace(quotedRegex, (_match, _quote) => {
           hasReplacements = true
           return `__pt("${sourceText}")`
