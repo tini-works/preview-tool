@@ -30,27 +30,26 @@ export function transformUseState(code: string): string {
     }
   }
 
-  // Suppress useEffect — override with no-op to prevent side effects (API calls, timers, etc.)
+  // Suppress useEffect — prevent side effects (API calls, timers, etc.)
   // In preview mode, all data comes from the region state machine, not from effects.
-  // We remove useEffect from the React import and shadow it with a no-op const.
+  // We remove useEffect from the React import and declare a no-op replacement.
   if (transformed.includes('useEffect')) {
-    // Remove useEffect from the import: import { useState, useEffect, useCallback } from 'react'
-    // → import { useState, useCallback } from 'react'
+    // Parse and filter the React import to remove useEffect cleanly
     transformed = transformed.replace(
-      /(import\s*\{[^}]*)\buseEffect\b\s*,?\s*/,
-      (match, before) => {
-        // Clean up trailing/leading commas
-        return before.replace(/,\s*$/, '')
+      /import\s*\{([^}]*)\}\s*from\s*['"]react['"]/g,
+      (_match, names: string) => {
+        const filtered = names
+          .split(',')
+          .map((n: string) => n.trim())
+          .filter((n: string) => n && n !== 'useEffect')
+          .join(', ')
+        return filtered ? `import { ${filtered} } from 'react'` : `import 'react'`
       }
     )
-    // Also handle if useEffect was the last named import: { foo, useEffect }
-    transformed = transformed.replace(/,\s*useEffect\s*}/g, ' }')
-    // Handle if useEffect was the only import: { useEffect }
-    transformed = transformed.replace(/\{\s*useEffect\s*\}/g, '{}')
 
-    // Shadow useEffect with a no-op
-    if (!transformed.includes('const useEffect =')) {
-      transformed = `const useEffect = (() => {}) as any\n${transformed}`
+    // Declare useEffect as a no-op (now safe — removed from import)
+    if (!transformed.includes('const useEffect')) {
+      transformed = `const useEffect = (() => {}) as any;\n${transformed}`
     }
   }
 
