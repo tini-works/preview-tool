@@ -650,7 +650,7 @@ describe('generateApiClientStub', () => {
     expect(stub).toContain('put:')
     expect(stub).toContain('patch:')
     expect(stub).toContain('delete:')
-    expect(stub).toContain('__getResponseData')
+    expect(stub).toContain('noopResponse')
     expect(stub).toContain('export const api = stub')
     expect(stub).toContain('export default stub')
   })
