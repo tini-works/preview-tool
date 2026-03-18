@@ -1,6 +1,7 @@
 /**
- * Vite plugin that transforms useState calls to usePreviewState in screen files.
- * Applied only during `preview dev` to screen component files.
+ * Vite plugin that transforms screen files for preview mode:
+ * 1. useState → usePreviewState (controlled by region state machine)
+ * 2. useEffect → no-op (suppresses side effects like fetch calls)
  */
 
 // Matches: const [x, setX] = useState(init) and const [x, setX] = useState<Type>(init)
@@ -11,21 +12,45 @@ const USE_STATE_PATTERN =
 
 export function transformUseState(code: string): string {
   let transformed = code
-  let hasReplacements = false
+  let hasStateReplacements = false
 
   transformed = transformed.replace(
     USE_STATE_PATTERN,
     (_match, varName, setterName, initialValue) => {
-      hasReplacements = true
+      hasStateReplacements = true
       return `const [${varName}, ${setterName}] = usePreviewState('${varName}', ${initialValue})`
     },
   )
 
-  if (hasReplacements) {
+  if (hasStateReplacements) {
     // Check for the specific usePreviewState import — not just any runtime import
     // (the i18n plugin may have already added a different runtime import)
     if (!transformed.includes('import { usePreviewState }')) {
       transformed = `import { usePreviewState } from '@preview-tool/runtime'\n${transformed}`
+    }
+  }
+
+  // Suppress useEffect — override with no-op to prevent side effects (API calls, timers, etc.)
+  // In preview mode, all data comes from the region state machine, not from effects.
+  // We remove useEffect from the React import and shadow it with a no-op const.
+  if (transformed.includes('useEffect')) {
+    // Remove useEffect from the import: import { useState, useEffect, useCallback } from 'react'
+    // → import { useState, useCallback } from 'react'
+    transformed = transformed.replace(
+      /(import\s*\{[^}]*)\buseEffect\b\s*,?\s*/,
+      (match, before) => {
+        // Clean up trailing/leading commas
+        return before.replace(/,\s*$/, '')
+      }
+    )
+    // Also handle if useEffect was the last named import: { foo, useEffect }
+    transformed = transformed.replace(/,\s*useEffect\s*}/g, ' }')
+    // Handle if useEffect was the only import: { useEffect }
+    transformed = transformed.replace(/\{\s*useEffect\s*\}/g, '{}')
+
+    // Shadow useEffect with a no-op
+    if (!transformed.includes('const useEffect =')) {
+      transformed = `const useEffect = (() => {}) as any\n${transformed}`
     }
   }
 
