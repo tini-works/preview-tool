@@ -4,6 +4,7 @@ import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import type { PreviewConfig } from '../lib/config.js'
 import { PREVIEW_DIR } from '../lib/config.js'
+import { createPreviewStatePlugin } from './vite-plugin-preview-state.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // Browser-safe shim for node:async_hooks.
@@ -118,10 +119,21 @@ export async function createViteConfig(
     specPlugin = createSpecPreviewPlugin({ specsDir: config.specsDir, cwd })
   }
 
-  // Zero source transforms — screen files are loaded as-is.
-  // Mocking happens via Vite aliases (hook → mock file) and fetch interceptor.
+  // Load screen source paths for useState transform
+  const screenFilePaths: string[] = []
+  try {
+    const raw = readFileSync(join(previewDir, 'screen-source-paths.json'), 'utf-8')
+    screenFilePaths.push(...JSON.parse(raw))
+  } catch { /* no paths */ }
+
+  const previewStatePlugin = screenFilePaths.length > 0
+    ? createPreviewStatePlugin(screenFilePaths)
+    : null
+
+  // Plugins: spec manifest, useState→usePreviewState (AST-based), tailwind, react
   const plugins = [
     ...(specPlugin ? [specPlugin] : []),
+    ...(previewStatePlugin ? [previewStatePlugin] : []),
     ...(tailwindPlugin ? [tailwindPlugin] : []),
     ...(reactPlugin ? [reactPlugin] : []),
   ]
