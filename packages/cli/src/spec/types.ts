@@ -35,9 +35,9 @@ export type SpecDataDep = z.infer<typeof SpecDataDepSchema>
 export const SpecScreenSchema = z.object({
   id: z.string(),
   type: z.literal('screen').optional(),
-  parent: z.string().optional(),
-  title: z.string().optional(),
-  status: z.string().optional(),
+  parent: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  status: z.string().nullable().optional(),
   states: z.array(SpecStateSchema).default([]),
   data_deps: z.array(SpecDataDepSchema).default([]),
   route_params: z.record(z.string(), z.string()).optional(),

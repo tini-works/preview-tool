@@ -111,6 +111,13 @@ function findBestMatch(slug: string, files: string[]): string | null {
     if (name === pascal || name === pascal + 'Page') return file
   }
 
+  // Strategy 6: case-insensitive match (home → Homepage, Homepage.tsx)
+  const lowerSlug = normalized.replace(/-/g, '').toLowerCase()
+  for (const file of files) {
+    const name = fileNameWithoutExt(file).toLowerCase()
+    if (name === lowerSlug || name === lowerSlug + 'page') return file
+  }
+
   return null
 }
 
