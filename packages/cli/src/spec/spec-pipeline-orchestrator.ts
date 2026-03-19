@@ -242,6 +242,24 @@ export function specToPerHookRegions(
       states = distributeStateData(screen.stateData, dep.provides)
     }
 
+    // Auto-fill missing fields: if the hook provides fields that aren't in the
+    // spec mockData, fill them from the resolved type shape or sensible defaults.
+    // This prevents blank screens when flow state (doctor, timeSlot, etc.) is
+    // set by a previous screen and not declared in this screen's spec.
+    const providedFields = dep.provides
+    const typeShape = dep.resolvedType?.shape ?? {}
+    for (const [, stateData] of Object.entries(states)) {
+      for (const field of providedFields) {
+        if (!(field in stateData)) {
+          // Fill from resolved type shape if available
+          if (field in typeShape) {
+            stateData[field] = typeShape[field]
+          }
+          // Otherwise: functions get NOOP marker, data stays absent (undefined from proxy)
+        }
+      }
+    }
+
     const region: RegionDef = {
       label: dep.hook,
       defaultState: screen.defaultState ?? screen.states[0] ?? 'default',
