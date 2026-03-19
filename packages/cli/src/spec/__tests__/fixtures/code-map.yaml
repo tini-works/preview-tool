@@ -1,0 +1,4 @@
+scr-home:
+  - src/pages/HomePage.tsx
+scr-detail:
+  - src/pages/DetailPage.tsx

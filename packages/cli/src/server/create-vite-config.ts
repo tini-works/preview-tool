@@ -1,12 +1,66 @@
 import { join, dirname } from 'node:path'
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { fileURLToPath } from 'node:url'
 import type { PreviewConfig } from '../lib/config.js'
 import { PREVIEW_DIR } from '../lib/config.js'
 import { createPreviewStatePlugin } from './vite-plugin-preview-state.js'
-
 const __dirname = dirname(fileURLToPath(import.meta.url))
+
+// Browser-safe shim for node:async_hooks.
+// Packages like @tanstack/react-start import AsyncLocalStorage which is Node-only.
+// Vite externalises it to a Proxy that throws on `new`, crashing the preview.
+const ASYNC_HOOKS_SHIM = `\
+class AsyncLocalStorage {
+  constructor() { this._store = undefined }
+  getStore() { return this._store }
+  run(store, callback, ...args) {
+    const prev = this._store
+    this._store = store
+    try { return callback(...args) }
+    finally { this._store = prev }
+  }
+  enterWith(store) { this._store = store }
+  disable() { this._store = undefined }
+}
+class AsyncResource {
+  constructor() {}
+  runInAsyncScope(fn, thisArg, ...args) { return fn.apply(thisArg, args) }
+  emitDestroy() {}
+  asyncId() { return 0 }
+  triggerAsyncId() { return 0 }
+}
+export { AsyncLocalStorage, AsyncResource }
+export default { AsyncLocalStorage, AsyncResource }
+`
+
+/**
+ * Write browser-safe shims for Node.js built-ins into .preview/shims/.
+ * Returns alias entries that redirect `node:X` → the physical shim file.
+ * Using resolve.alias (not a plugin) ensures esbuild pre-bundling picks it up.
+ */
+function writeNodeShims(previewDir: string, cwd: string): Array<{ find: string; replacement: string }> {
+  const shimsDir = join(previewDir, 'shims')
+  if (!existsSync(shimsDir)) mkdirSync(shimsDir, { recursive: true })
+
+  const shimPath = join(shimsDir, 'async-hooks.mjs')
+
+  // Check if shim content changed — if so, clear Vite's dep cache
+  let existing = ''
+  try { existing = readFileSync(shimPath, 'utf-8') } catch { /* first run */ }
+  writeFileSync(shimPath, ASYNC_HOOKS_SHIM, 'utf-8')
+  if (existing && existing !== ASYNC_HOOKS_SHIM) {
+    const viteCacheDir = join(cwd, 'node_modules', '.vite')
+    if (existsSync(viteCacheDir)) {
+      rmSync(viteCacheDir, { recursive: true, force: true })
+    }
+  }
+
+  return [
+    { find: 'node:async_hooks', replacement: shimPath },
+    { find: 'async_hooks', replacement: shimPath },
+  ]
+}
 
 /**
  * Resolve the @preview-tool/runtime package root.
@@ -58,42 +112,48 @@ export async function createViteConfig(
     // Tailwind CSS v4 vite plugin not available
   }
 
-  // Load screen file paths for useState transform plugin
+  // Spec-driven preview plugin (when specsDir is configured)
+  let specPlugin: unknown = null
+  if (config.specsDir) {
+    const { createSpecPreviewPlugin } = await import('./vite-plugin-spec-preview.js')
+    specPlugin = createSpecPreviewPlugin({ specsDir: config.specsDir, cwd })
+  }
+
+  // Load screen source paths for useState transform
   const screenFilePaths: string[] = []
   try {
-    const screensDir = join(previewDir, 'screens')
-    const screenDirs = readdirSync(screensDir, { withFileTypes: true })
-      .filter((d) => d.isDirectory())
-      .map((d) => d.name)
-    for (const screenDir of screenDirs) {
-      try {
-        const modelPath = join(screensDir, screenDir, 'model.ts')
-        const modelContent = readFileSync(modelPath, 'utf-8')
-        const filePathMatch = modelContent.match(/filePath:\s*["']([^"']+)["']/)
-        if (filePathMatch) {
-          screenFilePaths.push(join(cwd, filePathMatch[1]))
-        }
-      } catch {
-        // Individual model file unreadable — skip this screen
-      }
-    }
-  } catch {
-    // No screens directory — skip plugin
-  }
+    const raw = readFileSync(join(previewDir, 'screen-source-paths.json'), 'utf-8')
+    screenFilePaths.push(...JSON.parse(raw))
+  } catch { /* no paths */ }
 
   const previewStatePlugin = screenFilePaths.length > 0
     ? createPreviewStatePlugin(screenFilePaths)
     : null
 
+  // i18n transform: wraps translatable JSX strings with __pt() calls (AST-based)
+  let i18nPlugin: unknown = null
+  if (config.specsDir && screenFilePaths.length > 0) {
+    const { loadSpecs } = await import('../spec/spec-loader.js')
+    const { createI18nTransformPlugin } = await import('./vite-plugin-i18n-transform.js')
+    const manifest = await loadSpecs(config.specsDir)
+    const hasTranslations = manifest.screens.some((s) => s.translations && Object.keys(s.translations).length > 0)
+    if (hasTranslations) {
+      i18nPlugin = createI18nTransformPlugin({ manifest, screenFilePaths })
+    }
+  }
+
+  // Plugins: spec manifest, useState (AST), i18n (AST), tailwind, react
   const plugins = [
+    ...(specPlugin ? [specPlugin] : []),
     ...(previewStatePlugin ? [previewStatePlugin] : []),
+    ...(i18nPlugin ? [i18nPlugin] : []),
     ...(tailwindPlugin ? [tailwindPlugin] : []),
     ...(reactPlugin ? [reactPlugin] : []),
   ]
 
-  // Deduplicate React — force all imports to resolve to the host project's copy.
-  // Without this, the runtime and host app load separate React instances,
-  // causing "Cannot read properties of null (reading 'useMemo')" errors.
+  // React shim: overrides useState/useEffect for preview mode.
+  // The shim re-exports everything from real React but intercepts useState/useEffect
+  // for screen components (activated by the screen wrapper in main.tsx).
   const hostRequire = createRequire(join(cwd, 'package.json'))
   const reactPath = dirname(hostRequire.resolve('react/package.json'))
   const reactDomPath = dirname(hostRequire.resolve('react-dom/package.json'))
@@ -137,9 +197,14 @@ export async function createViteConfig(
     // No alias manifest — no mock hooks
   }
 
-  // Use array format to guarantee ordering: __real: aliases first (for mock re-exports),
+  // Write browser-safe shims for Node.js built-ins (e.g. node:async_hooks)
+  const nodeShimAliases = writeNodeShims(previewDir, cwd)
+
+  // Use array format to guarantee ordering: shims first, then __real: aliases,
   // then mock aliases, then React deduplication, then general @/ alias last.
   const aliasArray = [
+    // Node.js built-in shims (must be first so esbuild pre-bundling picks them up)
+    ...nodeShimAliases,
     // 0. Real module aliases (used by mocks to re-export non-hook exports)
     ...realModuleEntries,
     // 1. Mock aliases (redirect imports to mock files)
@@ -151,10 +216,21 @@ export async function createViteConfig(
     { find: '@preview-tool/runtime', replacement: join(runtimeRoot, 'src', 'index.ts') },
     { find: '@host', replacement: join(cwd, 'src') },
     { find: '@preview', replacement: previewDir },
-    // 4. General @/ alias (must be last — catches anything not matched above)
+    // 4. General path aliases (must be last — catches anything not matched above)
+    { find: '~/', replacement: join(cwd, 'src') + '/' },
     { find: '@/', replacement: join(cwd, 'src') + '/' },
     { find: '@', replacement: join(cwd, 'src') },
   ]
+
+  // Only include packages that the host project actually depends on
+  const optimizeDepsInclude = ['react', 'react-dom']
+  try {
+    const hostPkg = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf-8'))
+    const allDeps = { ...hostPkg.dependencies, ...hostPkg.devDependencies }
+    if (allDeps['zustand']) optimizeDepsInclude.push('zustand')
+  } catch {
+    // package.json unreadable — stick with react/react-dom
+  }
 
   return {
     root: previewDir,
@@ -171,7 +247,10 @@ export async function createViteConfig(
     },
     plugins,
     optimizeDeps: {
-      include: ['react', 'react-dom', 'zustand'],
+      include: optimizeDepsInclude,
+      // Exclude react from pre-bundling when React shim is active.
+      // Pre-bundling caches react to .vite/deps/react.js which bypasses
+      // the resolveId plugin. Excluding it forces fresh resolution per request.
     },
   }
 }

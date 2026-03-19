@@ -4,6 +4,7 @@ import type { RegionsMap, RegionDataMap, HookMapping } from './types.ts'
 interface RegionDataContextValue {
   regions: RegionsMap
   regionData: RegionDataMap
+  language: string
 }
 
 export const RegionDataContext = createContext<RegionDataContextValue | null>(null)
@@ -11,12 +12,13 @@ export const RegionDataContext = createContext<RegionDataContextValue | null>(nu
 interface RegionDataProviderProps {
   regions: RegionsMap
   regionData: RegionDataMap
+  language?: string
   children: ReactNode
 }
 
-export function RegionDataProvider({ regions, regionData, children }: RegionDataProviderProps) {
+export function RegionDataProvider({ regions, regionData, language = 'en', children }: RegionDataProviderProps) {
   return (
-    <RegionDataContext.Provider value={{ regions, regionData }}>
+    <RegionDataContext.Provider value={{ regions, regionData, language }}>
       {children}
     </RegionDataContext.Provider>
   )

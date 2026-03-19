@@ -121,5 +121,6 @@ function parseInferredType(record: TypeShapeRecord): TypeShapeInfo {
     confidence: properties.length > 0 || methods.length > 0 ? 'partial' : 'none',
     methods,
     properties,
+    nullableFields: [],
   }
 }

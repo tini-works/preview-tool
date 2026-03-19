@@ -1,4 +1,4 @@
-import { type CallExpression, type Type, type TypeChecker, type Symbol as TsSymbol, SyntaxKind } from 'ts-morph'
+import { type CallExpression, type Type, type TypeChecker, type Symbol as TsSymbol, type Node, SyntaxKind } from 'ts-morph'
 import type { TypeShapeInfo } from './types.js'
 import { inferLeafValue } from './infer-shape.js'
 
@@ -19,7 +19,7 @@ export function extractHookReturnType(
 ): TypeShapeInfo | null {
   try {
     const type = typeChecker.getTypeAtLocation(call)
-    return serializeType(type, typeChecker)
+    return serializeType(type, typeChecker, 0, call)
   } catch {
     return null
   }
@@ -134,12 +134,13 @@ function serializeType(
   type: Type,
   typeChecker: TypeChecker,
   depth: number = 0,
+  contextNode?: Node,
 ): TypeShapeInfo | null {
   if (depth > MAX_DEPTH) return null
 
   // Skip unresolvable types
   if (isUnresolvable(type)) {
-    return { shape: {}, confidence: 'none', methods: [], properties: [] }
+    return { shape: {}, confidence: 'none', methods: [], properties: [], nullableFields: [] }
   }
 
   // Handle union types at the top level: pick the most informative non-null branch
@@ -148,16 +149,17 @@ function serializeType(
       (t) => !t.isNull() && !t.isUndefined(),
     )
     if (nonNullTypes.length === 0) {
-      return { shape: {}, confidence: 'none', methods: [], properties: [] }
+      return { shape: {}, confidence: 'none', methods: [], properties: [], nullableFields: [] }
     }
     // Prefer object types in the union
     const objectType = nonNullTypes.find((t) => t.isObject() && !t.isArray())
     const bestType = objectType ?? nonNullTypes[0]
-    return serializeType(bestType, typeChecker, depth)
+    return serializeType(bestType, typeChecker, depth, contextNode)
   }
 
   const properties: string[] = []
   const methods: string[] = []
+  const nullableFields: string[] = []
   const shape: Record<string, unknown> = {}
   let hasPartial = false
 
@@ -174,17 +176,27 @@ function serializeType(
     // Skip inherited Object.prototype methods
     if (isBuiltinObjectMethod(name)) continue
 
-    const memberType = getMemberType(sym, typeChecker)
+    const memberType = getMemberType(sym, typeChecker, contextNode)
     if (!memberType) {
       hasPartial = true
       continue
+    }
+
+    // Detect nullable fields: properties whose type is a union including null or undefined
+    if (memberType.isUnion()) {
+      const hasNull = memberType.getUnionTypes().some(
+        (t) => t.isNull() || t.isUndefined(),
+      )
+      if (hasNull) {
+        nullableFields.push(name)
+      }
     }
 
     if (isCallableType(memberType)) {
       methods.push(name)
     } else {
       properties.push(name)
-      const value = serializeValueType(memberType, typeChecker, name, depth + 1)
+      const value = serializeValueType(memberType, typeChecker, name, depth + 1, contextNode)
       if (value !== undefined) {
         shape[name] = value
       } else {
@@ -195,11 +207,17 @@ function serializeType(
 
   // If we got nothing meaningful, confidence is 'none'
   if (properties.length === 0 && methods.length === 0) {
-    return { shape: {}, confidence: 'none', methods: [], properties: [] }
+    return { shape: {}, confidence: 'none', methods: [], properties: [], nullableFields: [] }
+  }
+
+  // Methods-only objects (no data properties) get 'none' confidence so callers
+  // fall back to leaf inference rather than using an empty shape
+  if (properties.length === 0) {
+    return { shape: {}, confidence: 'none', methods, properties: [], nullableFields: [] }
   }
 
   const confidence = hasPartial ? 'partial' : 'full'
-  return { shape, confidence, methods, properties }
+  return { shape, confidence, methods, properties, nullableFields }
 }
 
 // ---------------------------------------------------------------------------
@@ -211,6 +229,7 @@ function serializeValueType(
   typeChecker: TypeChecker,
   fieldName: string,
   depth: number,
+  contextNode?: Node,
 ): unknown {
   if (depth > MAX_DEPTH) return undefined
 
@@ -221,14 +240,14 @@ function serializeValueType(
     )
     if (nonNullTypes.length === 0) return null
     if (nonNullTypes.length === 1) {
-      return serializeValueType(nonNullTypes[0], typeChecker, fieldName, depth)
+      return serializeValueType(nonNullTypes[0], typeChecker, fieldName, depth, contextNode)
     }
     // Multiple non-null types — try the first object type, or fallback to leaf
     const objectType = nonNullTypes.find((t) => t.isObject() && !t.isArray())
     if (objectType) {
-      return serializeValueType(objectType, typeChecker, fieldName, depth)
+      return serializeValueType(objectType, typeChecker, fieldName, depth, contextNode)
     }
-    return serializeValueType(nonNullTypes[0], typeChecker, fieldName, depth)
+    return serializeValueType(nonNullTypes[0], typeChecker, fieldName, depth, contextNode)
   }
 
   // Primitives
@@ -252,7 +271,7 @@ function serializeValueType(
   if (type.isArray()) {
     const elementType = type.getArrayElementType()
     if (elementType) {
-      const elementValue = serializeValueType(elementType, typeChecker, fieldName, depth + 1)
+      const elementValue = serializeValueType(elementType, typeChecker, fieldName, depth + 1, contextNode)
       if (elementValue !== undefined && typeof elementValue === 'object' && elementValue !== null) {
         return [elementValue]
       }
@@ -266,13 +285,19 @@ function serializeValueType(
     return []
   }
 
+  // Date type — return ISO string
+  const sym = type.getSymbol()
+  const typeName = sym?.getName()
+  if (typeName === 'Date') return '2026-01-01T00:00:00Z'
+
   // Object types — recurse
   if (type.isObject()) {
-    const nested = serializeType(type, typeChecker, depth)
+    const nested = serializeType(type, typeChecker, depth, contextNode)
     if (nested && nested.confidence !== 'none') {
       return nested.shape
     }
-    return {}
+    // Methods-only objects (like Date) already handled above; fallback to leaf inference
+    return inferLeafValue(fieldName)
   }
 
   // Fallback to leaf inference
@@ -297,8 +322,14 @@ function isCallableType(type: Type): boolean {
   return type.getCallSignatures().length > 0
 }
 
-function getMemberType(sym: TsSymbol, typeChecker: TypeChecker): Type | null {
+function getMemberType(sym: TsSymbol, typeChecker: TypeChecker, contextNode?: Node): Type | null {
   try {
+    // When a contextNode is available, use getTypeOfSymbolAtLocation which
+    // preserves generic instantiation (e.g. TData → Employee[] in UseQueryResult<Employee[]>).
+    // Without it, getTypeAtLocation(declaration) resolves to the uninstantiated generic parameter.
+    if (contextNode) {
+      return typeChecker.getTypeOfSymbolAtLocation(sym, contextNode)
+    }
     const decls = sym.getDeclarations()
     if (decls.length > 0) {
       return typeChecker.getTypeAtLocation(decls[0])

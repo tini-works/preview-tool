@@ -2,6 +2,7 @@ import { useEffect, useState, type ComponentType } from 'react'
 import { FlowProvider } from './flow/FlowProvider.tsx'
 import { NetworkSimulationLayer } from './devtools/NetworkSimulationLayer.tsx'
 import { ScreenErrorBoundary } from './ErrorBoundary.tsx'
+import { RegionDataProvider } from './RegionDataContext.tsx'
 import { useDevToolsStore } from './store/useDevToolsStore.ts'
 import { getScreenEntries } from './ScreenRegistry.ts'
 import type { ScreenModule, RegionsMap, FlagDefinition, RegionDataMap } from './types.ts'
@@ -21,13 +22,19 @@ export function resolveFlags(
 export function assembleRegionData(
   regions: RegionsMap,
   regionStates: Record<string, string>,
-  regionListCounts: Record<string, number>
+  regionListCounts: Record<string, number>,
+  language?: string
 ): Record<string, unknown> {
   let data: Record<string, unknown> = {}
 
   for (const [key, region] of Object.entries(regions)) {
     const activeState = regionStates[key] ?? region.defaultState
-    const stateData = region.states[activeState] ?? region.states[region.defaultState] ?? {}
+    let stateData = { ...(region.states[activeState] ?? region.states[region.defaultState] ?? {}) }
+
+    if (language && region.translations?.[language]) {
+      stateData = { ...stateData, ...region.translations[language] }
+    }
+
     data = { ...data, ...stateData }
 
     if (region.isList && region.mockItems) {
@@ -47,7 +54,8 @@ export function assembleRegionData(
 export function computeRegionData(
   regions: RegionsMap,
   regionStates: Record<string, string>,
-  regionListCounts: Record<string, number>
+  regionListCounts: Record<string, number>,
+  language?: string
 ): RegionDataMap {
   const result: RegionDataMap = {}
 
@@ -63,7 +71,19 @@ export function computeRegionData(
       }
     }
 
-    result[key] = { activeState, stateData }
+    if (language && region.translations?.[language]) {
+      stateData = { ...stateData, ...region.translations[language] }
+    }
+
+    const entry = { activeState, stateData }
+    result[key] = entry
+
+    // Duplicate data for alias keys so mock hooks can find it
+    if (region.regionAliases) {
+      for (const alias of region.regionAliases) {
+        result[alias] = entry
+      }
+    }
   }
 
   return result
@@ -84,6 +104,7 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
   const featureFlags = useDevToolsStore((s) => s.featureFlags)
   const regionStates = useDevToolsStore((s) => s.regionStates)
   const regionListCounts = useDevToolsStore((s) => s.regionListCounts)
+  const language = useDevToolsStore((s) => s.language)
   const [loaded, setLoaded] = useState<LoadedScreen | null>(null)
   const [loadError, setLoadError] = useState<Error | null>(null)
 
@@ -95,7 +116,13 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
 
     let cancelled = false
     setLoadError(null)
-    entry.module()
+
+    const LOAD_TIMEOUT_MS = 10_000
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`Timeout loading screen "${route}" after ${LOAD_TIMEOUT_MS / 1000}s`)), LOAD_TIMEOUT_MS)
+    )
+
+    Promise.race([entry.module(), timeout])
       .then((mod: ScreenModule) => {
         if (!cancelled) {
           if (!mod.default) {
@@ -153,16 +180,24 @@ export function ScreenRenderer({ route }: ScreenRendererProps) {
   const { Component } = loaded
   const regions = entry.regions
   const resolvedFlags = resolveFlags(entry.flags, featureFlags)
-  const regionData = regions
-    ? computeRegionData(regions, regionStates, regionListCounts)
-    : {}
+
+  let regionData: RegionDataMap = {}
+  try {
+    regionData = regions
+      ? computeRegionData(regions, regionStates, regionListCounts, language)
+      : {}
+  } catch (e) {
+    console.warn('[preview-tool] Failed to compute region data:', e)
+  }
 
   return (
     <NetworkSimulationLayer key={route}>
-      <div style={{ zoom: fontScale }} className="h-full">
+      <div style={{ zoom: fontScale }} lang={language} data-font-scale={fontScale} className="h-full">
         <ScreenErrorBoundary key={route}>
           <FlowProvider>
-            <Component regionData={regionData} flags={resolvedFlags} />
+            <RegionDataProvider regions={regions ?? {}} regionData={regionData} language={language}>
+              <Component key={JSON.stringify(regionStates)} regionData={regionData} flags={resolvedFlags} />
+            </RegionDataProvider>
           </FlowProvider>
         </ScreenErrorBoundary>
       </div>

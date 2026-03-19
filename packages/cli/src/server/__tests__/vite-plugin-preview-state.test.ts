@@ -1,89 +1,110 @@
 import { describe, it, expect } from 'vitest'
-import { createPreviewStatePlugin, transformUseState } from '../vite-plugin-preview-state.js'
+import { transformUseState } from '../vite-plugin-preview-state.js'
 
-describe('transformUseState', () => {
-  it('transforms const [x, setX] = useState(false)', () => {
-    const input = `import { useState } from 'react'\nconst [showPassword, setShowPassword] = useState(false)`
-    const result = transformUseState(input)
-    expect(result).toContain("usePreviewState('showPassword', false)")
-    expect(result).not.toContain('useState(false)')
+describe('transformUseState (AST-based)', () => {
+  it('transforms basic useState', () => {
+    const code = `
+import { useState } from 'react'
+function Page() {
+  const [count, setCount] = useState(0)
+  return <div>{count}</div>
+}
+`
+    const result = transformUseState(code, 'Page.tsx')
+    expect(result).not.toBeNull()
+    expect(result).toContain("usePreviewState('count', 0)")
+    expect(result).toContain('usePreviewState')
+    expect(result).toContain('@preview-tool/runtime')
   })
 
-  it('transforms useState with string initial value', () => {
-    const input = `import { useState } from 'react'\nconst [name, setName] = useState('')`
-    const result = transformUseState(input)
+  it('transforms useState with generic type', () => {
+    const code = `
+import { useState } from 'react'
+function Page() {
+  const [items, setItems] = useState<string[]>([])
+  return <div />
+}
+`
+    const result = transformUseState(code, 'Page.tsx')
+    expect(result).not.toBeNull()
+    expect(result).toContain("usePreviewState('items', [])")
+  })
+
+  it('preserves other React imports (useCallback, useEffect, useRef)', () => {
+    const code = `
+import { useState, useCallback, useEffect, useRef } from 'react'
+function Page() {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  const cb = useCallback(() => {}, [])
+  useEffect(() => {}, [])
+  return <div />
+}
+`
+    const result = transformUseState(code, 'Page.tsx')
+    expect(result).not.toBeNull()
+    expect(result).toContain('useCallback')
+    expect(result).toContain('useEffect')
+    expect(result).toContain('useRef')
+    // useState import should still be there (usePreviewState wraps it internally)
+    expect(result).toContain("usePreviewState('open', false)")
+  })
+
+  it('transforms multiple useState calls', () => {
+    const code = `
+import { useState } from 'react'
+function Page() {
+  const [name, setName] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  return <div />
+}
+`
+    const result = transformUseState(code, 'Page.tsx')
+    expect(result).not.toBeNull()
     expect(result).toContain("usePreviewState('name', '')")
+    expect(result).toContain("usePreviewState('loading', true)")
+    expect(result).toContain("usePreviewState('error', null)")
   })
 
-  it('transforms useState with object initial value', () => {
-    const input = `import { useState } from 'react'\nconst [errors, setErrors] = useState({})`
-    const result = transformUseState(input)
-    expect(result).toContain("usePreviewState('errors', {})")
+  it('returns null when no useState calls', () => {
+    const code = `
+import { useEffect } from 'react'
+function Page() {
+  useEffect(() => {}, [])
+  return <div />
+}
+`
+    const result = transformUseState(code, 'Page.tsx')
+    expect(result).toBeNull()
   })
 
-  it('adds usePreviewState import when transformations made', () => {
-    const input = `import { useState } from 'react'\nconst [show, setShow] = useState(false)`
-    const result = transformUseState(input)
-    expect(result).toContain("import { usePreviewState } from '@preview-tool/runtime'")
+  it('does not transform non-destructured useState', () => {
+    const code = `
+import { useState } from 'react'
+function Page() {
+  const state = useState(0)
+  return <div />
+}
+`
+    const result = transformUseState(code, 'Page.tsx')
+    expect(result).toBeNull()
   })
 
-  it('does not add import when no transformations made', () => {
-    const input = `const x = 42`
-    const result = transformUseState(input)
-    expect(result).not.toContain('usePreviewState')
-    expect(result).toBe(input)
+  it('handles complex initial values', () => {
+    const code = `
+import { useState } from 'react'
+function Page() {
+  const [formData, setFormData] = useState<LoginFormData>({
+    email: '',
+    password: '',
   })
-
-  it('handles multiple useState calls', () => {
-    const input = [
-      "import { useState } from 'react'",
-      'const [a, setA] = useState(false)',
-      'const [b, setB] = useState(0)',
-    ].join('\n')
-    const result = transformUseState(input)
-    expect(result).toContain("usePreviewState('a', false)")
-    expect(result).toContain("usePreviewState('b', 0)")
-  })
-
-  it('preserves React.useState pattern', () => {
-    const input = `const [show, setShow] = React.useState(false)`
-    const result = transformUseState(input)
-    expect(result).toContain("usePreviewState('show', false)")
-  })
-
-  it('handles useState with simple generic type parameter', () => {
-    const input = `const [formData, setFormData] = useState<LoginFormData>({email: '', password: ''})`
-    const result = transformUseState(input)
-    expect(result).toContain("usePreviewState('formData', {email: '', password: ''})")
-  })
-
-  it('handles useState with nested generic type parameter', () => {
-    const input = `const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({})`
-    const result = transformUseState(input)
-    expect(result).toContain("usePreviewState('errors', {})")
-  })
-})
-
-describe('createPreviewStatePlugin', () => {
-  it('returns a Vite plugin with transform hook', () => {
-    const plugin = createPreviewStatePlugin(['/src/pages/Login.tsx'])
-    expect(plugin.name).toBe('preview-state-transform')
-    expect(plugin.enforce).toBe('pre')
-    expect(typeof plugin.transform).toBe('function')
-  })
-
-  it('transforms matching screen files', () => {
-    const plugin = createPreviewStatePlugin(['/src/pages/Login.tsx'])
-    const input = `import { useState } from 'react'\nconst [show, setShow] = useState(false)`
-    const result = (plugin.transform as Function)(input, '/src/pages/Login.tsx')
-    expect(result).toBeDefined()
-    expect(result.code).toContain('usePreviewState')
-  })
-
-  it('skips non-screen files', () => {
-    const plugin = createPreviewStatePlugin(['/src/pages/Login.tsx'])
-    const input = `import { useState } from 'react'\nconst [show, setShow] = useState(false)`
-    const result = (plugin.transform as Function)(input, '/src/utils/helper.ts')
-    expect(result).toBeUndefined()
+  return <div />
+}
+`
+    const result = transformUseState(code, 'Page.tsx')
+    expect(result).not.toBeNull()
+    expect(result).toContain("usePreviewState('formData',")
+    expect(result).toContain("email: ''")
   })
 })

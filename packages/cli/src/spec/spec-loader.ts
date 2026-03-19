@@ -1,0 +1,212 @@
+import { readFile, readdir, access } from 'node:fs/promises'
+import { join } from 'node:path'
+import { parse as parseYaml } from 'yaml'
+import {
+  SpecScreenSchema,
+  SpecFlowSchema,
+  SpecCodeMapSchema,
+  type SpecManifest,
+  type SpecManifestScreen,
+  type SpecManifestFlow,
+  type SpecCodeMap,
+} from './types.js'
+
+function parseFrontmatter(content: string): Record<string, unknown> | null {
+  const match = content.match(/^---\n([\s\S]*?)\n---/)
+  if (!match) return null
+  try {
+    return parseYaml(match[1]) as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+async function dirExists(path: string): Promise<boolean> {
+  try {
+    await access(path)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function loadMarkdownFiles(dir: string): Promise<Record<string, unknown>[]> {
+  if (!(await dirExists(dir))) return []
+
+  const entries = await readdir(dir)
+  const results: Record<string, unknown>[] = []
+
+  for (const entry of entries) {
+    if (!entry.endsWith('.md')) continue
+    const content = await readFile(join(dir, entry), 'utf-8')
+    const fm = parseFrontmatter(content)
+    if (fm && fm.id) results.push(fm)
+  }
+
+  return results
+}
+
+async function loadCodeMap(specsDir: string): Promise<SpecCodeMap> {
+  const codemapPath = join(specsDir, 'code-map.yaml')
+  if (!(await dirExists(codemapPath))) return {}
+
+  try {
+    const content = await readFile(codemapPath, 'utf-8')
+    const raw = parseYaml(content)
+    if (!raw || typeof raw !== 'object') return {}
+    return SpecCodeMapSchema.parse(raw)
+  } catch {
+    return {}
+  }
+}
+
+function resolveSourceFile(
+  screenId: string,
+  codeMap: SpecCodeMap
+): string | null {
+  const entry = codeMap[screenId]
+  if (!entry) return null
+
+  if (typeof entry === 'string') {
+    return entry
+  }
+
+  if (Array.isArray(entry)) {
+    return entry[0] ?? null
+  }
+
+  if (typeof entry === 'object') {
+    const route = entry['route']
+    if (typeof route === 'string') return route
+    const components = entry['components']
+    if (Array.isArray(components) && components.length > 0) {
+      return components[0] as string
+    }
+  }
+
+  return null
+}
+
+function getStateName(state: Record<string, unknown>): string {
+  return (state.name as string) ?? (state.id as string) ?? 'unknown'
+}
+
+/**
+ * Pick the best default state — prefer data-rich states over loading.
+ * Users want to see the fully populated screen first, not a spinner.
+ */
+const PREFERRED_DEFAULTS = ['default', 'populated', 'loaded', 'active-warning']
+const LOADING_STATES = new Set(['loading', 'submitting', 'saving', 'deleting'])
+
+function pickDefaultState(stateNames: string[]): string | null {
+  if (stateNames.length === 0) return null
+
+  // First: try preferred state names
+  for (const preferred of PREFERRED_DEFAULTS) {
+    if (stateNames.includes(preferred)) return preferred
+  }
+
+  // Second: pick first non-loading state
+  for (const name of stateNames) {
+    if (!LOADING_STATES.has(name)) return name
+  }
+
+  // Last resort: first state
+  return stateNames[0]
+}
+
+export async function loadSpecs(specsDir: string, cwd?: string): Promise<SpecManifest> {
+  if (!(await dirExists(specsDir))) {
+    return { screens: [], flows: [] }
+  }
+
+  const [rawScreens, rawFlows, rawCodeMap] = await Promise.all([
+    loadMarkdownFiles(join(specsDir, 'screens')),
+    loadMarkdownFiles(join(specsDir, 'flows')),
+    loadCodeMap(specsDir),
+  ])
+
+  // Auto-discover source files when code-map is empty
+  let codeMap = rawCodeMap
+  if (cwd) {
+    const { autoDiscoverSourceFiles } = await import('./auto-discover.js')
+    // Build preliminary screens list for auto-discovery
+    const screenIds = rawScreens
+      .map((raw) => SpecScreenSchema.safeParse(raw))
+      .filter((r) => r.success)
+      .map((r) => ({ id: r.data.id, sourceFile: null } as SpecManifestScreen))
+    const discovered = autoDiscoverSourceFiles(screenIds, cwd, codeMap)
+    if (Object.keys(discovered).length > 0) {
+      codeMap = { ...codeMap, ...discovered }
+    }
+  }
+
+  const screens: SpecManifestScreen[] = []
+  for (const raw of rawScreens) {
+    const parsed = SpecScreenSchema.safeParse(raw)
+    if (!parsed.success) continue
+
+    const screen = parsed.data
+    const stateNames = screen.states.map(getStateName)
+    const stateData: Record<string, Record<string, unknown>> = {}
+    const stateDescriptions: Record<string, string> = {}
+    for (const state of screen.states) {
+      const name = getStateName(state)
+      stateData[name] = (state.mockData as Record<string, unknown>) ?? {}
+      if (typeof state.description === 'string' && state.description) {
+        stateDescriptions[name] = state.description
+      }
+    }
+
+    const sourceFile = resolveSourceFile(screen.id, codeMap)
+
+    // Build preliminary screen for auto-generate
+    const prelimScreen: SpecManifestScreen = {
+      id: screen.id,
+      title: screen.title ?? screen.id,
+      sourceFile,
+      states: stateNames,
+      defaultState: pickDefaultState(stateNames),
+      stateData,
+      stateDescriptions,
+      dataDeps: screen.data_deps,
+      routeParams: screen.route_params ?? null,
+      translations: screen.translations ?? null,
+      apiClient: screen.api_client
+        ? { module: screen.api_client.module, export: screen.api_client.export }
+        : null,
+    }
+
+    // Auto-generate mockData when states have no data
+    let finalStateData = stateData
+    if (cwd && sourceFile) {
+      const { autoGenerateMockData } = await import('./auto-discover.js')
+      finalStateData = autoGenerateMockData(prelimScreen, cwd)
+    }
+
+    screens.push({ ...prelimScreen, stateData: finalStateData })
+  }
+
+  const flows: SpecManifestFlow[] = []
+  for (const raw of rawFlows) {
+    const parsed = SpecFlowSchema.safeParse(raw)
+    if (!parsed.success) continue
+
+    const flow = parsed.data
+    flows.push({
+      id: flow.id,
+      title: flow.title ?? flow.id,
+      steps: flow.steps.map((s) => ({
+        screen: s.screen,
+        entryState: s.entry_state,
+      })),
+      branches: flow.branches.map((b) => ({
+        atStep: b.at_step,
+        action: b.action,
+        resumeStep: b.resume_step,
+      })),
+    })
+  }
+
+  return { screens, flows }
+}

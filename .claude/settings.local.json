@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vitest run packages/cli/src/analyzer/__tests__/collect-facts.test.ts 2>&1)",
+      "Bash(npx vitest run packages/cli/src/generator/__tests__/generate-mock-from-analysis.test.ts 2>&1)",
+      "Bash(npx vitest run packages/cli/src/llm/prompts/__tests__/understand-screens.test.ts 2>&1)",
+      "Bash(npx vitest run packages/cli/src 2>&1)",
+      "Bash(npx vitest run packages/cli/src --exclude=\"**/integration/**\" 2>&1)",
+      "Bash(pnpm build 2>&1)",
+      "Bash(npx vitest run packages/cli/src/analyzer/__tests__/collect-facts.test.ts packages/cli/src/generator/__tests__/generate-mock-from-analysis.test.ts 2>&1)",
+      "Bash(npm view @preview-tool/cli version 2>&1)",
+      "Bash(cd /Users/loclam/Desktop/booking/client && pnpm update @preview-tool/cli --latest 2>&1)",
+      "Bash(npm view @preview-tool/runtime version 2>&1)",
+      "Bash(cd /Users/loclam/Desktop/booking/client && rm -rf node_modules/.pnpm/@preview-tool+cli@* && pnpm install 2>&1 | tail -5)",
+      "Bash(cd /Users/loclam/Desktop/booking/client && pnpm add @preview-tool/cli@0.1.2 2>&1)",
+      "Bash(npm view @preview-tool/cli@0.1.2 dependencies 2>&1)",
+      "Bash(pnpm --filter @preview-tool/cli exec vitest run 2>&1)",
+      "Bash(cd /Users/loclam/Desktop/preview-tool/packages/cli && npx vitest run 2>&1)",
+      "Bash(cd /Users/loclam/Desktop/preview-tool/packages/cli && npx vitest run --reporter=verbose 2>&1 | grep -E '\\(✓|×|FAIL|PASS|Tests|failed|passed\\)')",
+      "Bash(cd /Users/loclam/Desktop/preview-tool && pnpm build 2>&1)",
+      "Bash(npx vitest --version 2>/dev/null || echo \"vitest not found\"; ls node_modules/.bin/vitest 2>/dev/null || echo \"no vitest binary\")",
+      "Bash(npx vitest run --config packages/cli/vitest.config.ts 2>&1 | head -5; echo \"---\"; ls packages/cli/vitest.config.* 2>/dev/null || echo \"no vitest config\")",
+      "Bash(cd packages/cli && npx vitest run src/resolver/__tests__/resolve-source.test.ts 2>&1 | tail -15)",
+      "Bash(npm view @preview-tool/cli version 2>/dev/null)",
+      "Bash(git -C /Users/loclam/Desktop/preview-tool status --short)",
+      "Bash(git -C /Users/loclam/Desktop/preview-tool diff --stat HEAD)",
+      "Bash(git -C /Users/loclam/Desktop/preview-tool log --oneline -10)",
+      "Bash(git -C /Users/loclam/Desktop/preview-tool add packages/cli/package.json && git -C /Users/loclam/Desktop/preview-tool commit -m \"$\\(cat <<'EOF'\nchore: bump cli to 0.1.11\n\nIncludes:\n- Monorepo auto-detection \\(finds React package in workspace roots\\)\n- Dynamic CSS entry point detection \\(content-based, not hardcoded filenames\\)\n- cssEntry config override in preview.config.json\nEOF\n\\)\")",
+      "Bash(cd /Users/loclam/Desktop/preview-tool && pnpm release 2>&1)",
+      "Bash(cd ~/Desktop/roomio && pnpm update @preview-tool/cli 2>&1 | tail -5)",
+      "Bash(cd ~/Desktop/booking && pnpm update @preview-tool/cli 2>&1 | tail -5)",
+      "Bash(find /Users/loclam/Desktop/roomio -type f -name \"*use-toast*\" -o -name \"*use-dev-tools*\" 2>/dev/null | head -20)",
+      "Bash(grep -l \"export\" /Users/loclam/Desktop/preview-tool/packages/cli/src/analyzer/*.ts | head -5)"
+    ]
+  }
+}

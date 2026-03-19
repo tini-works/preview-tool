@@ -1,3 +1,4 @@
+import { useEffect, useMemo } from 'react'
 import type React from 'react'
 import { Moon, Sun, Monitor, PanelRightClose, PanelRight } from 'lucide-react'
 import { Button } from '../ui/button.tsx'
@@ -49,6 +50,33 @@ export function InspectorPanel({ onLanguageChange }: InspectorPanelProps = {}) {
   const currentModule = modules.find((m) => m.route === selectedRoute)
   const currentFlags = currentModule?.flags
   const regions = currentModule?.regions
+
+  const availableLanguages = useMemo(() => {
+    const translationLangs = new Set<string>()
+    if (regions) {
+      for (const region of Object.values(regions)) {
+        if (region.translations) {
+          for (const lang of Object.keys(region.translations)) {
+            translationLangs.add(lang)
+          }
+        }
+      }
+    }
+    if (translationLangs.size === 0) return ['en', 'de']
+    // Base language is inferred: if only 'en' translations exist, base is 'de' and vice versa
+    const baseLang = translationLangs.has('en') && !translationLangs.has('de') ? 'de'
+      : translationLangs.has('de') && !translationLangs.has('en') ? 'en'
+      : 'en'
+    return [baseLang, ...translationLangs].filter((v, i, a) => a.indexOf(v) === i)
+  }, [regions])
+
+  // Auto-set language to base (first available) when screen changes
+  const baseLanguage = availableLanguages[0]
+  useEffect(() => {
+    if (baseLanguage && language !== baseLanguage && !availableLanguages.includes(language)) {
+      setLanguage(baseLanguage)
+    }
+  }, [baseLanguage, selectedRoute])
 
   const device = getDevice(activeDevice)
   const displayWidth =
@@ -144,7 +172,16 @@ export function InspectorPanel({ onLanguageChange }: InspectorPanelProps = {}) {
                   defaultCount={region.defaultCount}
                   activeState={regionStates[key] ?? region.defaultState}
                   listCount={regionListCounts[key]}
-                  onStateChange={(state) => setRegionState(key, state)}
+                  onStateChange={(state) => {
+                    // Sync all sibling regions to the same state — in spec mode all
+                    // regions share the same screen-level states.
+                    for (const regionKey of Object.keys(regions!)) {
+                      if (regionKey !== key && regions![regionKey].states[state]) {
+                        setRegionState(regionKey, state)
+                      }
+                    }
+                    setRegionState(key, state)
+                  }}
                   onListCountChange={(count) => setRegionListCount(key, count)}
                 />
               ))}
@@ -155,7 +192,7 @@ export function InspectorPanel({ onLanguageChange }: InspectorPanelProps = {}) {
         {/* Language section */}
         <Section title="Language">
           <div className="flex gap-1">
-            {['en', 'de'].map((lang) => (
+            {availableLanguages.map((lang) => (
               <button
                 key={lang}
                 onClick={() => {

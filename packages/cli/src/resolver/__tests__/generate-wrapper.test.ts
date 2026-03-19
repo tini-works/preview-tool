@@ -57,6 +57,18 @@ describe('generateWrapperCode', () => {
     expect(routerIdx).toBeLessThan(i18nIdx)
   })
 
+  it('wraps with TanStackRouterWrapper for @tanstack/react-router', () => {
+    const code = generateWrapperCode(['@tanstack/react-router'])
+    expect(code).toContain('RouterProvider')
+    expect(code).toContain('createRouter')
+    expect(code).toContain('createRootRoute')
+    expect(code).toContain('createMemoryHistory')
+    expect(code).toContain("from '@tanstack/react-router'")
+    expect(code).toContain('TanStackRouterWrapper')
+    expect(code).toContain('<TanStackRouterWrapper>')
+    expect(code).toContain('</TanStackRouterWrapper>')
+  })
+
   it('ignores unknown providers', () => {
     const code = generateWrapperCode(['zustand', 'some-unknown-lib'])
     expect(code).toContain('export function Wrapper')
@@ -89,7 +101,7 @@ describe('generateWrapperCode', () => {
   // -----------------------------------------------------------------------
 
   it('uses MemoryRouter with initialEntries when route is provided', () => {
-    const code = generateWrapperCode(['react-router-dom'], '/register')
+    const code = generateWrapperCode(['react-router-dom'], { route: '/register' })
     expect(code).toContain("initialEntries={['/register']}")
     expect(code).toContain('MemoryRouter')
   })
@@ -101,9 +113,46 @@ describe('generateWrapperCode', () => {
   })
 
   it('route parameter does not affect non-router providers', () => {
-    const code = generateWrapperCode(['@tanstack/react-query'], '/some-route')
+    const code = generateWrapperCode(['@tanstack/react-query'], { route: '/some-route' })
     expect(code).not.toContain('initialEntries')
     expect(code).toContain('QueryClientProvider')
+  })
+
+  // -----------------------------------------------------------------------
+  // i18n path resolution
+  // -----------------------------------------------------------------------
+
+  it('uses detected i18n path in import', () => {
+    const code = generateWrapperCode(['react-i18next'], { i18nPath: 'src/lib/i18n.ts' })
+    expect(code).toContain("from '@host/lib/i18n'")
+    expect(code).not.toContain("from '@host/i18n'")
+  })
+
+  it('falls back to @host/i18n when no i18nPath', () => {
+    const code = generateWrapperCode(['react-i18next'])
+    expect(code).toContain("from '@host/i18n'")
+  })
+
+  it('handles i18n path in index file', () => {
+    const code = generateWrapperCode(['react-i18next'], { i18nPath: 'src/i18n/index.ts' })
+    expect(code).toContain("from '@host/i18n/index'")
+    expect(code).not.toContain("from '@host/i18n'")
+  })
+
+  // -----------------------------------------------------------------------
+  // Competing routers
+  // -----------------------------------------------------------------------
+
+  it('excludes react-router-dom when both routers detected', () => {
+    const code = generateWrapperCode(['@tanstack/react-router', 'react-router-dom'])
+    expect(code).toContain('TanStackRouterWrapper')
+    expect(code).not.toContain('MemoryRouter')
+  })
+
+  it('keeps react-router-dom when TanStack Router is not present', () => {
+    const code = generateWrapperCode(['react-router-dom'])
+    expect(code).toContain('MemoryRouter')
+    expect(code).not.toContain('TanStackRouterWrapper')
   })
 })
 
@@ -126,8 +175,9 @@ describe('syncWrapperProviders', () => {
   })
 
   it('creates wrapper if file is missing', () => {
-    const updated = syncWrapperProviders(wrapperPath, ['react-router-dom'])
-    expect(updated).toBe(true)
+    const result = syncWrapperProviders(wrapperPath, ['react-router-dom'])
+    expect(result.created).toBe(true)
+    expect(result.missingProviders).toEqual([])
     expect(existsSync(wrapperPath)).toBe(true)
     const content = readFileSync(wrapperPath, 'utf-8')
     expect(content).toContain('MemoryRouter')
@@ -137,26 +187,28 @@ describe('syncWrapperProviders', () => {
     const initial = generateWrapperCode(['react-router-dom', '@tanstack/react-query'])
     writeFileSync(wrapperPath, initial, 'utf-8')
 
-    const updated = syncWrapperProviders(wrapperPath, ['react-router-dom', '@tanstack/react-query'])
-    expect(updated).toBe(false)
+    const result = syncWrapperProviders(wrapperPath, ['react-router-dom', '@tanstack/react-query'])
+    expect(result.created).toBe(false)
+    expect(result.missingProviders).toEqual([])
   })
 
-  it('updates wrapper when new provider detected', () => {
+  it('reports missing providers without modifying existing file', () => {
     const initial = generateWrapperCode(['react-router-dom'])
     writeFileSync(wrapperPath, initial, 'utf-8')
 
-    const updated = syncWrapperProviders(wrapperPath, ['react-router-dom', '@tanstack/react-query'])
-    expect(updated).toBe(true)
+    const result = syncWrapperProviders(wrapperPath, ['react-router-dom', '@tanstack/react-query'])
+    expect(result.created).toBe(false)
+    expect(result.missingProviders).toEqual(['@tanstack/react-query'])
     const content = readFileSync(wrapperPath, 'utf-8')
-    expect(content).toContain('MemoryRouter')
-    expect(content).toContain('QueryClientProvider')
+    expect(content).toBe(initial)  // File unchanged
   })
 
-  it('returns false when providers list is empty', () => {
+  it('returns empty missingProviders when providers list is empty', () => {
     const initial = generateWrapperCode([])
     writeFileSync(wrapperPath, initial, 'utf-8')
 
-    const updated = syncWrapperProviders(wrapperPath, [])
-    expect(updated).toBe(false)
+    const result = syncWrapperProviders(wrapperPath, [])
+    expect(result.created).toBe(false)
+    expect(result.missingProviders).toEqual([])
   })
 })

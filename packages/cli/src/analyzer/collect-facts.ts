@@ -118,7 +118,7 @@ function extractReturnInfo(call: CallExpression): ReturnInfo {
  * Aggregates these into a single HookFact with destructuredFields.
  * Non-selector calls are passed through unchanged.
  */
-function aggregateSelectorHooks(hooks: HookFact[]): HookFact[] {
+export function aggregateSelectorHooks(hooks: HookFact[]): HookFact[] {
   // Group hooks by name+importPath
   const groups = new Map<string, HookFact[]>()
   for (const h of hooks) {
@@ -131,34 +131,48 @@ function aggregateSelectorHooks(hooks: HookFact[]): HookFact[] {
   const result: HookFact[] = []
 
   for (const [, group] of groups) {
-    // Check if all calls in this group use selector pattern: (s) => s.field
-    const selectorFields: string[] = []
-    let allSelectors = group.length > 1 // Only aggregate if 2+ calls
-
-    if (allSelectors) {
-      for (const h of group) {
-        const field = extractSelectorField(h)
-        if (field) {
-          selectorFields.push(field)
-        } else {
-          allSelectors = false
-          break
-        }
-      }
+    if (group.length < 2) {
+      // Single call — pass through unchanged
+      for (const h of group) result.push(h)
+      continue
     }
 
-    if (allSelectors && selectorFields.length > 0) {
-      // Merge into single hook fact with destructuredFields
+    // Try to collect fields from all calls in the group
+    const allFields: string[] = []
+    let hasSelectorPattern = false
+
+    for (const h of group) {
+      // Try selector pattern first: (s) => s.field
+      const selectorField = extractSelectorField(h)
+      if (selectorField) {
+        allFields.push(selectorField)
+        hasSelectorPattern = true
+        continue
+      }
+
+      // Try destructured fields: const { a, b } = useStore()
+      if (h.destructuredFields && h.destructuredFields.length > 0) {
+        allFields.push(...h.destructuredFields)
+        continue
+      }
+
+      // Simple variable assignment: const store = useStore()
+      // No fields to extract — skip but don't prevent merging
+    }
+
+    if (allFields.length > 0) {
+      // Deduplicate fields while preserving order
+      const uniqueFields = [...new Set(allFields)]
       result.push({
         name: group[0].name,
         importPath: group[0].importPath,
         arguments: group[0].arguments,
-        returnVariable: `{ ${selectorFields.join(', ')} }`,
-        destructuredFields: selectorFields,
-        selectorPattern: true,
+        returnVariable: `{ ${uniqueFields.join(', ')} }`,
+        destructuredFields: uniqueFields,
+        selectorPattern: hasSelectorPattern,
       })
     } else {
-      // Pass through unchanged
+      // No fields extractable from any call — pass all through unchanged
       for (const h of group) result.push(h)
     }
   }

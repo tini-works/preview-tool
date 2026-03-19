@@ -181,6 +181,8 @@ export interface TypeShapeInfo {
   /** Field classifications from the type (methods vs properties) */
   methods: string[]
   properties: string[]
+  /** Property names whose type includes null or undefined in a union */
+  nullableFields: string[]
 }
 
 // === Stage 2: AST Fact Collection ===

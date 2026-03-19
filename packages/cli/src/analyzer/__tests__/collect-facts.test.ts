@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
-import { extractHookFacts, extractComponentFacts, extractConditionalFacts, extractNavigationFacts, extractLocalStateFacts, extractDerivedVarFacts, extractFunctionFacts, extractPropertyChains, collectAllFacts, findTsConfig } from '../collect-facts.js'
+import { extractHookFacts, extractComponentFacts, extractConditionalFacts, extractNavigationFacts, extractLocalStateFacts, extractDerivedVarFacts, extractFunctionFacts, extractPropertyChains, collectAllFacts, findTsConfig, aggregateSelectorHooks } from '../collect-facts.js'
 import { Project } from 'ts-morph'
 import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
@@ -678,6 +678,76 @@ describe('findTsConfig', () => {
   it('returns null for non-existent path', () => {
     const result = findTsConfig('/nonexistent/path/to/file.tsx')
     expect(result).toBeNull()
+  })
+})
+
+describe('Zustand selector aggregation', () => {
+  it('merges multiple selector calls for the same store into one fact', () => {
+    const sf = createSourceFile(`
+      import { useBookingStore } from '@/stores/booking'
+      function Screen() {
+        const doctor = useBookingStore((s) => s.doctor)
+        const setTimeSlot = useBookingStore((s) => s.setTimeSlot)
+        const selectedDate = useBookingStore((s) => s.selectedDate)
+        return <div />
+      }
+    `)
+    const rawHooks = extractHookFacts(sf)
+    const hooks = aggregateSelectorHooks(rawHooks)
+    expect(hooks).toHaveLength(1)
+    expect(hooks[0].name).toBe('useBookingStore')
+    expect(hooks[0].destructuredFields).toEqual(
+      expect.arrayContaining(['doctor', 'setTimeSlot', 'selectedDate'])
+    )
+    expect(hooks[0].selectorPattern).toBe(true)
+  })
+
+  it('merges selector calls even when mixed with non-selector calls', () => {
+    const sf = createSourceFile(`
+      import { useBookingStore } from '@/stores/booking'
+      function Screen() {
+        const doctor = useBookingStore((s) => s.doctor)
+        const { isLoading } = useBookingStore()
+        const setDate = useBookingStore((s) => s.setDate)
+        return <div />
+      }
+    `)
+    const rawHooks = extractHookFacts(sf)
+    const hooks = aggregateSelectorHooks(rawHooks)
+    expect(hooks).toHaveLength(1)
+    expect(hooks[0].destructuredFields).toEqual(
+      expect.arrayContaining(['doctor', 'isLoading', 'setDate'])
+    )
+  })
+
+  it('does not merge hooks with different importPaths', () => {
+    const sf = createSourceFile(`
+      import { useStore as useStoreA } from '@/stores/a'
+      import { useStore as useStoreB } from '@/stores/b'
+      function Screen() {
+        const x = useStoreA((s) => s.x)
+        const y = useStoreB((s) => s.y)
+        return <div />
+      }
+    `)
+    const rawHooks = extractHookFacts(sf)
+    const hooks = aggregateSelectorHooks(rawHooks)
+    expect(hooks).toHaveLength(2)
+  })
+
+  it('preserves single calls unchanged', () => {
+    const sf = createSourceFile(`
+      import { useAuthStore } from '@/stores/auth'
+      function Screen() {
+        const user = useAuthStore(s => s.user)
+        return <div />
+      }
+    `)
+    const rawHooks = extractHookFacts(sf)
+    const hooks = aggregateSelectorHooks(rawHooks)
+    expect(hooks).toHaveLength(1)
+    expect(hooks[0].destructuredFields).toBeUndefined()
+    expect(hooks[0].selectorPattern).toBeUndefined()
   })
 })
 

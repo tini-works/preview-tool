@@ -1,9 +1,10 @@
 import { writeFile, mkdir } from 'node:fs/promises'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { join, dirname, relative } from 'node:path'
+import { join, dirname, relative, resolve } from 'node:path'
 import { createRequire } from 'node:module'
 import { PREVIEW_DIR } from '../lib/config.js'
 import type { PreviewConfig } from '../lib/config.js'
+import { loadSpecs } from '../spec/spec-loader.js'
 
 /**
  * Resolve the @preview-tool/runtime package root.
@@ -86,12 +87,51 @@ function readHead(filePath: string, lines: number): string {
   }
 }
 
+export interface SpecScreenImport {
+  id: string
+  sourceFile: string | null
+  exportType: 'default' | 'named' | 'tanstack-route'
+  exportName?: string
+}
+
+/**
+ * Detect how a source file exports its component.
+ * Returns 'tanstack-route' for TanStack Router file routes,
+ * 'named' for named exports, 'default' for default exports.
+ */
+export function detectExportType(filePath: string): { type: 'default' | 'named' | 'tanstack-route'; name?: string } {
+  let source: string
+  try {
+    source = readFileSync(filePath, 'utf-8')
+  } catch {
+    return { type: 'default' }
+  }
+
+  // TanStack Router file-based routes
+  if (/createFileRoute|createLazyFileRoute/.test(source)) {
+    return { type: 'tanstack-route' }
+  }
+
+  // Default export
+  if (/export\s+default\s/.test(source)) {
+    return { type: 'default' }
+  }
+
+  // Named export: export function Name or export const Name
+  const namedMatch = source.match(/export\s+(?:function|const)\s+([A-Z]\w*)/)
+  if (namedMatch) {
+    return { type: 'named', name: namedMatch[1] }
+  }
+
+  return { type: 'default' }
+}
+
 /**
  * Generates the index.html, main.tsx, and preview.css entry files.
  */
 export async function generateEntryFiles(
   cwd: string,
-  config: PreviewConfig
+  config: PreviewConfig,
 ): Promise<void> {
   const previewDir = join(cwd, PREVIEW_DIR)
   await mkdir(previewDir, { recursive: true })
@@ -116,11 +156,36 @@ export async function generateEntryFiles(
     'utf-8'
   )
 
-  await writeFile(
-    join(previewDir, 'main.tsx'),
-    generateMainTsx(),
-    'utf-8'
-  )
+  if (config.specsDir) {
+    const manifest = await loadSpecs(config.specsDir, cwd)
+    // Normalize sourceFile paths for monorepos and detect export types
+    const specsRoot = resolve(config.specsDir, '..')
+    const screens: SpecScreenImport[] = manifest.screens.map((s) => {
+      if (!s.sourceFile) return { id: s.id, sourceFile: null, exportType: 'default' as const }
+
+      // Resolve actual file path
+      let resolvedSourceFile = s.sourceFile
+      if (!existsSync(resolve(cwd, s.sourceFile))) {
+        const fromRoot = resolve(specsRoot, s.sourceFile)
+        if (existsSync(fromRoot)) {
+          resolvedSourceFile = relative(cwd, fromRoot)
+        }
+      }
+
+      const absPath = resolve(cwd, resolvedSourceFile)
+      const exportInfo = detectExportType(absPath)
+
+      return {
+        id: s.id,
+        sourceFile: resolvedSourceFile,
+        exportType: exportInfo.type,
+        exportName: exportInfo.name,
+      }
+    })
+    await writeFile(join(previewDir, 'main.tsx'), generateSpecMainTsx(screens), 'utf-8')
+  } else {
+    await writeFile(join(previewDir, 'main.tsx'), generateMainTsx(), 'utf-8')
+  }
 }
 
 function generateIndexHtml(title: string): string {
@@ -130,6 +195,11 @@ function generateIndexHtml(title: string): string {
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>${escapeHtml(title)}</title>
+    <script>
+      // Shim Node.js globals for server-side code pulled into browser bundle
+      window.process = window.process || { env: {}, argv: [], version: '' };
+      window.global = window.global || globalThis;
+    </script>
   </head>
   <body>
     <div id="root"></div>
@@ -168,6 +238,20 @@ import { PreviewShell, registerFlows } from '@preview-tool/runtime'
 import type { ScreenEntry, AnyFlowAction } from '@preview-tool/runtime'
 import { Wrapper } from './wrapper'
 import './preview.css'
+
+// Global fetch interceptor — prevents real network requests in preview mode.
+const __realFetch = window.fetch
+window.fetch = async (input, init) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+  if (url.startsWith('/') || url.includes('localhost:6100') || url.includes('/@')) {
+    return __realFetch(input, init)
+  }
+  console.debug('[preview-tool] Intercepted fetch:', url)
+  return new Response(JSON.stringify({ success: true, data: null }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
+}
 
 // Auto-discover from per-screen folders
 const screenModules = import.meta.glob('./screens/*/adapter.tsx')
@@ -235,6 +319,73 @@ for (const [adapterPath, importFn] of Object.entries(screenModules)) {
   if (controller?.flows && controller.flows.length > 0) {
     registerFlows(model.meta.route, controller.flows)
   }
+}
+
+// Render
+const root = document.getElementById('root')
+if (root) {
+  createRoot(root).render(
+    <React.StrictMode>
+      <Wrapper>
+        <PreviewShell screens={entries} />
+      </Wrapper>
+    </React.StrictMode>
+  )
+}
+`
+}
+
+export function generateSpecMainTsx(screens: SpecScreenImport[]): string {
+  // Generate static import map so Vite can resolve paths at compile time
+  const importEntries = screens
+    .filter((s) => s.sourceFile)
+    .map((s) => {
+      const importPath = `'../${s.sourceFile}'`
+      switch (s.exportType) {
+        case 'tanstack-route':
+          return `  '${s.id}': () => import(${importPath}).then(m => ({ default: m.Route.options.component })),`
+        case 'named':
+          return `  '${s.id}': () => import(${importPath}).then(m => ({ default: m.${s.exportName} })),`
+        default:
+          return `  '${s.id}': () => import(${importPath}),`
+      }
+    })
+    .join('\n')
+
+  return `// Auto-generated by @preview-tool/cli — spec-driven mode
+import React from 'react'
+import { createRoot } from 'react-dom/client'
+import { PreviewShell } from '@preview-tool/runtime'
+import type { ScreenEntry } from '@preview-tool/runtime'
+import { Wrapper } from './wrapper'
+import { screenEntries } from 'virtual:spec-manifest'
+import './preview.css'
+
+// Static import map — Vite resolves these at compile time
+const screenModules: Record<string, () => Promise<any>> = {
+${importEntries}
+}
+
+// Build screen entries from spec manifest
+const entries: ScreenEntry[] = screenEntries.map((entry: any) => ({
+  route: entry.route,
+  module: screenModules[entry.route] ?? (() => Promise.resolve({ default: () => null })),
+  regions: entry.regions,
+}))
+
+// Global fetch interceptor — catches direct fetch() calls.
+// Prevents real network requests in preview mode.
+const __realFetch = window.fetch
+window.fetch = async (input: any, init: any) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+  if (url.startsWith('/') || url.includes('localhost:6100') || url.includes('/@')) {
+    return __realFetch(input, init)
+  }
+  console.debug('[preview-tool] Intercepted fetch:', url)
+  return new Response(JSON.stringify({ success: true, data: null }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  })
 }
 
 // Render
