@@ -91,7 +91,7 @@ export function createSpecPreviewPlugin(options: SpecPreviewOptions): VitePlugin
     enforce: 'pre',
 
     async buildStart() {
-      manifest = await loadSpecs(options.specsDir)
+      manifest = await loadSpecs(options.specsDir, options.cwd)
       manifest = { ...manifest, screens: normalizeSourceFiles(manifest.screens, options.specsDir, options.cwd) }
       // Run pipeline to get enriched regions (mock files already written by dev command)
       try {
@@ -127,7 +127,7 @@ export const screenEntries = ${JSON.stringify(screenEntries, null, 2)};`
       server.watcher.add(options.specsDir)
       server.watcher.on('change', async (file: string) => {
         if (file.startsWith(options.specsDir)) {
-          manifest = await loadSpecs(options.specsDir)
+          manifest = await loadSpecs(options.specsDir, options.cwd)
           manifest = { ...manifest, screens: normalizeSourceFiles(manifest.screens, options.specsDir, options.cwd) }
           try {
             const result = await runSpecPipeline(manifest.screens, options.cwd, options.specsDir)
