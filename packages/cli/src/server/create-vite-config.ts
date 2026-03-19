@@ -130,10 +130,23 @@ export async function createViteConfig(
     ? createPreviewStatePlugin(screenFilePaths)
     : null
 
-  // Plugins: spec manifest, useState→usePreviewState (AST-based), tailwind, react
+  // i18n transform: wraps translatable JSX strings with __pt() calls (AST-based)
+  let i18nPlugin: unknown = null
+  if (config.specsDir && screenFilePaths.length > 0) {
+    const { loadSpecs } = await import('../spec/spec-loader.js')
+    const { createI18nTransformPlugin } = await import('./vite-plugin-i18n-transform.js')
+    const manifest = await loadSpecs(config.specsDir)
+    const hasTranslations = manifest.screens.some((s) => s.translations && Object.keys(s.translations).length > 0)
+    if (hasTranslations) {
+      i18nPlugin = createI18nTransformPlugin({ manifest, screenFilePaths })
+    }
+  }
+
+  // Plugins: spec manifest, useState (AST), i18n (AST), tailwind, react
   const plugins = [
     ...(specPlugin ? [specPlugin] : []),
     ...(previewStatePlugin ? [previewStatePlugin] : []),
+    ...(i18nPlugin ? [i18nPlugin] : []),
     ...(tailwindPlugin ? [tailwindPlugin] : []),
     ...(reactPlugin ? [reactPlugin] : []),
   ]
