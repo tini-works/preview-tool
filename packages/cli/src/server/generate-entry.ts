@@ -152,7 +152,7 @@ export async function generateEntryFiles(
 
   await writeFile(
     join(previewDir, 'preview.css'),
-    generatePreviewCss(hostCssPath, hostSrcRelative, runtimeSrcRelative),
+    generatePreviewCss(cwd, hostCssPath, hostSrcRelative, runtimeSrcRelative),
     'utf-8'
   )
 
@@ -210,6 +210,7 @@ function generateIndexHtml(title: string): string {
 }
 
 function generatePreviewCss(
+  cwd: string,
   hostCssPath: string | null,
   hostSrcRelative: string,
   runtimeSrcRelative: string
@@ -219,13 +220,25 @@ function generatePreviewCss(
   ]
 
   if (hostCssPath) {
-    // Import the host project's CSS (which includes @import "tailwindcss")
+    // Import the host project's CSS
     lines.push(`@import "${hostSrcRelative}/${hostCssPath.replace('src/', '')}";`)
   }
 
-  // Tell Tailwind CSS v4 to also scan the runtime package and host src for classes
-  lines.push(`@source "${runtimeSrcRelative}";`)
-  lines.push(`@source "${hostSrcRelative}";`)
+  // @source is Tailwind CSS v4 only.
+  // v4 uses @import "tailwindcss", v3 uses @tailwind base.
+  // Only emit @source for v4 — v3 uses tailwind.config.js content paths instead.
+  let isTailwindV4 = false
+  if (hostCssPath) {
+    try {
+      const cssContent = readFileSync(join(cwd, hostCssPath), 'utf-8')
+      isTailwindV4 = /@import\s+['"]tailwindcss['"]/.test(cssContent)
+    } catch { /* file unreadable */ }
+  }
+
+  if (isTailwindV4) {
+    lines.push(`@source "${runtimeSrcRelative}";`)
+    lines.push(`@source "${hostSrcRelative}";`)
+  }
 
   return lines.join('\n') + '\n'
 }
