@@ -1,6 +1,6 @@
 {
   "name": "@preview-tool/cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Preview any React app's screens in isolated device frames with mock data",
   "type": "module",
   "license": "MIT",
