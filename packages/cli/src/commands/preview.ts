@@ -86,11 +86,64 @@ export const previewCommand = new Command('preview')
       console.log(chalk.yellow(`  Add them manually: ${wrapperPath}`))
     }
 
-    // Step 5: Generate MVC files
-    console.log(chalk.dim('\nGenerating preview artifacts...'))
+    // Step 5: Generate preview artifacts
     const config = await readConfig(resolved.cwd)
-    const result = await generateAllV2(resolved.cwd)
-    console.log(chalk.green(`  ${result.screens.length} screens found, ${result.analyses.length} analyses generated`))
+
+    if (config.specsDir) {
+      // Spec-driven pipeline — auto-detected .specs/ directory
+      console.log(chalk.dim(`\nUsing specs: ${config.specsDir}`))
+      const { loadSpecs } = await import('../spec/spec-loader.js')
+      const { runSpecPipeline } = await import('../spec/spec-pipeline-orchestrator.js')
+      const { writeFile, mkdir } = await import('node:fs/promises')
+      const { toSafeFileName } = await import('../spec/spec-pipeline-orchestrator.js')
+
+      const manifest = await loadSpecs(config.specsDir, resolved.cwd)
+      const pipelineResult = await runSpecPipeline(manifest.screens, resolved.cwd, config.specsDir)
+
+      // Write mock files
+      const mocksDir = join(previewDir, 'mocks')
+      await mkdir(mocksDir, { recursive: true })
+      for (const [importPath, code] of pipelineResult.mockFiles) {
+        const safeName = toSafeFileName(importPath)
+        await writeFile(join(mocksDir, `${safeName}.ts`), code, 'utf-8')
+      }
+
+      // Write alias manifest
+      await writeFile(
+        join(previewDir, 'alias-manifest.json'),
+        JSON.stringify(pipelineResult.aliasManifest, null, 2),
+        'utf-8'
+      )
+
+      // Write screen source paths
+      if (pipelineResult.screenSourcePaths.length > 0) {
+        await writeFile(
+          join(previewDir, 'screen-source-paths.json'),
+          JSON.stringify(pipelineResult.screenSourcePaths, null, 2),
+          'utf-8'
+        )
+      }
+
+      const hookCount = pipelineResult.mockFiles.size
+      const regionCount = pipelineResult.enrichedScreens.reduce(
+        (sum, s) => sum + Object.keys(s.enrichedRegions).length, 0
+      )
+      console.log(chalk.dim(`  Generated ${hookCount} mock modules, ${regionCount} regions`))
+
+      // Validate screens
+      const { validateScreens, printValidationResults } = await import('../spec/validate-screens.js')
+      const validationResults = validateScreens(pipelineResult.enrichedScreens, resolved.cwd)
+      const hasIssues = validationResults.some((r) => r.issues.length > 0)
+      if (hasIssues) {
+        console.log(chalk.dim('  Validating screens...'))
+        printValidationResults(validationResults)
+      }
+    } else {
+      // Legacy pipeline — no specs, use AST + LLM
+      console.log(chalk.dim('\nGenerating preview artifacts...'))
+      const result = await generateAllV2(resolved.cwd)
+      console.log(chalk.green(`  ${result.screens.length} screens found, ${result.analyses.length} analyses generated`))
+    }
 
     // Step 6: Start dev server
     const serverConfig = { ...config }
