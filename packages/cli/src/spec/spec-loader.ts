@@ -115,16 +115,31 @@ function pickDefaultState(stateNames: string[]): string | null {
   return stateNames[0]
 }
 
-export async function loadSpecs(specsDir: string): Promise<SpecManifest> {
+export async function loadSpecs(specsDir: string, cwd?: string): Promise<SpecManifest> {
   if (!(await dirExists(specsDir))) {
     return { screens: [], flows: [] }
   }
 
-  const [rawScreens, rawFlows, codeMap] = await Promise.all([
+  const [rawScreens, rawFlows, rawCodeMap] = await Promise.all([
     loadMarkdownFiles(join(specsDir, 'screens')),
     loadMarkdownFiles(join(specsDir, 'flows')),
     loadCodeMap(specsDir),
   ])
+
+  // Auto-discover source files when code-map is empty
+  let codeMap = rawCodeMap
+  if (cwd) {
+    const { autoDiscoverSourceFiles } = await import('./auto-discover.js')
+    // Build preliminary screens list for auto-discovery
+    const screenIds = rawScreens
+      .map((raw) => SpecScreenSchema.safeParse(raw))
+      .filter((r) => r.success)
+      .map((r) => ({ id: r.data.id, sourceFile: null } as SpecManifestScreen))
+    const discovered = autoDiscoverSourceFiles(screenIds, cwd, codeMap)
+    if (Object.keys(discovered).length > 0) {
+      codeMap = { ...codeMap, ...discovered }
+    }
+  }
 
   const screens: SpecManifestScreen[] = []
   for (const raw of rawScreens) {
@@ -143,21 +158,33 @@ export async function loadSpecs(specsDir: string): Promise<SpecManifest> {
       }
     }
 
-    screens.push({
+    const sourceFile = resolveSourceFile(screen.id, codeMap)
+
+    // Build preliminary screen for auto-generate
+    const prelimScreen: SpecManifestScreen = {
       id: screen.id,
       title: screen.title ?? screen.id,
-      sourceFile: resolveSourceFile(screen.id, codeMap),
+      sourceFile,
       states: stateNames,
       defaultState: pickDefaultState(stateNames),
       stateData,
       stateDescriptions,
       dataDeps: screen.data_deps,
-      translations: screen.translations ?? null,
       routeParams: screen.route_params ?? null,
+      translations: screen.translations ?? null,
       apiClient: screen.api_client
         ? { module: screen.api_client.module, export: screen.api_client.export }
         : null,
-    })
+    }
+
+    // Auto-generate mockData when states have no data
+    let finalStateData = stateData
+    if (cwd && sourceFile) {
+      const { autoGenerateMockData } = await import('./auto-discover.js')
+      finalStateData = autoGenerateMockData(prelimScreen, cwd)
+    }
+
+    screens.push({ ...prelimScreen, stateData: finalStateData })
   }
 
   const flows: SpecManifestFlow[] = []

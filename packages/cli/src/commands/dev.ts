@@ -62,7 +62,7 @@ export const devCommand = new Command('dev')
     // Run spec pipeline: AST analysis + mock generation
     let pipelineResult: Awaited<ReturnType<typeof runSpecPipeline>> | null = null
     if (config.specsDir) {
-      const manifest = await loadSpecs(config.specsDir)
+      const manifest = await loadSpecs(config.specsDir, cwd)
       const previewDir = join(cwd, PREVIEW_DIR)
       pipelineResult = await runSpecPipeline(manifest.screens, cwd, config.specsDir)
 

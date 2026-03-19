@@ -157,7 +157,7 @@ export async function generateEntryFiles(
   )
 
   if (config.specsDir) {
-    const manifest = await loadSpecs(config.specsDir)
+    const manifest = await loadSpecs(config.specsDir, cwd)
     // Normalize sourceFile paths for monorepos and detect export types
     const specsRoot = resolve(config.specsDir, '..')
     const screens: SpecScreenImport[] = manifest.screens.map((s) => {
