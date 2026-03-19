@@ -104,6 +104,15 @@ export const devCommand = new Command('dev')
         (sum, s) => sum + Object.keys(s.enrichedRegions).length, 0
       )
       console.log(chalk.dim(`  Generated ${hookCount} mock modules, ${regionCount} regions`))
+
+      // Validate screens — catch missing fields, identical states, translation mismatches
+      const { validateScreens, printValidationResults } = await import('../spec/validate-screens.js')
+      const validationResults = validateScreens(pipelineResult.enrichedScreens, cwd)
+      const hasIssues = validationResults.some((r) => r.issues.length > 0)
+      if (hasIssues) {
+        console.log(chalk.dim('  Validating screens...'))
+        printValidationResults(validationResults)
+      }
     }
 
     // Generate entry files (index.html + main.tsx)
