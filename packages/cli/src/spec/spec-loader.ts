@@ -91,6 +91,30 @@ function getStateName(state: Record<string, unknown>): string {
   return (state.name as string) ?? (state.id as string) ?? 'unknown'
 }
 
+/**
+ * Pick the best default state — prefer data-rich states over loading.
+ * Users want to see the fully populated screen first, not a spinner.
+ */
+const PREFERRED_DEFAULTS = ['default', 'populated', 'loaded', 'active-warning']
+const LOADING_STATES = new Set(['loading', 'submitting', 'saving', 'deleting'])
+
+function pickDefaultState(stateNames: string[]): string | null {
+  if (stateNames.length === 0) return null
+
+  // First: try preferred state names
+  for (const preferred of PREFERRED_DEFAULTS) {
+    if (stateNames.includes(preferred)) return preferred
+  }
+
+  // Second: pick first non-loading state
+  for (const name of stateNames) {
+    if (!LOADING_STATES.has(name)) return name
+  }
+
+  // Last resort: first state
+  return stateNames[0]
+}
+
 export async function loadSpecs(specsDir: string): Promise<SpecManifest> {
   if (!(await dirExists(specsDir))) {
     return { screens: [], flows: [] }
@@ -124,7 +148,7 @@ export async function loadSpecs(specsDir: string): Promise<SpecManifest> {
       title: screen.title ?? screen.id,
       sourceFile: resolveSourceFile(screen.id, codeMap),
       states: stateNames,
-      defaultState: stateNames[0] ?? null,
+      defaultState: pickDefaultState(stateNames),
       stateData,
       stateDescriptions,
       dataDeps: screen.data_deps,

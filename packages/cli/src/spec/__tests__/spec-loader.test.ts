@@ -15,7 +15,7 @@ describe('loadSpecs', () => {
     expect(home).toBeDefined()
     expect(home!.title).toBe('Home Screen')
     expect(home!.states).toEqual(['loading', 'populated', 'empty', 'error'])
-    expect(home!.defaultState).toBe('loading')
+    expect(home!.defaultState).toBe('populated')
     expect(home!.stateData.loading).toEqual({ isLoading: true, rooms: [] })
     expect(home!.dataDeps).toHaveLength(1)
     expect(home!.dataDeps[0].hook).toBe('useRooms')
