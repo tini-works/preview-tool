@@ -324,6 +324,10 @@ function generateForLoaded(v: StateVar): unknown {
   if (v.name === 'isLoading' || v.name === 'loading') return false
   if (v.name === 'isError') return false
   if (v.name === 'error') return v.type === 'boolean' ? false : null
-  if (v.type === 'array') return [{ id: '1', name: 'Sample Item 1' }, { id: '2', name: 'Sample Item 2' }]
+  // Return empty array for loaded state — safer than generic items that may
+  // lack required nested fields (e.g., room.status.state). The component
+  // shows its empty state UI, which is better than crashing on undefined.
+  // Proper array items should come from spec mockData or type resolution.
+  if (v.type === 'array') return []
   return v.initialValue
 }
