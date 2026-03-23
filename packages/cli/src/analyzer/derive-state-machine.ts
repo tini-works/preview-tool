@@ -90,6 +90,23 @@ function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ')
 }
 
+function extractReducerStates(reducerSource: string): StateNode[] {
+  // Match case 'LABEL': or case "LABEL":
+  const casePattern = /case\s+['"]([^'"]+)['"]\s*:/g
+  const ids: string[] = []
+  let match: RegExpExecArray | null
+  while ((match = casePattern.exec(reducerSource)) !== null) {
+    ids.push(match[1])
+  }
+  if (ids.length === 0) return []
+  return ids.map((id): StateNode => ({
+    id,
+    label: capitalize(id),
+    mockData: {},
+    source: 'use-reducer',
+  }))
+}
+
 // ── Main export ───────────────────────────────────────────────────────────
 
 export function deriveStateMachine(screenName: string, facts: ScreenFacts): ScreenStateMachine {
@@ -113,7 +130,13 @@ function deriveStates(facts: ScreenFacts): StateNode[] {
     if (template) return template.states.map(s => ({ ...s }))
   }
 
-  // Layer 2: useReducer switch/case (implemented in Task 4)
+  // Layer 2: useReducer — parse switch/case action types
+  for (const local of facts.localState) {
+    if (local.hook !== 'useReducer') continue
+    if (!local.reducerSource) continue
+    const states = extractReducerStates(local.reducerSource)
+    if (states.length > 0) return states
+  }
 
   // Layer 3: useState with explicit string union type
   for (const local of facts.localState) {

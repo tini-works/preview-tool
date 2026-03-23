@@ -180,3 +180,48 @@ describe('deriveStateMachine — Layer 7: JSX conditionals', () => {
     expect(machine.states[1].mockData).toEqual({ isLoggedIn: false })
   })
 })
+
+describe('deriveStateMachine — Layer 2: useReducer', () => {
+  it('extracts states from switch/case string literals in reducer source', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      localState: [{
+        name: 'status',
+        hook: 'useReducer',
+        initialValue: "'idle'",
+        valueType: 'string',
+        reducerSource: `
+          function reducer(state, action) {
+            switch (action.type) {
+              case 'FETCH': return 'loading'
+              case 'SUCCESS': return 'success'
+              case 'ERROR': return 'error'
+              default: return state
+            }
+          }
+        `,
+      }],
+    }
+    const machine = deriveStateMachine('Screen', facts)
+    const ids = machine.states.map((s: StateNode) => s.id)
+    expect(ids).toContain('FETCH')
+    expect(ids).toContain('SUCCESS')
+    expect(ids).toContain('ERROR')
+    expect(machine.states[0].source).toBe('use-reducer')
+  })
+
+  it('falls through to default when reducerSource is absent', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      localState: [{
+        name: 'count',
+        hook: 'useReducer',
+        initialValue: '0',
+        valueType: 'number',
+      }],
+    }
+    const machine = deriveStateMachine('Screen', facts)
+    expect(machine.states[0].id).toBe('default')
+    expect(machine.states[0].source).toBe('unknown')
+  })
+})
