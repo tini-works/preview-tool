@@ -104,7 +104,7 @@ function deriveStates(facts: ScreenFacts): StateNode[] {
       return match.states.map((id, i) => ({
         id,
         label: capitalize(id),
-        mockData: { [local.name]: heuristicMockValue(local.name, i) },
+        mockData: { [local.name]: heuristicMockValue(local.name, id, i) },
         source: 'heuristic' as StateSource,
       }))
     }
@@ -140,11 +140,15 @@ function matchHeuristic(name: string): HeuristicMatch | undefined {
   return HEURISTIC_PATTERNS.find(p => p.pattern.test(name))
 }
 
-function heuristicMockValue(varName: string, index: number): unknown {
-  // Boolean variables: false for index 0, true for index 1
+function heuristicMockValue(varName: string, stateId: string, index: number): unknown {
+  // Boolean variables (is*): false for index 0, true for index 1
   if (/^is[A-Z]/.test(varName)) return index === 1
-  // Return undefined for non-boolean variables — let component handle it
-  return undefined
+  // Error variables: null (no error) for index 0, string message for index 1
+  if (/^(error|err)$/.test(varName)) return index === 0 ? null : 'Something went wrong'
+  // Data/list variables: undefined (loading) for index 0, empty array for index 1
+  if (/^(data|result|items|list)$/.test(varName)) return index === 0 ? undefined : []
+  // Other non-boolean patterns: return the state id as a string value
+  return stateId
 }
 
 function capitalize(s: string): string {

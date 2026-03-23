@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { deriveStateMachine } from '../derive-state-machine.js'
-import type { ScreenFacts } from '../types.js'
+import type { ScreenFacts, StateNode } from '../types.js'
 
 // ScreenFacts requires sourceCode — include it in the base fixture
 function emptyFacts(): ScreenFacts {
@@ -31,7 +31,7 @@ describe('deriveStateMachine — Layer 1: library fingerprints', () => {
       }],
     }
     const machine = deriveStateMachine('HomeScreen', facts)
-    const ids = machine.states.map(s => s.id)
+    const ids = machine.states.map((s: StateNode) => s.id)
     expect(ids).toEqual(['idle', 'loading', 'success', 'error'])
     expect(machine.states[0].source).toBe('library')
     expect(machine.initialState).toBe('success')
@@ -48,7 +48,7 @@ describe('deriveStateMachine — Layer 1: library fingerprints', () => {
       }],
     }
     const machine = deriveStateMachine('FormScreen', facts)
-    const ids = machine.states.map(s => s.id)
+    const ids = machine.states.map((s: StateNode) => s.id)
     expect(ids).toEqual(['idle', 'loading', 'success', 'error'])
   })
 
@@ -63,7 +63,7 @@ describe('deriveStateMachine — Layer 1: library fingerprints', () => {
       }],
     }
     const machine = deriveStateMachine('LoginScreen', facts)
-    const ids = machine.states.map(s => s.id)
+    const ids = machine.states.map((s: StateNode) => s.id)
     expect(ids).toContain('submitting')
     expect(machine.states[0].source).toBe('form')
   })
@@ -105,9 +105,11 @@ describe('deriveStateMachine — Layer 3: useState enum', () => {
       }],
     }
     const machine = deriveStateMachine('Screen', facts)
-    const ids = machine.states.map(s => s.id)
+    const ids = machine.states.map((s: StateNode) => s.id)
     expect(ids).toEqual(['idle', 'loading', 'done'])
     expect(machine.states[0].source).toBe('use-state-enum')
+    expect(machine.states[0].mockData).toEqual({ status: 'idle' })
+    expect(machine.states[1].mockData).toEqual({ status: 'loading' })
     expect(machine.initialState).toBe('done')   // pickDefaultState prefers 'done' over 'idle'
   })
 })
@@ -124,10 +126,12 @@ describe('deriveStateMachine — Layer 6: heuristics', () => {
       }],
     }
     const machine = deriveStateMachine('Screen', facts)
-    const ids = machine.states.map(s => s.id)
+    const ids = machine.states.map((s: StateNode) => s.id)
     expect(ids).toContain('idle')
     expect(ids).toContain('loading')
     expect(machine.states[0].source).toBe('heuristic')
+    expect(machine.states[0].mockData).toEqual({ isLoading: false })
+    expect(machine.states[1].mockData).toEqual({ isLoading: true })
   })
 
   it('maps isOpen variable to closed/open states', () => {
@@ -141,7 +145,7 @@ describe('deriveStateMachine — Layer 6: heuristics', () => {
       }],
     }
     const machine = deriveStateMachine('ModalScreen', facts)
-    const ids = machine.states.map(s => s.id)
+    const ids = machine.states.map((s: StateNode) => s.id)
     expect(ids).toEqual(['closed', 'open'])
   })
 
