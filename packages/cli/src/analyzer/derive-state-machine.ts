@@ -58,72 +58,7 @@ const LIBRARY_REGISTRY: Record<string, MachineTemplate> = {
   'formik#useFormik':                       FORM_MACHINE,
 }
 
-// ── Main export ───────────────────────────────────────────────────────────
-
-export function deriveStateMachine(screenName: string, facts: ScreenFacts): ScreenStateMachine {
-  try {
-    const states = deriveStates(facts)
-    const transitions = deriveTransitions(facts)
-    const initialState = pickDefaultState(states)
-    return { screenName, states, transitions, initialState }
-  } catch {
-    return { screenName, states: [{ ...DEFAULT_STATE }], transitions: [], initialState: 'default' }
-  }
-}
-
-// ── State derivation ──────────────────────────────────────────────────────
-
-function deriveStates(facts: ScreenFacts): StateNode[] {
-  // Layer 1: library fingerprints (highest priority)
-  for (const hook of facts.hooks) {
-    const key = `${hook.importPath}#${hook.name}`
-    const template = LIBRARY_REGISTRY[key]
-    if (template) return template.states
-  }
-
-  // Layer 2: useReducer switch/case (implemented in Task 4)
-
-  // Layer 3: useState with explicit string union type
-  for (const local of facts.localState) {
-    if (local.hook !== 'useState') continue
-    if (local.valueTypeUnion && local.valueTypeUnion.length >= 2) {
-      return local.valueTypeUnion.map(id => ({
-        id,
-        label: capitalize(id),
-        mockData: { [local.name]: id },
-        source: 'use-state-enum' as StateSource,
-      }))
-    }
-  }
-
-  // Layer 6: variable name heuristics (only for useState — not useReducer)
-  for (const local of facts.localState) {
-    if (local.hook !== 'useState') continue
-    const match = matchHeuristic(local.name)
-    if (match) {
-      return match.states.map((id, i) => ({
-        id,
-        label: capitalize(id),
-        mockData: { [local.name]: heuristicMockValue(local.name, id, i) },
-        source: 'heuristic' as StateSource,
-      }))
-    }
-  }
-
-  // Layer 7: JSX conditionals
-  if (facts.conditionals.length > 0) {
-    const cond = facts.conditionals[0]
-    const condName = cond.condition ?? 'condition'
-    return [
-      { id: 'true-branch',  label: capitalize(condName) + ' true',  mockData: { [condName]: true  }, source: 'conditional' as StateSource },
-      { id: 'false-branch', label: capitalize(condName) + ' false', mockData: { [condName]: false }, source: 'conditional' as StateSource },
-    ]
-  }
-
-  return [{ ...DEFAULT_STATE }]
-}
-
-// ── Heuristic helpers ─────────────────────────────────────────────────────
+// ── Heuristic helpers (defined before deriveStates to avoid TDZ) ──────────
 
 interface HeuristicMatch { states: string[] }
 
@@ -153,6 +88,71 @@ function heuristicMockValue(varName: string, stateId: string, index: number): un
 
 function capitalize(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ')
+}
+
+// ── Main export ───────────────────────────────────────────────────────────
+
+export function deriveStateMachine(screenName: string, facts: ScreenFacts): ScreenStateMachine {
+  try {
+    const states = deriveStates(facts)
+    const transitions = deriveTransitions(facts)
+    const initialState = pickDefaultState(states)
+    return { screenName, states, transitions, initialState }
+  } catch {
+    return { screenName, states: [{ ...DEFAULT_STATE }], transitions: [], initialState: 'default' }
+  }
+}
+
+// ── State derivation ──────────────────────────────────────────────────────
+
+function deriveStates(facts: ScreenFacts): StateNode[] {
+  // Layer 1: library fingerprints (highest priority) — return spread copies to prevent shared-ref mutation
+  for (const hook of facts.hooks) {
+    const key = `${hook.importPath}#${hook.name}`
+    const template = LIBRARY_REGISTRY[key]
+    if (template) return template.states.map(s => ({ ...s }))
+  }
+
+  // Layer 2: useReducer switch/case (implemented in Task 4)
+
+  // Layer 3: useState with explicit string union type
+  for (const local of facts.localState) {
+    if (local.hook !== 'useState') continue
+    if (local.valueTypeUnion && local.valueTypeUnion.length >= 2) {
+      return local.valueTypeUnion.map((id): StateNode => ({
+        id,
+        label: capitalize(id),
+        mockData: { [local.name]: id },
+        source: 'use-state-enum',
+      }))
+    }
+  }
+
+  // Layer 6: variable name heuristics (only for useState — not useReducer)
+  for (const local of facts.localState) {
+    if (local.hook !== 'useState') continue
+    const match = matchHeuristic(local.name)
+    if (match) {
+      return match.states.map((id, i): StateNode => ({
+        id,
+        label: capitalize(id),
+        mockData: { [local.name]: heuristicMockValue(local.name, id, i) },
+        source: 'heuristic',
+      }))
+    }
+  }
+
+  // Layer 7: JSX conditionals — use first conditional as primary discriminant
+  if (facts.conditionals.length > 0) {
+    const cond = facts.conditionals[0]
+    const condName = cond.condition ?? 'condition'
+    return [
+      { id: 'true-branch',  label: capitalize(condName) + ' true',  mockData: { [condName]: true  }, source: 'conditional' as StateSource },
+      { id: 'false-branch', label: capitalize(condName) + ' false', mockData: { [condName]: false }, source: 'conditional' as StateSource },
+    ]
+  }
+
+  return [{ ...DEFAULT_STATE }]
 }
 
 // ── Transition derivation ─────────────────────────────────────────────────

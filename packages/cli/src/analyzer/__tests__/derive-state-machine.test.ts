@@ -164,3 +164,19 @@ describe('deriveStateMachine — Layer 6: heuristics', () => {
     expect(machine.states[0].source).toBe('unknown')
   })
 })
+
+describe('deriveStateMachine — Layer 7: JSX conditionals', () => {
+  it('maps a conditional fact to true/false branch states', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      conditionals: [{ condition: 'isLoggedIn', trueBranch: ['Dashboard'], falseBranch: ['Login'] }],
+    }
+    const machine = deriveStateMachine('Screen', facts)
+    expect(machine.states).toHaveLength(2)
+    expect(machine.states[0].id).toBe('true-branch')
+    expect(machine.states[0].mockData).toEqual({ isLoggedIn: true })
+    expect(machine.states[0].source).toBe('conditional')
+    expect(machine.states[1].id).toBe('false-branch')
+    expect(machine.states[1].mockData).toEqual({ isLoggedIn: false })
+  })
+})
