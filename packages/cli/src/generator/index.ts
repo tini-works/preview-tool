@@ -11,6 +11,8 @@ import { collectAllFacts } from '../analyzer/collect-facts.js'
 import { understandScreens } from '../analyzer/understand-screens.js'
 import { analysisToModel, analysisToController } from './generate-from-analysis.js'
 import { generateMockModules } from './generate-mock-from-analysis.js'
+import { deriveStateMachine } from '../analyzer/derive-state-machine.js'
+import { generateScenarios } from './generate-scenarios.js'
 import type { PreviewConfig } from '../lib/config.js'
 import { PREVIEW_DIR } from '../lib/config.js'
 import type { DevToolConfig } from '../resolver/detect-framework.js'
@@ -50,9 +52,11 @@ export async function generateAll(
   const mocksDir = join(previewDir, 'mocks')
   const overridesDir = join(previewDir, 'overrides')
 
+  const scenariosDir = join(previewDir, 'scenarios')
   await mkdir(screensDir, { recursive: true })
   await mkdir(mocksDir, { recursive: true })
   await mkdir(overridesDir, { recursive: true })
+  await mkdir(scenariosDir, { recursive: true })
 
   // Stage 1: Discover screens
   console.log(chalk.dim('Stage 1: Discovering screens...'))
@@ -146,6 +150,20 @@ export async function generateAll(
     // Adapter (always regenerated)
     await writeFile(join(screenOutDir, 'adapter.tsx'), buildAdapterContent(screen, screenOutDir), 'utf-8')
     adaptersGenerated++
+
+    // Scenario generation (additive — never blocks mock generation)
+    try {
+      const scenarioFacts = factsMap.get(screen.route)
+      if (scenarioFacts) {
+        const scenarioScreenName = screen.exportName ?? deriveScreenName(screen.route)
+        const machine = deriveStateMachine(scenarioScreenName, scenarioFacts)
+        const scenarioCode = generateScenarios(machine)
+        const safeScenarioName = routeToFolderName(screen.route)
+        await writeFile(join(scenariosDir, `${safeScenarioName}.ts`), scenarioCode, 'utf-8')
+      }
+    } catch (err) {
+      if (process.env.DEBUG) console.debug(`[scenarios] skipped ${screen.route}:`, err)
+    }
   }
 
   // Mock modules (simplified, direct region keys)
