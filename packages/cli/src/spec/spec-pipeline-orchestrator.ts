@@ -428,6 +428,7 @@ export function generateLocalStateRegion(
   defaultState: string | null,
   stateData?: Record<string, Record<string, unknown>>,
 ): RegionDef | null {
+  // useReducer facts excluded: reducer-body state extraction is handled by derive-state-machine.ts
   // Only process useState facts (skip useRef)
   const useStateFacts = localStateFacts.filter((f) => f.hook === 'useState')
   if (useStateFacts.length === 0) return null
@@ -1048,6 +1049,7 @@ export async function runSpecPipeline(
 
     // Collect useState variable names (in call order) for the preview override
     if (absPath && localStateFacts.length > 0) {
+      // useReducer facts excluded: reducer-body state extraction is handled by derive-state-machine.ts
       screenStateVars[absPath] = localStateFacts
         .filter((f) => f.hook === 'useState')
         .map((f) => f.name)

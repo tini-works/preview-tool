@@ -239,7 +239,7 @@ export interface LocalStateFact {
   valueType: string
   /** Resolved generic type for useState<T> */
   resolvedType?: TypeShapeInfo
-  /** Raw source text of the reducer function; present when hook === 'useReducer' */
+  /** Identifier or inline source of the reducer argument (e.g. "reducer" or "(s, a) => ..."); present when hook === 'useReducer' */
   reducerSource?: string
   /** Literal union values from useState<'a' | 'b' | 'c'>; present when generic type is a string union */
   valueTypeUnion?: string[]

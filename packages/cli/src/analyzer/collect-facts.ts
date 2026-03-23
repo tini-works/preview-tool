@@ -1150,6 +1150,7 @@ export async function collectAllFacts(screens: ScreenInput[]): Promise<ScreenFac
 
         // Enrich local state with useState<T> types
         for (const local of localState) {
+          // useReducer facts are handled by derive-state-machine.ts — intentionally skipped here
           if (local.hook !== 'useState') continue
           const calls = hookCallMap.get('useState')
           if (!calls) continue
