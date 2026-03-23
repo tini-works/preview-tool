@@ -21,7 +21,7 @@ export function generateScenarios(machine: ScreenStateMachine): string {
       ``,
       `export const scenarios: Scenario[] = ${scenariosArray}`,
       ``,
-      `export const defaultScenario = '${defaultScenario}'`,
+      `export const defaultScenario = ${JSON.stringify(defaultScenario)}`,
       ``,
     ].join('\n')
   } catch {
@@ -39,10 +39,10 @@ function serializeScenario(state: StateNode): string {
   const mockDataStr = serializeMockData(state.mockData)
   return [
     `{`,
-    `  id: '${state.id}',`,
+    `  id: ${JSON.stringify(state.id)},`,
     `  label: ${JSON.stringify(state.label)},`,
     `  mockData: ${mockDataStr},`,
-    `  source: '${state.source}',`,
+    `  source: ${JSON.stringify(state.source)},`,
     `}`,
   ].join('\n')
 }

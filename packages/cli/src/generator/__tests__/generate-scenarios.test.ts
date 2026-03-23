@@ -30,7 +30,7 @@ describe('generateScenarios', () => {
 
   it('exports defaultScenario = success when success state present', () => {
     const code = generateScenarios(makeMachine())
-    expect(code).toContain("export const defaultScenario = 'success'")
+    expect(code).toContain('export const defaultScenario = "success"')
   })
 
   it('exports defaultScenario = initialState when no success or done state', () => {
@@ -39,7 +39,7 @@ describe('generateScenarios', () => {
       initialState: 'step-1',
     })
     const code = generateScenarios(machine)
-    expect(code).toContain("export const defaultScenario = 'step-1'")
+    expect(code).toContain('export const defaultScenario = "step-1"')
   })
 
   it('imports Scenario type from @preview-tool/runtime', () => {

@@ -2,6 +2,7 @@ import type {
   ScreenFacts,
   ScreenStateMachine,
   StateNode,
+  Transition,
   MachineTemplate,
 } from './types.js'
 
@@ -65,7 +66,7 @@ export function deriveStateMachine(screenName: string, facts: ScreenFacts): Scre
     const initialState = pickDefaultState(states)
     return { screenName, states, transitions, initialState }
   } catch {
-    return { screenName, states: [DEFAULT_STATE], transitions: [], initialState: 'default' }
+    return { screenName, states: [{ ...DEFAULT_STATE }], transitions: [], initialState: 'default' }
   }
 }
 
@@ -80,10 +81,10 @@ function deriveStates(facts: ScreenFacts): StateNode[] {
   }
 
   // Layers 2, 3, 6, 7 implemented in later tasks
-  return [DEFAULT_STATE]
+  return [{ ...DEFAULT_STATE }]
 }
 
-function deriveTransitions(facts: ScreenFacts) {
+function deriveTransitions(facts: ScreenFacts): Transition[] {
   // NavigationFact has fields: target (route) and trigger (description)
   return facts.navigation.map(nav => ({
     event: nav.trigger,
