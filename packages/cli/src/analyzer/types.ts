@@ -233,12 +233,16 @@ export interface NavigationFact {
 
 export interface LocalStateFact {
   name: string
-  hook: 'useState' | 'useRef'
+  hook: 'useState' | 'useRef' | 'useReducer'
   setter?: string
   initialValue: string
   valueType: string
   /** Resolved generic type for useState<T> */
   resolvedType?: TypeShapeInfo
+  /** Raw source text of the reducer function; present when hook === 'useReducer' */
+  reducerSource?: string
+  /** Literal union values from useState<'a' | 'b' | 'c'>; present when generic type is a string union */
+  valueTypeUnion?: string[]
 }
 
 export interface DerivedVarFact {
@@ -285,4 +289,43 @@ export interface ScreenFacts {
   derivedVars: DerivedVarFact[]
   functions: FunctionFact[]
   propertyChains: PropertyChainFact[]
+}
+
+// ── State Machine types ───────────────────────────────────────────────────
+
+export type StateSource =
+  | 'library'
+  | 'use-reducer'
+  | 'use-state-enum'
+  | 'store'
+  | 'form'
+  | 'heuristic'
+  | 'conditional'
+  | 'unknown'
+
+export interface StateNode {
+  id: string
+  label: string
+  mockData: Record<string, unknown>
+  source: StateSource
+}
+
+export interface Transition {
+  event: string
+  from: string
+  to: string
+  type: 'internal' | 'navigate'
+}
+
+export interface ScreenStateMachine {
+  screenName: string
+  states: StateNode[]
+  transitions: Transition[]
+  initialState: string
+}
+
+export interface MachineTemplate {
+  states: StateNode[]
+  initial: string
+  source: StateSource
 }

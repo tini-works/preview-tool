@@ -379,6 +379,27 @@ describe('extractLocalStateFacts', () => {
     const facts = extractLocalStateFacts(sf)
     expect(facts).toHaveLength(0)
   })
+
+  it('marks useReducer calls with hook: useReducer', () => {
+    const sf = createSourceFile(`
+      import { useReducer } from 'react'
+      function reducer(state: string, action: { type: string }) {
+        switch (action.type) {
+          case 'LOAD': return 'loading'
+          default: return state
+        }
+      }
+      function Screen() {
+        const [status, dispatch] = useReducer(reducer, 'idle')
+        return <div>{status}</div>
+      }
+    `)
+    const facts = extractLocalStateFacts(sf)
+    const reducerFact = facts.find(f => f.name === 'status')
+    expect(reducerFact).toBeDefined()
+    expect(reducerFact!.hook).toBe('useReducer')
+    expect(reducerFact!.initialValue).toBe("'idle'")
+  })
 })
 
 describe('extractDerivedVarFacts', () => {
@@ -631,7 +652,7 @@ describe('extractLocalStateFacts — useReducer', () => {
     const facts = extractLocalStateFacts(sf)
     expect(facts).toHaveLength(1)
     expect(facts[0].name).toBe('state')
-    expect(facts[0].hook).toBe('useState') // Treated as useState for region generation
+    expect(facts[0].hook).toBe('useReducer')
     expect(facts[0].setter).toBe('dispatch')
     expect(facts[0].initialValue).toBe("{ count: 0, name: '' }")
     expect(facts[0].valueType).toBe('object')

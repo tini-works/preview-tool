@@ -283,12 +283,16 @@ export function extractLocalStateFacts(sourceFile: SourceFile): LocalStateFact[]
       const initialValue = args.length > 1 ? args[1].getText() : 'undefined'
       const valueType = inferValueType(initialValue)
 
+      const reducerArg = args[0]
+      const reducerSource = reducerArg ? reducerArg.getText() : undefined
+
       facts.push({
         name: stateName,
-        hook: 'useState', // Treat useReducer like useState for region generation
+        hook: 'useReducer',
         ...(dispatch ? { setter: dispatch } : {}),
         initialValue,
         valueType,
+        ...(reducerSource ? { reducerSource } : {}),
       })
     } else {
       // useRef uses simple identifier: const ref = useRef(...)
