@@ -11,7 +11,7 @@ function makeMachine(overrides: Partial<ScreenStateMachine> = {}): ScreenStateMa
       { id: 'error',   label: 'Fetch failed',  mockData: { isLoading: false, error: { message: 'Oops' } }, source: 'library' },
     ],
     transitions: [],
-    initialState: 'loading',
+    initialState: 'success',  // mirrors pickDefaultState: prefers 'success' when present
     ...overrides,
   }
 }

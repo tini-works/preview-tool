@@ -10,7 +10,7 @@ import type { ScreenStateMachine, StateNode } from '../analyzer/types.js'
  */
 export function generateScenarios(machine: ScreenStateMachine): string {
   try {
-    const defaultScenario = pickDefault(machine)
+    const defaultScenario = machine.initialState || 'default'
     const scenarioObjects = machine.states.map(state => serializeScenario(state))
     const scenariosArray = `[\n${scenarioObjects.map(s => indent(s, 2)).join(',\n')},\n]`
 
@@ -27,12 +27,6 @@ export function generateScenarios(machine: ScreenStateMachine): string {
   } catch {
     return fallbackOutput()
   }
-}
-
-function pickDefault(machine: ScreenStateMachine): string {
-  if (machine.states.some(s => s.id === 'success')) return 'success'
-  if (machine.states.some(s => s.id === 'done')) return 'done'
-  return machine.initialState || machine.states[0]?.id || 'default'
 }
 
 function serializeScenario(state: StateNode): string {

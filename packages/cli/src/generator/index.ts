@@ -158,8 +158,7 @@ export async function generateAll(
         const scenarioScreenName = screen.exportName ?? deriveScreenName(screen.route)
         const machine = deriveStateMachine(scenarioScreenName, scenarioFacts)
         const scenarioCode = generateScenarios(machine)
-        const safeScenarioName = routeToFolderName(screen.route)
-        await writeFile(join(scenariosDir, `${safeScenarioName}.ts`), scenarioCode, 'utf-8')
+        await writeFile(join(scenariosDir, `${safeName}.ts`), scenarioCode, 'utf-8')
       }
     } catch (err) {
       if (process.env.DEBUG) console.debug(`[scenarios] skipped ${screen.route}:`, err)
