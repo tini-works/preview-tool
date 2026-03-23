@@ -1096,6 +1096,7 @@ export async function collectAllFacts(screens: ScreenInput[]): Promise<ScreenFac
       // Build immutable maps of resolved types, then create enriched copies.
       const hookResolvedTypes = new Map<number, import('./types.js').TypeShapeInfo>()
       const localResolvedTypes = new Map<string, import('./types.js').TypeShapeInfo>()
+      const localUnionTypes = new Map<string, string[]>()
 
       if (tsConfigPath) {
         const typeChecker = project.getTypeChecker()
@@ -1170,6 +1171,22 @@ export async function collectAllFacts(screens: ScreenInput[]): Promise<ScreenFac
             if (stateType && stateType.confidence !== 'none') {
               localResolvedTypes.set(local.name, stateType)
             }
+
+            // Extract union literal values from useState<'a' | 'b' | 'c'>
+            const typeArgs = matchingCall.getTypeArguments()
+            if (typeArgs.length > 0) {
+              const resolvedType = typeChecker.getTypeAtLocation(typeArgs[0])
+              if (resolvedType.isUnion()) {
+                const literalValues = resolvedType
+                  .getUnionTypes()
+                  .map(t => {
+                    const lit = t.getLiteralValue()
+                    return typeof lit === 'string' ? lit : undefined
+                  })
+                  .filter((v): v is string => v !== undefined)
+                if (literalValues.length >= 2) localUnionTypes.set(local.name, literalValues)
+              }
+            }
           }
         }
       }
@@ -1182,7 +1199,12 @@ export async function collectAllFacts(screens: ScreenInput[]): Promise<ScreenFac
 
       const enrichedLocalState = localState.map((local) => {
         const resolved = localResolvedTypes.get(local.name)
-        return resolved ? { ...local, resolvedType: resolved } : local
+        const union = localUnionTypes.get(local.name)
+        return {
+          ...local,
+          ...(resolved ? { resolvedType: resolved } : {}),
+          ...(union ? { valueTypeUnion: union } : {}),
+        }
       })
 
       return {

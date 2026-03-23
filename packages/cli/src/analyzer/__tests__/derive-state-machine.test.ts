@@ -91,3 +91,72 @@ describe('deriveStateMachine — Layer 1: library fingerprints', () => {
     expect(machine.states[0].id).toBe('default')
   })
 })
+
+describe('deriveStateMachine — Layer 3: useState enum', () => {
+  it('extracts union literal type as state ids', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      localState: [{
+        name: 'status',
+        hook: 'useState',
+        initialValue: "'idle'",
+        valueType: 'string',
+        valueTypeUnion: ['idle', 'loading', 'done'],
+      }],
+    }
+    const machine = deriveStateMachine('Screen', facts)
+    const ids = machine.states.map(s => s.id)
+    expect(ids).toEqual(['idle', 'loading', 'done'])
+    expect(machine.states[0].source).toBe('use-state-enum')
+    expect(machine.initialState).toBe('done')   // pickDefaultState prefers 'done' over 'idle'
+  })
+})
+
+describe('deriveStateMachine — Layer 6: heuristics', () => {
+  it('maps isLoading variable to idle/loading states', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      localState: [{
+        name: 'isLoading',
+        hook: 'useState',
+        initialValue: 'false',
+        valueType: 'boolean',
+      }],
+    }
+    const machine = deriveStateMachine('Screen', facts)
+    const ids = machine.states.map(s => s.id)
+    expect(ids).toContain('idle')
+    expect(ids).toContain('loading')
+    expect(machine.states[0].source).toBe('heuristic')
+  })
+
+  it('maps isOpen variable to closed/open states', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      localState: [{
+        name: 'isOpen',
+        hook: 'useState',
+        initialValue: 'false',
+        valueType: 'boolean',
+      }],
+    }
+    const machine = deriveStateMachine('ModalScreen', facts)
+    const ids = machine.states.map(s => s.id)
+    expect(ids).toEqual(['closed', 'open'])
+  })
+
+  it('useReducer does not trigger heuristic (heuristic only matches useState)', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      localState: [{
+        name: 'isLoading',
+        hook: 'useReducer',
+        initialValue: 'false',
+        valueType: 'boolean',
+      }],
+    }
+    const machine = deriveStateMachine('Screen', facts)
+    expect(machine.states[0].id).toBe('default')
+    expect(machine.states[0].source).toBe('unknown')
+  })
+})

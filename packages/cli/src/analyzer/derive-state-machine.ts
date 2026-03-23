@@ -4,6 +4,7 @@ import type {
   StateNode,
   Transition,
   MachineTemplate,
+  StateSource,
 } from './types.js'
 
 // ── Constants ─────────────────────────────────────────────────────────────
@@ -80,9 +81,77 @@ function deriveStates(facts: ScreenFacts): StateNode[] {
     if (template) return template.states
   }
 
-  // Layers 2, 3, 6, 7 implemented in later tasks
+  // Layer 2: useReducer switch/case (implemented in Task 4)
+
+  // Layer 3: useState with explicit string union type
+  for (const local of facts.localState) {
+    if (local.hook !== 'useState') continue
+    if (local.valueTypeUnion && local.valueTypeUnion.length >= 2) {
+      return local.valueTypeUnion.map(id => ({
+        id,
+        label: capitalize(id),
+        mockData: { [local.name]: id },
+        source: 'use-state-enum' as StateSource,
+      }))
+    }
+  }
+
+  // Layer 6: variable name heuristics (only for useState — not useReducer)
+  for (const local of facts.localState) {
+    if (local.hook !== 'useState') continue
+    const match = matchHeuristic(local.name)
+    if (match) {
+      return match.states.map((id, i) => ({
+        id,
+        label: capitalize(id),
+        mockData: { [local.name]: heuristicMockValue(local.name, i) },
+        source: 'heuristic' as StateSource,
+      }))
+    }
+  }
+
+  // Layer 7: JSX conditionals
+  if (facts.conditionals.length > 0) {
+    const cond = facts.conditionals[0]
+    const condName = cond.condition ?? 'condition'
+    return [
+      { id: 'true-branch',  label: capitalize(condName) + ' true',  mockData: { [condName]: true  }, source: 'conditional' as StateSource },
+      { id: 'false-branch', label: capitalize(condName) + ' false', mockData: { [condName]: false }, source: 'conditional' as StateSource },
+    ]
+  }
+
   return [{ ...DEFAULT_STATE }]
 }
+
+// ── Heuristic helpers ─────────────────────────────────────────────────────
+
+interface HeuristicMatch { states: string[] }
+
+const HEURISTIC_PATTERNS: Array<{ pattern: RegExp } & HeuristicMatch> = [
+  { pattern: /^is(Loading|Fetching|Pending)$/,   states: ['idle', 'loading'] },
+  { pattern: /^(error|err)$/,                    states: ['idle', 'error'] },
+  { pattern: /^(data|result|items|list)$/,        states: ['loading', 'success'] },
+  { pattern: /^(step|currentStep|activeStep)$/,   states: ['step-1', 'step-2'] },
+  { pattern: /^is(Open|Visible|Show)/,            states: ['closed', 'open'] },
+  { pattern: /^is(Auth|LoggedIn|Authenticated)/,  states: ['unauthenticated', 'authenticated'] },
+]
+
+function matchHeuristic(name: string): HeuristicMatch | undefined {
+  return HEURISTIC_PATTERNS.find(p => p.pattern.test(name))
+}
+
+function heuristicMockValue(varName: string, index: number): unknown {
+  // Boolean variables: false for index 0, true for index 1
+  if (/^is[A-Z]/.test(varName)) return index === 1
+  // Return undefined for non-boolean variables — let component handle it
+  return undefined
+}
+
+function capitalize(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1).replace(/-/g, ' ')
+}
+
+// ── Transition derivation ─────────────────────────────────────────────────
 
 function deriveTransitions(facts: ScreenFacts): Transition[] {
   // NavigationFact has fields: target (route) and trigger (description)
