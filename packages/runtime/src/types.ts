@@ -82,3 +82,12 @@ export interface FlowActionV2 {
   navigateState?: string
   setRegionState?: { region: string; state: string }
 }
+
+// ── Scenario type (used by generated .preview/scenarios/*.ts) ────────────
+
+export interface Scenario {
+  id: string
+  label: string
+  mockData: Record<string, unknown>
+  source: string
+}
