@@ -65,6 +65,11 @@ export async function callClaudeCode(
   options: CallOptions = {},
 ): Promise<unknown | null> {
   try {
+    // Skip LLM calls during unit/integration tests to prevent hangs
+    if (process.env.VITEST) {
+      return null
+    }
+
     const available = await isClaudeCodeAvailable()
     if (!available) {
       console.log(chalk.dim('  LLM: claude-code not available'))

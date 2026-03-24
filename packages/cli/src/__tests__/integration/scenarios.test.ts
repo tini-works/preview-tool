@@ -56,4 +56,23 @@ skipIfNoFixture('scenario generation integration', () => {
       expect(content).not.toContain('new Error(')
     }
   })
+
+  it('generates a scenario file for the products screen (Layer 1: useQuery)', () => {
+    // products screen imports useQuery from @tanstack/react-query
+    // deriveStateMachine Layer 1 should produce idle/loading/success/error states
+    const productsFile = join(SCENARIOS_DIR, 'products.ts')
+    expect(existsSync(productsFile)).toBe(true)
+    const content = readFileSync(productsFile, 'utf-8')
+    expect(content).toContain('"library"')
+    expect(content).toContain('"success"')
+  })
+
+  it('generates a scenario file for the checkout screen (Layer 1: useForm)', () => {
+    // checkout screen imports useForm from react-hook-form
+    // deriveStateMachine Layer 1 should produce form states (idle/dirty/submitting/...)
+    const checkoutFile = join(SCENARIOS_DIR, 'checkout.ts')
+    expect(existsSync(checkoutFile)).toBe(true)
+    const content = readFileSync(checkoutFile, 'utf-8')
+    expect(content).toContain('"form"')
+  })
 })
