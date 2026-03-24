@@ -200,6 +200,26 @@ function deriveStates(facts: ScreenFacts, registry: Record<string, MachineTempla
     if (template) return template.states.map(s => ({ ...s }))
   }
 
+  // Layer 1.5: Zustand selector pattern
+  // When collect-facts aggregates multiple useStore((s) => s.field) calls,
+  // it sets selectorPattern = true and destructuredFields = [field names].
+  // Apply heuristics to the first field that matches a known pattern.
+  // mockData key = the field name (same key the component reads from the store).
+  for (const hook of facts.hooks) {
+    if (!hook.selectorPattern || !hook.destructuredFields?.length) continue
+    for (const field of hook.destructuredFields) {
+      const match = matchHeuristic(field)
+      if (match) {
+        return match.states.map((id, i): StateNode => ({
+          id,
+          label: capitalize(id),
+          mockData: { [field]: heuristicMockValue(field, id, i) },
+          source: 'heuristic',
+        }))
+      }
+    }
+  }
+
   // Layer 2: useReducer — parse switch/case action types
   for (const local of facts.localState) {
     if (local.hook !== 'useReducer') continue

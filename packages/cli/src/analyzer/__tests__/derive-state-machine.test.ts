@@ -334,3 +334,71 @@ describe('deriveStateMachine — React Query v5', () => {
     expect(machine.states.map((s: StateNode) => s.id)).toEqual(['loading', 'success'])
   })
 })
+
+describe('deriveStateMachine — Layer 1.5: Zustand selector pattern', () => {
+  it('applies heuristics to isLoading selector field', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [{
+        name: 'useAppStore',
+        importPath: '../stores/appStore',
+        arguments: ['(s) => s.isLoading'],
+        returnVariable: 'isLoading',
+        destructuredFields: ['isLoading'],
+        selectorPattern: true,
+      }],
+    }
+    const machine = deriveStateMachine('Screen', facts)
+    const ids = machine.states.map((s: StateNode) => s.id)
+    expect(ids).toEqual(['idle', 'loading'])
+    expect(machine.states[0].source).toBe('heuristic')
+    expect(machine.states[0].mockData).toEqual({ isLoading: false })
+    expect(machine.states[1].mockData).toEqual({ isLoading: true })
+  })
+
+  it('applies heuristics to isOpen selector field', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [{
+        name: 'useUIStore',
+        importPath: '../stores/uiStore',
+        arguments: ['(s) => s.isOpen'],
+        returnVariable: 'isOpen',
+        destructuredFields: ['isOpen'],
+        selectorPattern: true,
+      }],
+    }
+    const machine = deriveStateMachine('Screen', facts)
+    expect(machine.states.map((s: StateNode) => s.id)).toEqual(['closed', 'open'])
+  })
+
+  it('skips Layer 1.5 when selector field has no heuristic match', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [{
+        name: 'useStore',
+        importPath: '../stores/store',
+        arguments: ['(s) => s.username'],
+        returnVariable: 'username',
+        destructuredFields: ['username'],
+        selectorPattern: true,
+      }],
+    }
+    const machine = deriveStateMachine('Screen', facts)
+    // Falls through to default
+    expect(machine.states[0].id).toBe('default')
+  })
+
+  it('Layer 1 takes priority over Layer 1.5 (library hook wins)', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [
+        { name: 'useQuery', importPath: '@tanstack/react-query', arguments: [], returnVariable: 'q' },
+        { name: 'useStore', importPath: '../store', arguments: ['(s) => s.isLoading'], returnVariable: 'isLoading', destructuredFields: ['isLoading'], selectorPattern: true },
+      ],
+    }
+    const machine = deriveStateMachine('Screen', facts)
+    // Layer 1 wins — 4 states from useQuery, not 2 from heuristic
+    expect(machine.states).toHaveLength(4)
+  })
+})
