@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import type { PreviewConfig } from '../lib/config.js'
 import { PREVIEW_DIR } from '../lib/config.js'
 import { createPreviewStatePlugin } from './vite-plugin-preview-state.js'
+import { readProjectAliases } from '../resolver/read-project-aliases.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
 // Browser-safe shim for node:async_hooks.
@@ -216,10 +217,8 @@ export async function createViteConfig(
     { find: '@preview-tool/runtime', replacement: join(runtimeRoot, 'src', 'index.ts') },
     { find: '@host', replacement: join(cwd, 'src') },
     { find: '@preview', replacement: previewDir },
-    // 4. General path aliases (must be last — catches anything not matched above)
-    { find: '~/', replacement: join(cwd, 'src') + '/' },
-    { find: '@/', replacement: join(cwd, 'src') + '/' },
-    { find: '@', replacement: join(cwd, 'src') },
+    // 4. Project path aliases from tsconfig.json (longest-find-first, falling back to src/)
+    ...buildProjectAliases(cwd),
   ]
 
   // Only include packages that the host project actually depends on
@@ -253,4 +252,26 @@ export async function createViteConfig(
       // the resolveId plugin. Excluding it forces fresh resolution per request.
     },
   }
+}
+
+/**
+ * Returns project-specific path aliases from tsconfig.json paths.
+ *
+ * If the project defines ANY paths in tsconfig.json, ALL of those paths are
+ * returned — we trust the project's own configuration and don't mix in
+ * defaults. Projects that use ~/ must have it in their tsconfig.
+ *
+ * Falls back to the conventional @/ + ~/ → src/ mapping ONLY when tsconfig
+ * has no paths at all (e.g. a plain CRA project). This preserves backwards
+ * compatibility for projects that rely on the old hardcoded defaults.
+ */
+function buildProjectAliases(cwd: string): Array<{ find: string; replacement: string }> {
+  const fromTsconfig = readProjectAliases(cwd)
+  if (fromTsconfig.length > 0) return fromTsconfig
+  // Fallback: used only when tsconfig has no paths section
+  return [
+    { find: '~/', replacement: join(cwd, 'src') + '/' },
+    { find: '@/', replacement: join(cwd, 'src') + '/' },
+    { find: '@',  replacement: join(cwd, 'src') },
+  ]
 }
