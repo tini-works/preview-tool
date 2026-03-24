@@ -1,6 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import { deriveStateMachine } from '../derive-state-machine.js'
 import type { ScreenFacts, StateNode } from '../types.js'
+import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
+
+function makeTempCwd(queryVersion: string): string {
+  const dir = mkdtempSync(join(tmpdir(), 'preview-test-'))
+  writeFileSync(join(dir, 'package.json'), JSON.stringify({
+    dependencies: { '@tanstack/react-query': queryVersion }
+  }))
+  return dir
+}
 
 // ScreenFacts requires sourceCode — include it in the base fixture
 function emptyFacts(): ScreenFacts {
@@ -223,5 +234,90 @@ describe('deriveStateMachine — Layer 2: useReducer', () => {
     const machine = deriveStateMachine('Screen', facts)
     expect(machine.states[0].id).toBe('default')
     expect(machine.states[0].source).toBe('unknown')
+  })
+})
+
+describe('detectQueryVersion edge cases', () => {
+  it('returns 4 when cwd is not provided', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [{ name: 'useQuery', importPath: '@tanstack/react-query', arguments: [], returnVariable: 'q' }],
+    }
+    const machine = deriveStateMachine('Screen', facts)  // no cwd
+    const loading = machine.states.find(s => s.id === 'loading')
+    expect(loading?.mockData).toHaveProperty('isLoading', true)
+    expect(loading?.mockData).not.toHaveProperty('isPending')
+  })
+
+  it('returns 4 when package.json missing @tanstack/react-query', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'preview-test-'))
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({ dependencies: {} }))
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [{ name: 'useQuery', importPath: '@tanstack/react-query', arguments: [], returnVariable: 'q' }],
+    }
+    const machine = deriveStateMachine('Screen', facts, dir)
+    expect(machine.states.find(s => s.id === 'loading')?.mockData).toHaveProperty('isLoading')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('returns 4 when version string is "latest" (non-numeric)', () => {
+    const dir = makeTempCwd('latest')
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [{ name: 'useQuery', importPath: '@tanstack/react-query', arguments: [], returnVariable: 'q' }],
+    }
+    const machine = deriveStateMachine('Screen', facts, dir)
+    expect(machine.states.find(s => s.id === 'loading')?.mockData).toHaveProperty('isLoading')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('returns 4 when version is "^4.0.0" (explicit v4)', () => {
+    const dir = makeTempCwd('^4.0.0')
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [{ name: 'useQuery', importPath: '@tanstack/react-query', arguments: [], returnVariable: 'q' }],
+    }
+    const machine = deriveStateMachine('Screen', facts, dir)
+    expect(machine.states.find(s => s.id === 'loading')?.mockData).toHaveProperty('isLoading', true)
+    expect(machine.states.find(s => s.id === 'loading')?.mockData).not.toHaveProperty('isPending')
+    rmSync(dir, { recursive: true, force: true })
+  })
+})
+
+describe('deriveStateMachine — React Query v5', () => {
+  it('uses isPending (not isLoading) when @tanstack/react-query ^5 is installed', () => {
+    const dir = makeTempCwd('^5.0.0')
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [{ name: 'useQuery', importPath: '@tanstack/react-query', arguments: [], returnVariable: 'result' }],
+    }
+    const machine = deriveStateMachine('Screen', facts, dir)
+    const loading = machine.states.find(s => s.id === 'loading')
+    expect(loading?.mockData).toHaveProperty('isPending', true)
+    expect(loading?.mockData).not.toHaveProperty('isLoading')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('useSuspenseQuery v5 maps to loading/success only (no error — throws to Error Boundary)', () => {
+    const dir = makeTempCwd('^5.0.0')
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [{ name: 'useSuspenseQuery', importPath: '@tanstack/react-query', arguments: [], returnVariable: 'result' }],
+    }
+    const machine = deriveStateMachine('Screen', facts, dir)
+    expect(machine.states.map((s: StateNode) => s.id)).toEqual(['loading', 'success'])
+    expect(machine.states.find(s => s.id === 'loading')?.mockData).toEqual({ data: undefined })
+    expect(machine.states.find(s => s.id === 'success')?.mockData).toEqual({ data: [] })
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('useSuspenseQuery without cwd still gets 2-state machine (no version detection)', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [{ name: 'useSuspenseQuery', importPath: '@tanstack/react-query', arguments: [], returnVariable: 'result' }],
+    }
+    const machine = deriveStateMachine('Screen', facts)  // no cwd
+    expect(machine.states.map((s: StateNode) => s.id)).toEqual(['loading', 'success'])
   })
 })

@@ -6,6 +6,8 @@ import type {
   MachineTemplate,
   StateSource,
 } from './types.js'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -21,6 +23,32 @@ const DATA_FETCHER_MACHINE: MachineTemplate = {
     { id: 'error',   label: 'Fetch failed',  mockData: { isLoading: false, data: undefined, error: { message: 'Network error' } }, source: 'library' },
   ],
   initial: 'idle',
+  source: 'library',
+}
+
+/** React Query v5: isPending replaced isLoading */
+const DATA_FETCHER_MACHINE_V5: MachineTemplate = {
+  states: [
+    { id: 'idle',    label: 'Initial state', mockData: {},                                                                          source: 'library' },
+    { id: 'loading', label: 'Fetching data', mockData: { isPending: true,  data: undefined, error: undefined },                    source: 'library' },
+    { id: 'success', label: 'Data loaded',   mockData: { isPending: false, data: [],        error: undefined },                    source: 'library' },
+    { id: 'error',   label: 'Fetch failed',  mockData: { isPending: false, data: undefined, error: { message: 'Network error' } }, source: 'library' },
+  ],
+  initial: 'idle',
+  source: 'library',
+}
+
+/**
+ * useSuspenseQuery — no isLoading/error in component body.
+ * Loading suspends via Promise throw; errors propagate to Error Boundary.
+ * Two preview states: loading (Suspense fallback shown) and success (data available).
+ */
+const SUSPENSE_QUERY_MACHINE: MachineTemplate = {
+  states: [
+    { id: 'loading', label: 'Fetching data', mockData: { data: undefined }, source: 'library' },
+    { id: 'success', label: 'Data loaded',   mockData: { data: [] },        source: 'library' },
+  ],
+  initial: 'loading',
   source: 'library',
 }
 
@@ -47,15 +75,52 @@ const FORM_MACHINE: MachineTemplate = {
   source: 'form',
 }
 
-const LIBRARY_REGISTRY: Record<string, MachineTemplate> = {
-  '@tanstack/react-query#useQuery':         DATA_FETCHER_MACHINE,
-  '@tanstack/react-query#useInfiniteQuery': DATA_FETCHER_MACHINE,
-  'swr#useSWR':                             DATA_FETCHER_MACHINE,
-  '@apollo/client#useQuery':                DATA_FETCHER_MACHINE,
-  '@tanstack/react-query#useMutation':      MUTATION_MACHINE,
-  '@apollo/client#useMutation':             MUTATION_MACHINE,
-  'react-hook-form#useForm':                FORM_MACHINE,
-  'formik#useFormik':                       FORM_MACHINE,
+/**
+ * Returns the major version of @tanstack/react-query listed in the project's
+ * package.json. Returns 4 if the file is absent, the key is missing, or the
+ * version string is non-numeric (e.g. "latest", "workspace:^5").
+ */
+function detectQueryVersion(cwd: string): number {
+  try {
+    const pkg = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf-8')) as Record<string, unknown>
+    const deps = {
+      ...(pkg['dependencies'] as Record<string, string> ?? {}),
+      ...(pkg['devDependencies'] as Record<string, string> ?? {}),
+    }
+    const version = deps['@tanstack/react-query'] ?? ''
+    const major = parseInt(version.replace(/^[\^~]/, ''), 10)
+    return isNaN(major) ? 4 : major
+  } catch {
+    return 4
+  }
+}
+
+/**
+ * Builds the library fingerprint registry.
+ * When cwd is provided the React Query version is detected from package.json;
+ * otherwise defaults to v4 field names (isLoading).
+ * Called once per deriveStateMachine invocation — not per hook.
+ *
+ * Note: detectQueryVersion is ONLY called when cwd is truthy (the `cwd &&` guard
+ * prevents it from ever receiving undefined and calling path.join(undefined, ...).
+ */
+function buildLibraryRegistry(cwd?: string): Record<string, MachineTemplate> {
+  const queryMachine = cwd && detectQueryVersion(cwd) >= 5
+    ? DATA_FETCHER_MACHINE_V5
+    : DATA_FETCHER_MACHINE
+
+  return {
+    '@tanstack/react-query#useQuery':           queryMachine,
+    '@tanstack/react-query#useInfiniteQuery':   queryMachine,
+    // useSuspenseQuery uses a dedicated 2-state machine (no error state — throws to Error Boundary)
+    '@tanstack/react-query#useSuspenseQuery':   SUSPENSE_QUERY_MACHINE,
+    'swr#useSWR':                               DATA_FETCHER_MACHINE,
+    '@apollo/client#useQuery':                  DATA_FETCHER_MACHINE,
+    '@tanstack/react-query#useMutation':        MUTATION_MACHINE,
+    '@apollo/client#useMutation':               MUTATION_MACHINE,
+    'react-hook-form#useForm':                  FORM_MACHINE,
+    'formik#useFormik':                         FORM_MACHINE,
+  }
 }
 
 // ── Heuristic helpers (defined before deriveStates to avoid TDZ) ──────────
@@ -109,9 +174,14 @@ function extractReducerStates(reducerSource: string): StateNode[] {
 
 // ── Main export ───────────────────────────────────────────────────────────
 
-export function deriveStateMachine(screenName: string, facts: ScreenFacts): ScreenStateMachine {
+export function deriveStateMachine(
+  screenName: string,
+  facts: ScreenFacts,
+  cwd?: string,
+): ScreenStateMachine {
   try {
-    const states = deriveStates(facts)
+    const registry = buildLibraryRegistry(cwd)
+    const states = deriveStates(facts, registry)
     const transitions = deriveTransitions(facts)
     const initialState = pickDefaultState(states)
     return { screenName, states, transitions, initialState }
@@ -122,11 +192,11 @@ export function deriveStateMachine(screenName: string, facts: ScreenFacts): Scre
 
 // ── State derivation ──────────────────────────────────────────────────────
 
-function deriveStates(facts: ScreenFacts): StateNode[] {
+function deriveStates(facts: ScreenFacts, registry: Record<string, MachineTemplate>): StateNode[] {
   // Layer 1: library fingerprints (highest priority) — return spread copies to prevent shared-ref mutation
   for (const hook of facts.hooks) {
     const key = `${hook.importPath}#${hook.name}`
-    const template = LIBRARY_REGISTRY[key]
+    const template = registry[key]
     if (template) return template.states.map(s => ({ ...s }))
   }
 

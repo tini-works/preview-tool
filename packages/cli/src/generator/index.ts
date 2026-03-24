@@ -156,7 +156,7 @@ export async function generateAll(
       const scenarioFacts = factsMap.get(screen.route)
       if (scenarioFacts) {
         const scenarioScreenName = screen.exportName ?? deriveScreenName(screen.route)
-        const machine = deriveStateMachine(scenarioScreenName, scenarioFacts)
+        const machine = deriveStateMachine(scenarioScreenName, scenarioFacts, cwd)
         const scenarioCode = generateScenarios(machine)
         await writeFile(join(scenariosDir, `${safeName}.ts`), scenarioCode, 'utf-8')
       }
