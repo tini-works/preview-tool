@@ -312,6 +312,19 @@ describe('deriveStateMachine — React Query v5', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 
+  it('useInfiniteQuery with v5 also uses isPending (not isLoading)', () => {
+    const dir = makeTempCwd('^5.0.0')
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [{ name: 'useInfiniteQuery', importPath: '@tanstack/react-query', arguments: [], returnVariable: 'result' }],
+    }
+    const machine = deriveStateMachine('Screen', facts, dir)
+    const loading = machine.states.find(s => s.id === 'loading')
+    expect(loading?.mockData).toHaveProperty('isPending', true)
+    expect(loading?.mockData).not.toHaveProperty('isLoading')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
   it('useSuspenseQuery without cwd still gets 2-state machine (no version detection)', () => {
     const facts: ScreenFacts = {
       ...emptyFacts(),
