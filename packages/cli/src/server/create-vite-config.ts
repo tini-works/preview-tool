@@ -102,15 +102,47 @@ export async function createViteConfig(
     console.warn('Warning: @vitejs/plugin-react not found. Install it in your project.')
   }
 
-  // Try to load host project's Tailwind CSS v4 vite plugin
-  let tailwindPlugin: unknown = null
+  // Try to load Tailwind CSS — detect version and configure appropriately
+  let tailwindPlugin: unknown = null         // v4: Vite plugin
+  let tailwindV3PostcssPlugins: unknown[] | null = null  // v3: PostCSS plugins
+
   try {
-    const require = createRequire(join(cwd, 'package.json'))
-    const tailwindcss = require('@tailwindcss/vite')
-    const factory = tailwindcss.default ?? tailwindcss
-    tailwindPlugin = factory()
+    const hostPkg = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf-8')) as Record<string, unknown>
+    const allDeps = {
+      ...((hostPkg['dependencies'] as Record<string, string>) ?? {}),
+      ...((hostPkg['devDependencies'] as Record<string, string>) ?? {}),
+    }
+    const twVersion = allDeps['tailwindcss'] ?? ''
+    const twMajor = parseInt((twVersion as string).replace(/^[^\d]*/, ''), 10)
+    const hostRequireForTw = createRequire(join(cwd, 'package.json'))
+
+    if (!isNaN(twMajor) && twMajor >= 4) {
+      // v4: use @tailwindcss/vite Vite plugin
+      try {
+        const tailwindcss = hostRequireForTw('@tailwindcss/vite')
+        const factory = (tailwindcss.default ?? tailwindcss) as () => unknown
+        tailwindPlugin = factory()
+      } catch {
+        // @tailwindcss/vite not installed
+      }
+    } else if (twMajor === 3) {
+      // v3: configure PostCSS
+      try {
+        const tailwindcss = hostRequireForTw('tailwindcss')
+        const plugins: unknown[] = [tailwindcss]
+        try {
+          const autoprefixer = hostRequireForTw('autoprefixer')
+          plugins.push(autoprefixer)
+        } catch {
+          // autoprefixer optional
+        }
+        tailwindV3PostcssPlugins = plugins
+      } catch {
+        // tailwindcss v3 not resolvable
+      }
+    }
   } catch {
-    // Tailwind CSS v4 vite plugin not available
+    // package.json unreadable — skip Tailwind
   }
 
   // Spec-driven preview plugin (when specsDir is configured)
@@ -228,6 +260,7 @@ export async function createViteConfig(
 
   return {
     root: previewDir,
+    ...(tailwindV3PostcssPlugins ? { css: { postcss: { plugins: tailwindV3PostcssPlugins } } } : {}),
     server: {
       port: config.port,
       open: true,
