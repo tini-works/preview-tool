@@ -1,8 +1,7 @@
 import { Command } from 'commander'
 import { resolve } from 'node:path'
 import chalk from 'chalk'
-import { readConfig } from '../lib/config.js'
-import { generateAll } from '../generator/index.js'
+import { generateAllV2 } from '../generator/generate-all-v2.js'
 
 export const generateCommand = new Command('generate')
   .description('Discover screens and generate preview artifacts')
@@ -12,25 +11,13 @@ export const generateCommand = new Command('generate')
 
     console.log(chalk.bold('\nPreview Tool — Generate\n'))
 
-    const config = await readConfig(cwd)
-    console.log(chalk.dim(`Config: glob=${config.screenGlob}, port=${config.port}`))
-
-    console.log('')
-
     try {
-      const result = await generateAll(cwd, config)
+      const result = await generateAllV2(cwd)
 
       console.log('')
       console.log(chalk.green('Generation complete:'))
-      console.log(`  Screens found:        ${result.screensFound}`)
-      console.log(`  Views generated:      ${result.viewsGenerated}`)
-      console.log(`  Models generated:     ${result.modelsGenerated}`)
-      console.log(`  Controllers generated: ${result.controllersGenerated}`)
-      console.log(`  Adapters generated:   ${result.adaptersGenerated}`)
-      console.log(`  Mocks generated:      ${result.mocksGenerated}`)
-      if (result.overridesSkipped > 0) {
-        console.log(`  Overrides skipped:    ${result.overridesSkipped}`)
-      }
+      console.log(`  Screens found: ${result.screens.length}`)
+      console.log(`  Mock modules: ${result.analyses.reduce((sum, a) => sum + a.mockModules.length, 0)}`)
 
       console.log('')
     } catch (error) {

@@ -2,13 +2,16 @@ import { Command } from 'commander'
 import chalk from 'chalk'
 import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { resolveSource } from '../resolver/resolve-source.js'
 import { detectFramework } from '../resolver/detect-framework.js'
 import { generateWrapperCode, syncWrapperProviders } from '../resolver/generate-wrapper.js'
 import { installDependencies, ensureNodeModules } from '../resolver/install-deps.js'
 import { initPreview } from './init.js'
 import { generateAllV2 } from '../generator/generate-all-v2.js'
-import { DEFAULT_CONFIG, PREVIEW_DIR } from '../lib/config.js'
+import { readConfig, DEFAULT_CONFIG, PREVIEW_DIR } from '../lib/config.js'
+import { loadSpecs } from '../spec/spec-loader.js'
+import { runSpecPipeline, toSafeFileName } from '../spec/spec-pipeline-orchestrator.js'
 export const buildCommand = new Command('build')
   .description('Analyze screens and build static preview site')
   .argument('[source]', 'Path to React app (or GitHub URL)', '.')
@@ -73,6 +76,56 @@ export const buildCommand = new Command('build')
     if (syncResult.missingProviders.length > 0) {
       console.log(chalk.yellow(`  Missing providers in wrapper.tsx: ${syncResult.missingProviders.join(', ')}`))
       console.log(chalk.yellow(`  Add them manually: ${wrapperPath}`))
+    }
+
+    // Read actual project config
+    const config = await readConfig(resolved.cwd)
+
+    // Run spec pipeline if specsDir is configured
+    if (config.specsDir && existsSync(config.specsDir)) {
+      const previewDir = join(resolved.cwd, PREVIEW_DIR)
+      console.log(chalk.dim('\nRunning spec pipeline...'))
+      const manifest = await loadSpecs(config.specsDir, resolved.cwd)
+      const pipelineResult = await runSpecPipeline(manifest.screens, resolved.cwd, config.specsDir)
+
+      // Write physical mock files
+      const mocksDir = join(previewDir, 'mocks')
+      await mkdir(mocksDir, { recursive: true })
+      for (const [importPath, code] of pipelineResult.mockFiles) {
+        const safeName = toSafeFileName(importPath)
+        await writeFile(join(mocksDir, `${safeName}.ts`), code, 'utf-8')
+      }
+
+      // Write alias manifest
+      await writeFile(
+        join(previewDir, 'alias-manifest.json'),
+        JSON.stringify(pipelineResult.aliasManifest, null, 2),
+        'utf-8'
+      )
+
+      // Write screen source paths
+      if (pipelineResult.screenSourcePaths.length > 0) {
+        await writeFile(
+          join(previewDir, 'screen-source-paths.json'),
+          JSON.stringify(pipelineResult.screenSourcePaths, null, 2),
+          'utf-8'
+        )
+      }
+
+      // Write screen state variable map
+      if (Object.keys(pipelineResult.screenStateVars).length > 0) {
+        await writeFile(
+          join(previewDir, 'screen-state-vars.json'),
+          JSON.stringify(pipelineResult.screenStateVars, null, 2),
+          'utf-8'
+        )
+      }
+
+      const hookCount = pipelineResult.mockFiles.size
+      const regionCount = pipelineResult.enrichedScreens.reduce(
+        (sum, s) => sum + Object.keys(s.enrichedRegions).length, 0
+      )
+      console.log(chalk.dim(`  Generated ${hookCount} mock modules, ${regionCount} regions`))
     }
 
     // Step 5: Run V2 analysis + generation pipeline
