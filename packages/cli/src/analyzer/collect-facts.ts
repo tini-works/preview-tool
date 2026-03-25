@@ -118,7 +118,7 @@ export function extractHookFacts(sourceFile: SourceFile): HookFact[] {
       }
     }
 
-    if (!importPath) continue
+    if (!importPath || !hookName) continue
 
     const args = call.getArguments().map((arg) => arg.getText())
     const { variable: returnVariable, destructuredFields } = extractReturnInfo(call)
@@ -197,8 +197,7 @@ export function aggregateSelectorHooks(hooks: HookFact[]): HookFact[] {
       // Single call — pass through, but annotate selectorPattern for object-return selectors (GAP-07)
       for (const h of group) {
         const selectorField = extractSelectorField(h)
-        const isObjectReturn = Array.isArray(selectorField)
-        if (isObjectReturn) {
+        if (Array.isArray(selectorField)) {
           result.push({
             ...h,
             selectorPattern: true,
