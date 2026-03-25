@@ -183,14 +183,7 @@ export async function createViteConfig(
       } else {
         // Local import — resolve __real: to the actual source file so mocks can
         // re-export non-hook symbols (e.g. ToastContext, DevToolsWrapper).
-        let realPath: string
-        if (importPath.startsWith('@/')) {
-          realPath = join(cwd, 'src', importPath.slice(2))
-        } else if (importPath.startsWith('~/')) {
-          realPath = join(cwd, 'src', importPath.slice(2))
-        } else {
-          realPath = join(cwd, importPath)
-        }
+        const realPath = resolveLocalImportPath(importPath, cwd)
         realModuleEntries.push({ find: `__real:${importPath}`, replacement: realPath })
       }
     }
@@ -231,19 +224,22 @@ export async function createViteConfig(
     // package.json unreadable — stick with react/react-dom
   }
 
+  const workspaceRoot = findWorkspaceRoot(cwd)
+
   return {
     root: previewDir,
     server: {
       port: config.port,
       open: true,
       fs: {
-        allow: [cwd, runtimeRoot, previewDir],
+        allow: [cwd, runtimeRoot, previewDir, ...(workspaceRoot ? [workspaceRoot] : [])],
       },
     },
     resolve: {
       alias: aliasArray,
       dedupe: ['react', 'react-dom'],
     },
+    define: loadHostEnvDefines(cwd),
     plugins,
     optimizeDeps: {
       include: optimizeDepsInclude,
@@ -252,6 +248,69 @@ export async function createViteConfig(
       // the resolveId plugin. Excluding it forces fresh resolution per request.
     },
   }
+}
+
+/**
+ * Resolves a local import path (e.g. @/, ~/, or relative) to an absolute path,
+ * consulting tsconfig aliases first before falling back to hardcoded defaults.
+ */
+function resolveLocalImportPath(importPath: string, cwd: string): string {
+  const aliases = readProjectAliases(cwd)
+  for (const { find, replacement } of aliases) {
+    if (importPath.startsWith(find)) {
+      return replacement + importPath.slice(find.length)
+    }
+  }
+  // Fallback: old hardcoded behavior
+  if (importPath.startsWith('@/')) return join(cwd, 'src', importPath.slice(2))
+  if (importPath.startsWith('~/')) return join(cwd, 'src', importPath.slice(2))
+  return join(cwd, importPath)
+}
+
+/**
+ * Reads VITE_* environment variables from the host project's .env files and
+ * returns a Vite `define` map so import.meta.env.VITE_* resolves in the preview.
+ * Files are read in order: .env, .env.local, .env.development, .env.development.local
+ * (later files override earlier ones — same as Vite's own loading order).
+ */
+export function loadHostEnvDefines(cwd: string): Record<string, string> {
+  const defines: Record<string, string> = {}
+  const envFiles = ['.env', '.env.local', '.env.development', '.env.development.local']
+  for (const file of envFiles) {
+    const envPath = join(cwd, file)
+    if (!existsSync(envPath)) continue
+    try {
+      const lines = readFileSync(envPath, 'utf-8').split('\n')
+      for (const line of lines) {
+        const match = line.match(/^(VITE_\w+)\s*=\s*(.*)$/)
+        if (match) {
+          defines[`import.meta.env.${match[1]}`] = JSON.stringify(match[2].trim())
+        }
+      }
+    } catch {
+      // unreadable — skip
+    }
+  }
+  return defines
+}
+
+/**
+ * Walks up from cwd to find the nearest package.json that declares workspaces.
+ * Returns the directory path, or null if no workspace root is found.
+ */
+export function findWorkspaceRoot(cwd: string): string | null {
+  let dir = dirname(cwd)
+  while (dir !== dirname(dir)) {
+    const pkgPath = join(dir, 'package.json')
+    if (existsSync(pkgPath)) {
+      try {
+        const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as Record<string, unknown>
+        if (pkg['workspaces']) return dir
+      } catch { /* ignore */ }
+    }
+    dir = dirname(dir)
+  }
+  return null
 }
 
 /**
