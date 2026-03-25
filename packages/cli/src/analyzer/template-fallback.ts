@@ -58,7 +58,7 @@ function hookNameToKey(hookName: string): string {
 }
 
 /** Default key derivation for data-fetching hooks */
-function deriveDataKey(hookName: string, args: string[]): string {
+function deriveDataKey(_hookName: string, args: string[]): string {
   const queryKey = extractQueryKey(args)
   if (queryKey) return queryKey
 
