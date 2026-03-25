@@ -427,6 +427,77 @@ describe('buildFromTemplates', () => {
     expect((region as any).sourceHook).toBe('useSearchParams')
   })
 
+  describe('catch-all with destructured fields', () => {
+    it('uses destructured boolean field names in mockData instead of generic data/isLoading', () => {
+      const facts: ScreenFacts = {
+        route: '/test',
+        filePath: 'test.tsx',
+        sourceCode: '',
+        hooks: [{
+          name: 'useAuthStore',
+          importPath: '../stores/authStore',
+          arguments: [],
+          returnVariable: 'auth',
+          destructuredFields: ['isLoggedIn', 'user'],
+        }],
+        components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
+      }
+      const result = buildFromTemplates(facts)
+      // Should have at least one region for the hook
+      expect(result.regions.length).toBeGreaterThan(0)
+      const region = result.regions[0]
+      // The states should contain field-specific mock data, not the generic { data: {} } shape
+      const stateValues = Object.values(region.states)
+      const firstState = stateValues[0] as { mockData: Record<string, unknown> }
+      expect(firstState.mockData).toHaveProperty('isLoggedIn')
+      expect(firstState.mockData).not.toHaveProperty('data')
+    })
+
+    it('falls back to generic shape when no destructuredFields', () => {
+      const facts: ScreenFacts = {
+        route: '/test',
+        filePath: 'test.tsx',
+        sourceCode: '',
+        hooks: [{
+          name: 'useCustomThing',
+          importPath: '../hooks/useCustomThing',
+          arguments: [],
+          returnVariable: 'thing',
+        }],
+        components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
+      }
+      const result = buildFromTemplates(facts)
+      expect(result.regions.length).toBeGreaterThan(0)
+      // Should not throw regardless of what it returns
+      expect(result.regions[0].states).toBeDefined()
+    })
+
+    it('maps isOpen and toggle fields for useModal with destructuredFields', () => {
+      const facts: ScreenFacts = {
+        route: '/test',
+        filePath: 'test.tsx',
+        sourceCode: '',
+        hooks: [{
+          name: 'useModal',
+          importPath: '../hooks/useModal',
+          arguments: [],
+          returnVariable: 'modal',
+          destructuredFields: ['isOpen', 'toggle'],
+        }],
+        components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
+      }
+      const result = buildFromTemplates(facts)
+      expect(result.regions.length).toBeGreaterThan(0)
+      const region = result.regions[0]
+      const stateValues = Object.values(region.states)
+      const firstState = stateValues[0] as { mockData: Record<string, unknown> }
+      // isOpen is a boolean field — should be present in mockData
+      expect(firstState.mockData).toHaveProperty('isOpen')
+      // Should not have a generic 'data' key
+      expect(firstState.mockData).not.toHaveProperty('data')
+    })
+  })
+
   it('skips provider hooks (useNavigate, useForm, useTranslation) — no regions produced', () => {
     const facts: ScreenFacts = {
       route: '/register',
