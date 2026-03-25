@@ -498,6 +498,44 @@ describe('buildFromTemplates', () => {
     })
   })
 
+  it('useSuspenseQuery matches query template (not catch-all)', () => {
+    const facts: ScreenFacts = {
+      route: '/users',
+      filePath: '/app/users.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useSuspenseQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['users'] }"] },
+      ],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
+    }
+    const result = buildFromTemplates(facts)
+    expect(result.regions.length).toBeGreaterThan(0)
+    const stateKeys = Object.keys(result.regions[0].states)
+    // Query template produces populated/loading/empty/error — catch-all only has populated/loading/error
+    expect(stateKeys).toContain('empty')
+    // Should not fall through to catch-all (custom) region type
+    expect(result.regions[0].type).toBe('list')
+  })
+
+  it('useSuspenseInfiniteQuery matches query template (not catch-all)', () => {
+    const facts: ScreenFacts = {
+      route: '/feed',
+      filePath: '/app/feed.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useSuspenseInfiniteQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['feed'] }"] },
+      ],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
+    }
+    const result = buildFromTemplates(facts)
+    expect(result.regions.length).toBeGreaterThan(0)
+    const stateKeys = Object.keys(result.regions[0].states)
+    // Query template produces populated/loading/empty/error — catch-all only has populated/loading/error
+    expect(stateKeys).toContain('empty')
+    // Should not fall through to catch-all (custom) region type
+    expect(result.regions[0].type).toBe('list')
+  })
+
   it('skips provider hooks (useNavigate, useForm, useTranslation) — no regions produced', () => {
     const facts: ScreenFacts = {
       route: '/register',

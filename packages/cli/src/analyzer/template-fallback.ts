@@ -81,7 +81,7 @@ const TEMPLATES: HookTemplate[] = [
   // 1. React Query / SWR / data-fetching hooks
   {
     pattern: (name, _importPath) =>
-      /^(useQuery|useSWR|useFetch|useAppLiveQuery|useLiveQuery)$/.test(name),
+      /^(useQuery|useSuspenseQuery|useSuspenseInfiniteQuery|useSWR|useFetch|useAppLiveQuery|useLiveQuery)$/.test(name),
     regionType: 'list',
     states: (label) => ({
       populated: {
