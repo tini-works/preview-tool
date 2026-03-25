@@ -402,3 +402,44 @@ describe('deriveStateMachine — Layer 1.5: Zustand selector pattern', () => {
     expect(machine.states).toHaveLength(4)
   })
 })
+
+describe('deriveStateMachine — hook priority (Layer 1)', () => {
+  it('useForm wins over useQuery when both present (form > data fetcher)', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [
+        { name: 'useQuery', importPath: '@tanstack/react-query', arguments: [], returnVariable: 'result' },
+        { name: 'useForm', importPath: 'react-hook-form', arguments: [], returnVariable: 'form' },
+      ],
+    }
+    const machine = deriveStateMachine('CheckoutScreen', facts)
+    expect(machine.states.some(s => s.id === 'submitting')).toBe(true)
+    expect(machine.states[0].source).toBe('form')
+  })
+
+  it('useMutation wins over useQuery (mutation > data fetcher)', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [
+        { name: 'useQuery', importPath: '@tanstack/react-query', arguments: [], returnVariable: 'q' },
+        { name: 'useMutation', importPath: '@tanstack/react-query', arguments: [], returnVariable: 'm' },
+      ],
+    }
+    const machine = deriveStateMachine('Screen', facts)
+    // Mutation machine states have 'isPending' key (not 'isLoading')
+    expect(machine.states.find(s => s.id === 'idle')?.mockData).toHaveProperty('isPending')
+  })
+
+  it('useForm wins over useMutation (form > mutation)', () => {
+    const facts: ScreenFacts = {
+      ...emptyFacts(),
+      hooks: [
+        { name: 'useMutation', importPath: '@tanstack/react-query', arguments: [], returnVariable: 'm' },
+        { name: 'useForm', importPath: 'react-hook-form', arguments: [], returnVariable: 'form' },
+      ],
+    }
+    const machine = deriveStateMachine('Screen', facts)
+    expect(machine.states.some(s => s.id === 'submitting')).toBe(true)
+    expect(machine.states[0].source).toBe('form')
+  })
+})

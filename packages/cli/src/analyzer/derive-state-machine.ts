@@ -75,6 +75,14 @@ const FORM_MACHINE: MachineTemplate = {
   source: 'form',
 }
 
+/** Layer 1 priority: lower number = higher priority. Unlisted keys default to 3. */
+const HOOK_PRIORITY: Record<string, number> = {
+  'react-hook-form#useForm': 1,
+  'formik#useFormik': 1,
+  '@tanstack/react-query#useMutation': 2,
+  '@apollo/client#useMutation': 2,
+}
+
 /**
  * Returns the major version of @tanstack/react-query listed in the project's
  * package.json. Returns 4 if the file is absent, the key is missing, or the
@@ -193,12 +201,20 @@ export function deriveStateMachine(
 // ── State derivation ──────────────────────────────────────────────────────
 
 function deriveStates(facts: ScreenFacts, registry: Record<string, MachineTemplate>): StateNode[] {
-  // Layer 1: library fingerprints (highest priority) — return spread copies to prevent shared-ref mutation
+  // Layer 1: library fingerprints — priority: form(1) > mutation(2) > data fetcher(3)
+  let bestPriority = Infinity
+  let bestTemplate: MachineTemplate | null = null
   for (const hook of facts.hooks) {
     const key = `${hook.importPath}#${hook.name}`
     const template = registry[key]
-    if (template) return template.states.map(s => ({ ...s }))
+    if (!template) continue
+    const priority = HOOK_PRIORITY[key] ?? 3
+    if (priority < bestPriority) {
+      bestPriority = priority
+      bestTemplate = template
+    }
   }
+  if (bestTemplate) return bestTemplate.states.map(s => ({ ...s }))
 
   // Layer 1.5: Zustand selector pattern
   // When collect-facts aggregates multiple useStore((s) => s.field) calls,
