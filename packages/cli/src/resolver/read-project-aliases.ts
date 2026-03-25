@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve, dirname } from 'node:path'
 
 export interface AliasEntry {
   find: string
@@ -7,8 +7,44 @@ export interface AliasEntry {
 }
 
 /**
- * Reads compilerOptions.paths from the project's tsconfig.json and converts
- * each path mapping to a Vite resolve.alias entry.
+ * Recursively reads compilerOptions.paths from a tsconfig file, following the
+ * `extends` chain. Base paths are merged first; child paths override same keys.
+ * Recursion is capped at 5 levels to prevent infinite loops.
+ */
+function readTsconfigPaths(tsconfigPath: string, depth: number): Record<string, string[]> {
+  if (depth > 5) return {}
+  if (!existsSync(tsconfigPath)) return {}
+
+  let tsconfig: Record<string, unknown>
+  try {
+    tsconfig = JSON.parse(readFileSync(tsconfigPath, 'utf-8')) as Record<string, unknown>
+  } catch {
+    return {}
+  }
+
+  // Follow extends chain first (base paths)
+  let basePaths: Record<string, string[]> = {}
+  const extendsValue = tsconfig['extends']
+  if (typeof extendsValue === 'string') {
+    let extendedPath = resolve(dirname(tsconfigPath), extendsValue)
+    if (!extendedPath.endsWith('.json')) {
+      extendedPath += '.json'
+    }
+    basePaths = readTsconfigPaths(extendedPath, depth + 1)
+  }
+
+  const compilerOptions = tsconfig['compilerOptions'] as Record<string, unknown> | undefined
+  const ownPaths = compilerOptions?.['paths'] as Record<string, string[]> | undefined
+
+  return {
+    ...basePaths,
+    ...(ownPaths && typeof ownPaths === 'object' ? ownPaths : {}),
+  }
+}
+
+/**
+ * Reads compilerOptions.paths from the project's tsconfig.json (following
+ * the `extends` chain) and converts each path mapping to a Vite resolve.alias entry.
  *
  * Rules:
  *   "@/*": ["src/*"]      →  { find: "@/",  replacement: "<cwd>/src/" }
@@ -23,16 +59,8 @@ export function readProjectAliases(cwd: string): AliasEntry[] {
   const tsconfigPath = join(cwd, 'tsconfig.json')
   if (!existsSync(tsconfigPath)) return []
 
-  let tsconfig: Record<string, unknown>
-  try {
-    tsconfig = JSON.parse(readFileSync(tsconfigPath, 'utf-8')) as Record<string, unknown>
-  } catch {
-    return []
-  }
-
-  const compilerOptions = tsconfig['compilerOptions'] as Record<string, unknown> | undefined
-  const paths = compilerOptions?.['paths'] as Record<string, string[]> | undefined
-  if (!paths || typeof paths !== 'object') return []
+  const paths = readTsconfigPaths(tsconfigPath, 0)
+  if (!paths || Object.keys(paths).length === 0) return []
 
   const aliases: AliasEntry[] = []
 

@@ -75,3 +75,45 @@ describe('readProjectAliases', () => {
     expect(readProjectAliases(tmp)).toEqual([])
   })
 })
+
+describe('readProjectAliases — extends support', () => {
+  it('follows extends to read base tsconfig paths', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'preview-aliases-'))
+    writeFileSync(join(dir, 'tsconfig.base.json'), JSON.stringify({
+      compilerOptions: { paths: { '@utils/*': ['./utils/*'] } }
+    }))
+    writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({
+      extends: './tsconfig.base.json',
+      compilerOptions: {}
+    }))
+    const aliases = readProjectAliases(dir)
+    expect(aliases.some(a => (a.find as string).startsWith('@utils'))).toBe(true)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('child paths override base paths with same key', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'preview-aliases-'))
+    writeFileSync(join(dir, 'tsconfig.base.json'), JSON.stringify({
+      compilerOptions: { paths: { '@/*': ['./base-src/*'] } }
+    }))
+    writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({
+      extends: './tsconfig.base.json',
+      compilerOptions: { paths: { '@/*': ['./src/*'] } }
+    }))
+    const aliases = readProjectAliases(dir)
+    const atAlias = aliases.find(a => (a.find as string) === '@/')
+    expect(atAlias?.replacement).toContain('/src/')
+    expect(atAlias?.replacement).not.toContain('base-src')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('does not throw or hang on circular extends', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'preview-aliases-'))
+    writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({
+      extends: './tsconfig.json',
+      compilerOptions: {}
+    }))
+    expect(() => readProjectAliases(dir)).not.toThrow()
+    rmSync(dir, { recursive: true, force: true })
+  })
+})
