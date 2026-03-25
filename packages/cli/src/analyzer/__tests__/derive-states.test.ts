@@ -402,6 +402,92 @@ describe('parseCompoundCondition', () => {
   })
 })
 
+describe('GAP-11: DATA_FIELD_EXCEPTIONS override function heuristic', () => {
+  it('fetchStatus is classified as data field (not function)', () => {
+    const { dataFields, functionFields } = classifyDestructuredFields(['fetchStatus', 'data', 'refetch'])
+    expect(dataFields).toContain('fetchStatus')
+    expect(functionFields).not.toContain('fetchStatus')
+    expect(functionFields).toContain('refetch')
+  })
+
+  it('resetToken is classified as data field (not function)', () => {
+    const { dataFields } = classifyDestructuredFields(['resetToken', 'openPrice', 'closeDate'])
+    expect(dataFields).toContain('resetToken')
+    expect(dataFields).toContain('openPrice')
+    expect(dataFields).toContain('closeDate')
+  })
+
+  it('all DATA_FIELD_EXCEPTIONS entries are classified as data', () => {
+    const exceptions = [
+      'fetchStatus', 'resetToken', 'resetKey', 'resetAt', 'resetTime',
+      'openDate', 'openPrice', 'openTime', 'openRate',
+      'closeDate', 'closePrice', 'closeTime', 'closeRate',
+      'fetchedAt', 'fetchedData', 'handlebarData', 'handleName',
+    ]
+    const { dataFields, functionFields } = classifyDestructuredFields(exceptions)
+    expect(dataFields).toEqual(exceptions)
+    expect(functionFields).toEqual([])
+  })
+})
+
+describe('GAP-13: useReducer states extracted from reducerSource', () => {
+  it('builds states from useReducer switch/case when reducerSource is present', () => {
+    const local: LocalStateFact = {
+      name: 'status',
+      hook: 'useReducer',
+      initialValue: "'idle'",
+      valueType: 'string',
+      reducerSource: `
+        function reducer(state, action) {
+          switch (action.type) {
+            case 'FETCH': return 'loading'
+            case 'SUCCESS': return 'success'
+            case 'ERROR': return 'error'
+            default: return state
+          }
+        }
+      `,
+    }
+
+    const result = deriveAllStates({
+      hooks: [],
+      localState: [local],
+      derivedVars: [],
+      conditionals: [{ condition: 'status', trueBranch: [], falseBranch: [] }],
+    })
+
+    const region = result.get('status')
+    expect(region).toBeDefined()
+    expect(region!.source).toBe('local-state')
+    expect(Object.keys(region!.states)).toContain('FETCH')
+    expect(Object.keys(region!.states)).toContain('SUCCESS')
+    expect(Object.keys(region!.states)).toContain('ERROR')
+    expect(region!.states['FETCH'].mockData).toEqual({ status: 'FETCH' })
+  })
+
+  it('uses fallback states when reducerSource has no case patterns', () => {
+    const local: LocalStateFact = {
+      name: 'mode',
+      hook: 'useReducer',
+      initialValue: "'idle'",
+      valueType: 'string',
+      reducerSource: 'function reducer(state, action) { return state }',
+    }
+
+    const result = deriveAllStates({
+      hooks: [],
+      localState: [local],
+      derivedVars: [],
+      conditionals: [{ condition: 'mode', trueBranch: [], falseBranch: [] }],
+    })
+
+    const region = result.get('mode')
+    expect(region).toBeDefined()
+    // Should fall through to default string handling
+    expect(region!.states).toHaveProperty('default')
+  })
+})
+
 describe('findConditionalsForHook with compound conditions', () => {
   it('matches compound conditionals containing hook fields', () => {
     const hook: HookFact = {

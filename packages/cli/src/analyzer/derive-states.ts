@@ -10,10 +10,21 @@ const FUNCTION_PREFIXES = [
   'handle', 'on', 'toggle', 'fetch', 'submit', 'reset', 'open', 'close',
 ]
 
+const DATA_FIELD_EXCEPTIONS = new Set([
+  // React Query v5 status fields
+  'fetchStatus',
+  // Common data fields that start with function-like prefixes
+  'resetToken', 'resetKey', 'resetAt', 'resetTime',
+  'openDate', 'openPrice', 'openTime', 'openRate',
+  'closeDate', 'closePrice', 'closeTime', 'closeRate',
+  'fetchedAt', 'fetchedData',
+  'handlebarData', 'handleName',
+])
+
 const EXACT_FUNCTION_NAMES = new Set([
   'login', 'logout', 'register',
   'reset', 'open', 'close', 'submit', 'toggle', 'fetch',
-  'clear', 'refresh', 'reload', 'retry', 'cancel', 'dismiss',
+  'clear', 'refresh', 'refetch', 'reload', 'retry', 'cancel', 'dismiss',
   'confirm', 'approve', 'reject', 'delete', 'remove', 'save',
   'send', 'start', 'stop', 'pause', 'resume', 'init',
 ])
@@ -36,6 +47,7 @@ export function classifyDestructuredFields(
 }
 
 function isFunction(field: string): boolean {
+  if (DATA_FIELD_EXCEPTIONS.has(field)) return false
   if (EXACT_FUNCTION_NAMES.has(field)) return true
   for (const prefix of FUNCTION_PREFIXES) {
     if (field.startsWith(prefix) && field.length > prefix.length && field[prefix.length] === field[prefix.length].toUpperCase()) {
@@ -382,6 +394,26 @@ export function deriveAllStates(input: DeriveAllStatesInput): Map<string, Derive
 function buildLocalStateRegion(local: LocalStateFact): Record<string, RegionState> {
   const { name, valueType } = local
   const regionKey = camelToKebab(name)
+
+  // useReducer with reducerSource: extract action types from switch/case statements
+  if (local.hook === 'useReducer' && local.reducerSource) {
+    const casePattern = /case\s+['"]([^'"]+)['"]\s*:/g
+    const ids: string[] = []
+    let m: RegExpExecArray | null
+    while ((m = casePattern.exec(local.reducerSource)) !== null) {
+      ids.push(m[1])
+    }
+    if (ids.length > 0) {
+      const states: Record<string, RegionState> = {}
+      for (const id of ids) {
+        states[id] = {
+          label: `${regionKey} ${id}`,
+          mockData: { [name]: id },
+        }
+      }
+      return states
+    }
+  }
 
   switch (valueType) {
     case 'boolean':
