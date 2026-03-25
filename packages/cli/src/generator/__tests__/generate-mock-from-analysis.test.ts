@@ -418,7 +418,7 @@ describe('generateMockModules', () => {
       regions: [{
         key: 'submit-action',
         label: 'Submit',
-        type: 'action',
+        type: 'custom',
         hookBindings: ['useMutation:submit-action'],
         states: { idle: { label: 'Idle', mockData: {} } },
         defaultState: 'idle',
@@ -459,7 +459,7 @@ describe('generateMockModules', () => {
         regions: [{
           key: 'swr-action',
           label: 'SWR Action',
-          type: 'action',
+          type: 'custom',
           hookBindings: ['useSWRMutation:swr-action'],
           states: { idle: { label: 'Idle', mockData: {} } },
           defaultState: 'idle',
