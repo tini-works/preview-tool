@@ -28,6 +28,10 @@ export function extractHookFacts(sourceFile: SourceFile): HookFact[] {
   // e.g. `import { useAppLiveQuery as useLiveQuery }` → localName="useLiveQuery", originalName="useAppLiveQuery"
   const importMap = new Map<string, string>()
   const exportNameMap = new Map<string, string>()
+
+  // GAP-04: Track React namespace local names (e.g. `import React from 'react'` or `import * as React from 'react'`)
+  const reactNamespaceNames = new Set<string>()
+
   for (const decl of sourceFile.getImportDeclarations()) {
     const modulePath = decl.getModuleSpecifierValue()
     for (const named of decl.getNamedImports()) {
@@ -40,29 +44,87 @@ export function extractHookFacts(sourceFile: SourceFile): HookFact[] {
     const defaultImport = decl.getDefaultImport()
     if (defaultImport) {
       importMap.set(defaultImport.getText(), modulePath)
+      // Track default React imports (import React from 'react')
+      if (modulePath === 'react') {
+        reactNamespaceNames.add(defaultImport.getText())
+      }
+    }
+    const namespaceImport = decl.getNamespaceImport()
+    if (namespaceImport) {
+      importMap.set(namespaceImport.getText(), modulePath)
+      // Track namespace React imports (import * as React from 'react')
+      if (modulePath === 'react') {
+        reactNamespaceNames.add(namespaceImport.getText())
+      }
     }
   }
+
+  // GAP-19: Collect locally-defined hook function names (functions starting with 'use' in same file)
+  const localHookNames = new Set<string>()
+  for (const fn of sourceFile.getFunctions()) {
+    const fnName = fn.getName()
+    if (fnName && fnName.startsWith('use')) {
+      localHookNames.add(fnName)
+    }
+  }
+  // Also check arrow functions assigned to variables at top-level
+  for (const varDecl of sourceFile.getVariableDeclarations()) {
+    const name = varDecl.getName()
+    if (name.startsWith('use') && varDecl.getInitializer()?.isKind(SyntaxKind.ArrowFunction)) {
+      localHookNames.add(name)
+    }
+  }
+
+  const filePath = sourceFile.getFilePath()
 
   // Find all call expressions that are hook calls (start with 'use')
   const calls = sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression)
 
   for (const call of calls) {
     const expr = call.getExpression()
-    const localName = expr.getText()
+    const exprText = expr.getText()
 
-    // Only process hook calls (useXxx pattern)
-    if (!localName.startsWith('use') || !importMap.has(localName)) continue
+    // GAP-04: Detect React.useXxx() member access pattern
+    let localName = exprText
+    let hookName: string | undefined
+    let importPath: string | undefined
 
-    const importPath = importMap.get(localName)
+    // Check for namespace.useHook pattern (e.g. React.useContext)
+    const memberMatch = exprText.match(/^(\w+)\.(\w+)$/)
+    if (memberMatch) {
+      const [, ns, method] = memberMatch
+      if (reactNamespaceNames.has(ns) && method.startsWith('use')) {
+        hookName = method
+        importPath = 'react'
+      }
+    }
+
+    if (!hookName) {
+      // Standard case: direct hook call
+      if (!localName.startsWith('use')) continue
+
+      if (importMap.has(localName)) {
+        importPath = importMap.get(localName)
+        if (!importPath) continue
+        // Use the original export name (not the local alias) so generated mocks
+        // export the correct name that other consumers of the module expect.
+        hookName = exportNameMap.get(localName) ?? localName
+      } else if (localHookNames.has(localName)) {
+        // GAP-19: Co-located hook — treat the file's own path as the import path
+        hookName = localName
+        importPath = filePath
+      } else {
+        continue
+      }
+    }
+
     if (!importPath) continue
-    // Use the original export name (not the local alias) so generated mocks
-    // export the correct name that other consumers of the module expect.
-    const name = exportNameMap.get(localName) ?? localName
+
     const args = call.getArguments().map((arg) => arg.getText())
     const { variable: returnVariable, destructuredFields } = extractReturnInfo(call)
 
     hooks.push({
-      name,
+      name: hookName,
       importPath,
       arguments: args,
       ...(returnVariable ? { returnVariable } : {}),
@@ -132,8 +194,21 @@ export function aggregateSelectorHooks(hooks: HookFact[]): HookFact[] {
 
   for (const [, group] of groups) {
     if (group.length < 2) {
-      // Single call — pass through unchanged
-      for (const h of group) result.push(h)
+      // Single call — pass through, but annotate selectorPattern for object-return selectors (GAP-07)
+      for (const h of group) {
+        const selectorField = extractSelectorField(h)
+        const isObjectReturn = Array.isArray(selectorField)
+        if (isObjectReturn) {
+          result.push({
+            ...h,
+            selectorPattern: true,
+            // Merge extracted fields with any destructured fields from variable binding
+            destructuredFields: [...new Set([...(h.destructuredFields ?? []), ...selectorField])],
+          })
+        } else {
+          result.push(h)
+        }
+      }
       continue
     }
 
@@ -142,10 +217,14 @@ export function aggregateSelectorHooks(hooks: HookFact[]): HookFact[] {
     let hasSelectorPattern = false
 
     for (const h of group) {
-      // Try selector pattern first: (s) => s.field
+      // Try selector pattern first: (s) => s.field or (s) => ({ f1: s.f1, f2: s.f2 })
       const selectorField = extractSelectorField(h)
       if (selectorField) {
-        allFields.push(selectorField)
+        if (Array.isArray(selectorField)) {
+          allFields.push(...selectorField)
+        } else {
+          allFields.push(selectorField)
+        }
         hasSelectorPattern = true
         continue
       }
@@ -182,14 +261,25 @@ export function aggregateSelectorHooks(hooks: HookFact[]): HookFact[] {
 
 /**
  * Check if a hook call uses the Zustand selector pattern: useStore((s) => s.field)
- * Returns the field name if matched, undefined otherwise.
+ * or object-return selector: useStore((s) => ({ field1: s.field1, field2: s.field2 }))
+ * Returns the field name(s) if matched, undefined otherwise.
  */
-function extractSelectorField(hook: HookFact): string | undefined {
+function extractSelectorField(hook: HookFact): string | string[] | undefined {
   if (hook.arguments.length === 0) return undefined
   const arg = hook.arguments[0]
-  // Match patterns: (s) => s.field, s => s.field, (state) => state.field
+
+  // GAP-07: Object-return selector: (s) => ({ field1: s.field1, field2: s.field2 })
+  const objectReturn = /^\(?\w+\)?\s*=>\s*\(\s*\{([^}]+)\}\s*\)/
+  const match2 = objectReturn.exec(arg)
+  if (match2) {
+    const fields = [...match2[1].matchAll(/(\w+)\s*:/g)].map(m => m[1])
+    if (fields.length > 0) return fields
+  }
+
+  // Single-field selector: (s) => s.field, s => s.field, (state) => state.field
   const match = arg.match(/^\(?(\w+)\)?\s*=>\s*\1\.(\w+)$/)
   if (match) return match[2]
+
   return undefined
 }
 

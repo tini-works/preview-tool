@@ -702,6 +702,56 @@ describe('findTsConfig', () => {
   })
 })
 
+describe('GAP-04: React.useContext() member access call', () => {
+  it('detects React.useContext() member access call', () => {
+    const sf = createSourceFile(`
+import React from 'react'
+import { AuthContext } from './auth'
+function Comp() {
+  const auth = React.useContext(AuthContext)
+  return null
+}
+`)
+    const hooks = extractHookFacts(sf)
+    const hook = hooks.find(h => h.name === 'useContext')
+    expect(hook).toBeDefined()
+  })
+})
+
+describe('GAP-07: Object-return Zustand selectors', () => {
+  it('aggregates object-return Zustand selector fields', () => {
+    const sf = createSourceFile(`
+import { useStore } from './store'
+function Comp() {
+  const { count, items } = useStore((s) => ({ count: s.count, items: s.items }))
+  return null
+}
+`)
+    const rawHooks = extractHookFacts(sf)
+    const hooks = aggregateSelectorHooks(rawHooks)
+    const hook = hooks.find(h => h.name === 'useStore')
+    expect(hook?.destructuredFields).toContain('count')
+    expect(hook?.destructuredFields).toContain('items')
+    expect(hook?.selectorPattern).toBe(true)
+  })
+})
+
+describe('GAP-19: Co-located hook definitions', () => {
+  it('detects co-located hook defined in same file', () => {
+    const sf = createSourceFile(`
+function useLocalData() { return { data: null } }
+function Comp() {
+  const result = useLocalData()
+  return null
+}
+`)
+    const hooks = extractHookFacts(sf)
+    const hook = hooks.find(h => h.name === 'useLocalData')
+    expect(hook).toBeDefined()
+    expect(hook?.importPath).toContain('test.tsx')
+  })
+})
+
 describe('Zustand selector aggregation', () => {
   it('merges multiple selector calls for the same store into one fact', () => {
     const sf = createSourceFile(`
