@@ -65,7 +65,7 @@ describe('createViteConfig — Tailwind version detection', () => {
     }))
     writeFileSync(join(dir, '.preview', 'screen-source-paths.json'), '[]')
     // Mock require so tailwindcss resolves
-    const config = await createViteConfig(dir, { port: 3300, specsDir: undefined })
+    const config = await createViteConfig(dir, { port: 3300, specsDir: undefined, screenGlob: 'src/**/*.tsx', title: 'Test' })
     // When v3 is detected but the actual package isn't installed, the code
     // should attempt and gracefully skip. But the detection logic should run.
     // We test that css key exists OR that the config is returned without throw.
@@ -80,7 +80,7 @@ describe('createViteConfig — Tailwind version detection', () => {
       dependencies: { react: '^18.0.0' }
     }))
     writeFileSync(join(dir, '.preview', 'screen-source-paths.json'), '[]')
-    const config = await createViteConfig(dir, { port: 3300, specsDir: undefined })
+    const config = await createViteConfig(dir, { port: 3300, specsDir: undefined, screenGlob: 'src/**/*.tsx', title: 'Test' })
     // No tailwindcss in deps → no css.postcss key
     expect((config as Record<string, unknown>)['css']).toBeUndefined()
     rmSync(dir, { recursive: true, force: true })
