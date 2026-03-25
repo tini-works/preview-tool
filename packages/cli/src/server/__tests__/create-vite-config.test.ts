@@ -103,3 +103,30 @@ describe('createViteConfig — Tailwind version detection', () => {
     rmSync(dir, { recursive: true, force: true })
   })
 })
+
+describe('createViteConfig — Emotion JSX transform', () => {
+  it('sets esbuild.jsxImportSource when @emotion/react is in package.json', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'preview-emotion-'))
+    mkdirSync(join(dir, '.preview'), { recursive: true })
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^18.0.0', '@emotion/react': '^11.0.0' }
+    }))
+    writeFileSync(join(dir, '.preview', 'screen-source-paths.json'), '[]')
+    const config = await createViteConfig(dir, { port: 3300, specsDir: undefined, screenGlob: 'src/**/*.tsx', title: 'Test' })
+    expect((config as Record<string, unknown>)['esbuild']).toBeDefined()
+    expect(((config as Record<string, unknown>)['esbuild'] as Record<string, unknown>)['jsxImportSource']).toBe('@emotion/react')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('does not set esbuild.jsxImportSource when @emotion/react is absent', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'preview-noemotion-'))
+    mkdirSync(join(dir, '.preview'), { recursive: true })
+    writeFileSync(join(dir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^18.0.0' }
+    }))
+    writeFileSync(join(dir, '.preview', 'screen-source-paths.json'), '[]')
+    const config = await createViteConfig(dir, { port: 3300, specsDir: undefined, screenGlob: 'src/**/*.tsx', title: 'Test' })
+    expect((config as Record<string, unknown>)['esbuild']).toBeUndefined()
+    rmSync(dir, { recursive: true, force: true })
+  })
+})

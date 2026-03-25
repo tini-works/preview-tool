@@ -145,6 +145,19 @@ export async function createViteConfig(
     // package.json unreadable — skip Tailwind
   }
 
+  // Detect @emotion/react for JSX transform
+  let emotionJsxSource: string | null = null
+  try {
+    const hostPkg = JSON.parse(readFileSync(join(cwd, 'package.json'), 'utf-8')) as Record<string, unknown>
+    const allDeps = {
+      ...((hostPkg['dependencies'] as Record<string, string>) ?? {}),
+      ...((hostPkg['devDependencies'] as Record<string, string>) ?? {}),
+    }
+    if (allDeps['@emotion/react']) {
+      emotionJsxSource = '@emotion/react'
+    }
+  } catch { /* ignore */ }
+
   // Spec-driven preview plugin (when specsDir is configured)
   let specPlugin: unknown = null
   if (config.specsDir) {
@@ -261,6 +274,7 @@ export async function createViteConfig(
   return {
     root: previewDir,
     ...(tailwindV3PostcssPlugins ? { css: { postcss: { plugins: tailwindV3PostcssPlugins } } } : {}),
+    ...(emotionJsxSource ? { esbuild: { jsxImportSource: emotionJsxSource } } : {}),
     server: {
       port: config.port,
       open: true,

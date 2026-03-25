@@ -236,6 +236,34 @@ export const devToolPages = {
     expect(result.providers).toContain('mobx-react-lite')
   })
 
+  it('detects styled-components as a provider', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'test-'))
+    await writeFile(join(dir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^19.0.0', 'styled-components': '^6.0.0' },
+      devDependencies: { vite: '^6.0.0' },
+    }))
+    await mkdir(join(dir, 'src', 'pages'), { recursive: true })
+    await writeFile(join(dir, 'src', 'pages', 'home.tsx'), '')
+
+    const result = await detectFramework(dir)
+
+    expect(result.providers).toContain('styled-components')
+  })
+
+  it('detects @emotion/react as a provider', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'test-'))
+    await writeFile(join(dir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^19.0.0', '@emotion/react': '^11.0.0' },
+      devDependencies: { vite: '^6.0.0' },
+    }))
+    await mkdir(join(dir, 'src', 'pages'), { recursive: true })
+    await writeFile(join(dir, 'src', 'pages', 'home.tsx'), '')
+
+    const result = await detectFramework(dir)
+
+    expect(result.providers).toContain('@emotion/react')
+  })
+
   it('does not detect @reduxjs/toolkit as provider when it is absent', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'test-'))
     await writeFile(join(dir, 'package.json'), JSON.stringify({

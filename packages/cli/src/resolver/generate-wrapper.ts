@@ -104,6 +104,20 @@ const PROVIDER_DEFS: ProviderDef[] = [
     open: '<JotaiProvider>',
     close: '</JotaiProvider>',
   },
+  {
+    dependency: 'styled-components',
+    imports: "import { ThemeProvider as SCThemeProvider } from 'styled-components'",
+    setup: 'const scTheme = {}',
+    open: '<SCThemeProvider theme={scTheme}>',
+    close: '</SCThemeProvider>',
+  },
+  {
+    dependency: '@emotion/react',
+    imports: "import { ThemeProvider as EmotionThemeProvider } from '@emotion/react'",
+    setup: 'const emotionTheme = {}',
+    open: '<EmotionThemeProvider theme={emotionTheme}>',
+    close: '</EmotionThemeProvider>',
+  },
 ]
 
 export function generateWrapperCode(

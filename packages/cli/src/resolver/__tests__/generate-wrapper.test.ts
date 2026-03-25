@@ -193,6 +193,32 @@ describe('generateWrapperCode', () => {
     expect(code).toContain('<JotaiProvider>')
     expect(code).toContain('</JotaiProvider>')
   })
+
+  // -----------------------------------------------------------------------
+  // styled-components ThemeProvider
+  // -----------------------------------------------------------------------
+
+  it('generates SCThemeProvider for styled-components', () => {
+    const code = generateWrapperCode(['styled-components'])
+    expect(code).toContain("from 'styled-components'")
+    expect(code).toContain('SCThemeProvider')
+    expect(code).toContain('<SCThemeProvider theme={scTheme}>')
+    expect(code).toContain('</SCThemeProvider>')
+    expect(code).toContain('const scTheme = {}')
+  })
+
+  // -----------------------------------------------------------------------
+  // Emotion ThemeProvider
+  // -----------------------------------------------------------------------
+
+  it('generates EmotionThemeProvider for @emotion/react', () => {
+    const code = generateWrapperCode(['@emotion/react'])
+    expect(code).toContain("from '@emotion/react'")
+    expect(code).toContain('EmotionThemeProvider')
+    expect(code).toContain('<EmotionThemeProvider theme={emotionTheme}>')
+    expect(code).toContain('</EmotionThemeProvider>')
+    expect(code).toContain('const emotionTheme = {}')
+  })
 })
 
 // ---------------------------------------------------------------------------

@@ -41,6 +41,8 @@ const KNOWN_PROVIDERS = [
   'recoil',
   'jotai',
   'mobx-react-lite',
+  'styled-components',
+  '@emotion/react',
 ] as const
 
 const PAGE_PATTERNS = [
