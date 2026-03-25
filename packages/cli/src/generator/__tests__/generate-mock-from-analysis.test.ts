@@ -360,6 +360,180 @@ describe('generateMockModules', () => {
     expect(code).toContain("typeof _args[0] === 'function'")
   })
 
+  describe('method stubs in query mock return values', () => {
+    const queryFacts: ScreenFacts[] = [{
+      route: '/list',
+      filePath: '/list.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useQuery', importPath: '@tanstack/react-query', arguments: ["{ queryKey: ['items'] }"] },
+      ],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
+    }]
+    const queryAnalyses: ScreenAnalysisOutput[] = [{
+      route: '/list',
+      regions: [{
+        key: 'items',
+        label: 'Items',
+        type: 'list',
+        hookBindings: ['useQuery:items'],
+        states: { populated: { label: 'P', mockData: { data: [{ id: '1' }] } } },
+        defaultState: 'populated',
+      }],
+      flows: [],
+    }]
+
+    it('resolveFromState includes refetch stub', () => {
+      const result = generateMockModules(queryFacts, queryAnalyses)
+      const code = result.mockFiles.get('@tanstack/react-query')!
+      expect(code).toContain('refetch: async () => ({})')
+    })
+
+    it('resolveFromState includes isFetching: false', () => {
+      const result = generateMockModules(queryFacts, queryAnalyses)
+      const code = result.mockFiles.get('@tanstack/react-query')!
+      expect(code).toContain('isFetching: false')
+    })
+
+    it('DEFAULT_STATE includes refetch stub', () => {
+      const result = generateMockModules(queryFacts, queryAnalyses)
+      const code = result.mockFiles.get('@tanstack/react-query')!
+      // DEFAULT_STATE should also have refetch stub
+      expect(code).toMatch(/DEFAULT_STATE\s*=\s*\{[^}]*refetch/)
+    })
+  })
+
+  describe('method stubs for mutation hooks', () => {
+    const mutationFacts: ScreenFacts[] = [{
+      route: '/submit',
+      filePath: '/submit.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useMutation', importPath: '@tanstack/react-query', arguments: [] },
+      ],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
+    }]
+    const mutationAnalyses: ScreenAnalysisOutput[] = [{
+      route: '/submit',
+      regions: [{
+        key: 'submit-action',
+        label: 'Submit',
+        type: 'action',
+        hookBindings: ['useMutation:submit-action'],
+        states: { idle: { label: 'Idle', mockData: {} } },
+        defaultState: 'idle',
+      }],
+      flows: [],
+    }]
+
+    it('useMutation mock includes mutate stub', () => {
+      const result = generateMockModules(mutationFacts, mutationAnalyses)
+      const code = result.mockFiles.get('@tanstack/react-query')!
+      expect(code).toContain('mutate: () => {}')
+    })
+
+    it('useMutation mock includes mutateAsync stub', () => {
+      const result = generateMockModules(mutationFacts, mutationAnalyses)
+      const code = result.mockFiles.get('@tanstack/react-query')!
+      expect(code).toContain('mutateAsync: async () => ({})')
+    })
+
+    it('useMutation mock includes reset stub', () => {
+      const result = generateMockModules(mutationFacts, mutationAnalyses)
+      const code = result.mockFiles.get('@tanstack/react-query')!
+      expect(code).toContain('reset: () => {}')
+    })
+
+    it('useSWRMutation mock includes mutate and reset stubs', () => {
+      const swrFacts: ScreenFacts[] = [{
+        route: '/swr',
+        filePath: '/swr.tsx',
+        sourceCode: '',
+        hooks: [
+          { name: 'useSWRMutation', importPath: 'swr/mutation', arguments: [] },
+        ],
+        components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
+      }]
+      const swrAnalyses: ScreenAnalysisOutput[] = [{
+        route: '/swr',
+        regions: [{
+          key: 'swr-action',
+          label: 'SWR Action',
+          type: 'action',
+          hookBindings: ['useSWRMutation:swr-action'],
+          states: { idle: { label: 'Idle', mockData: {} } },
+          defaultState: 'idle',
+        }],
+        flows: [],
+      }]
+      const result = generateMockModules(swrFacts, swrAnalyses)
+      const code = result.mockFiles.get('swr/mutation')!
+      expect(code).toContain('mutate: () => {}')
+      expect(code).toContain('mutateAsync: async () => ({})')
+      expect(code).toContain('reset: () => {}')
+    })
+  })
+
+  describe('method stubs for infinite query hooks', () => {
+    const infiniteFacts: ScreenFacts[] = [{
+      route: '/infinite',
+      filePath: '/infinite.tsx',
+      sourceCode: '',
+      hooks: [
+        { name: 'useInfiniteQuery', importPath: '@tanstack/react-query', arguments: [] },
+      ],
+      components: [], conditionals: [], navigation: [], localState: [], derivedVars: [], functions: [], propertyChains: [],
+    }]
+    const infiniteAnalyses: ScreenAnalysisOutput[] = [{
+      route: '/infinite',
+      regions: [{
+        key: 'infinite-list',
+        label: 'Infinite List',
+        type: 'list',
+        hookBindings: ['useInfiniteQuery:infinite-list'],
+        states: { populated: { label: 'P', mockData: { pages: [{ items: [] }] } } },
+        defaultState: 'populated',
+      }],
+      flows: [],
+    }]
+
+    it('useInfiniteQuery mock includes fetchNextPage stub', () => {
+      const result = generateMockModules(infiniteFacts, infiniteAnalyses)
+      const code = result.mockFiles.get('@tanstack/react-query')!
+      expect(code).toContain('fetchNextPage: async () => ({})')
+    })
+
+    it('useInfiniteQuery mock includes fetchPreviousPage stub', () => {
+      const result = generateMockModules(infiniteFacts, infiniteAnalyses)
+      const code = result.mockFiles.get('@tanstack/react-query')!
+      expect(code).toContain('fetchPreviousPage: async () => ({})')
+    })
+
+    it('useInfiniteQuery mock includes hasNextPage: false', () => {
+      const result = generateMockModules(infiniteFacts, infiniteAnalyses)
+      const code = result.mockFiles.get('@tanstack/react-query')!
+      expect(code).toContain('hasNextPage: false')
+    })
+
+    it('useInfiniteQuery mock includes hasPreviousPage: false', () => {
+      const result = generateMockModules(infiniteFacts, infiniteAnalyses)
+      const code = result.mockFiles.get('@tanstack/react-query')!
+      expect(code).toContain('hasPreviousPage: false')
+    })
+
+    it('useInfiniteQuery mock includes isFetchingNextPage: false', () => {
+      const result = generateMockModules(infiniteFacts, infiniteAnalyses)
+      const code = result.mockFiles.get('@tanstack/react-query')!
+      expect(code).toContain('isFetchingNextPage: false')
+    })
+
+    it('useInfiniteQuery mock still includes refetch stub', () => {
+      const result = generateMockModules(infiniteFacts, infiniteAnalyses)
+      const code = result.mockFiles.get('@tanstack/react-query')!
+      expect(code).toContain('refetch: async () => ({})')
+    })
+  })
+
   describe('react-router-dom mock for useSearchParams', () => {
     it('generates useSearchParams mock with actual param name from DerivedVarFact expression', () => {
       const facts: ScreenFacts = {

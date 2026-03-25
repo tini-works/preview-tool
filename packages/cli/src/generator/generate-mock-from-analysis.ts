@@ -76,6 +76,39 @@ interface HookInfo {
 }
 
 /**
+ * Classifies a query-style hook into its return shape category:
+ * - 'mutation'  — useMutation, useSWRMutation, Apollo useMutation variants
+ * - 'infinite'  — useInfiniteQuery, useSuspenseInfiniteQuery
+ * - 'query'     — all other query-style hooks (useQuery, useSWR, etc.)
+ */
+function classifyQueryHookShape(hookName: string): 'mutation' | 'infinite' | 'query' {
+  const lower = hookName.toLowerCase()
+  if (lower.includes('mutation')) return 'mutation'
+  if (lower.includes('infinite')) return 'infinite'
+  return 'query'
+}
+
+/**
+ * Returns true if the hook should be treated as a query-style hook (with data/isLoading wrapper
+ * and method stubs), regardless of the inferred mappingType.
+ *
+ * This ensures useMutation (classified as 'custom-hook' by inferHookMappingType) still gets
+ * the correct mutation stubs instead of the store/direct-return path.
+ */
+function isQueryStyleHook(hookName: string): boolean {
+  const lower = hookName.toLowerCase()
+  return (
+    lower === 'usequery' ||
+    lower === 'useswr' ||
+    lower === 'usefetch' ||
+    lower === 'uselifequery' ||
+    lower.includes('query') ||
+    lower.includes('mutation') ||
+    lower.includes('infinite')
+  )
+}
+
+/**
  * Generates a single mock module file for a set of hooks from the same import path.
  *
  * Re-exports all original exports via `__real:` prefix, then overrides hooks with mocks.
@@ -89,8 +122,8 @@ function generateMockFile(
   const uniqueNames = [...new Set(hooks.map((h) => h.name))]
   const hookMap = new Map(hooks.map((h) => [h.name, h]))
   const hasRegionMappings = uniqueNames.some((name) => hookToRegion.has(`${importPath}::${name}`))
-  const hasDirectReturnHooks = hooks.some((h) => h.mappingType === 'store' || h.mappingType === 'custom-hook')
-  const hasQueryHooks = hooks.some((h) => h.mappingType !== 'store' && h.mappingType !== 'custom-hook')
+  const hasDirectReturnHooks = hooks.some((h) => (h.mappingType === 'store' || h.mappingType === 'custom-hook') && !isQueryStyleHook(h.name))
+  const hasQueryHooks = hooks.some((h) => h.mappingType !== 'store' && h.mappingType !== 'custom-hook') || hooks.some((h) => isQueryStyleHook(h.name))
   const hasStoreHooks = hasDirectReturnHooks
   const lines: string[] = [
     '// Auto-generated mock by @preview-tool/cli — do not edit manually',
@@ -120,12 +153,19 @@ function generateMockFile(
       '',
       '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
       'function resolveFromState(stateData: Record<string, any>) {',
-      "  if (stateData._loading) return { data: null, isLoading: true, isError: false, isReady: false }",
-      "  if (stateData._error) return { data: null, isLoading: false, isError: true, isReady: false, error: stateData.message }",
-      '  return { data: stateData.data ?? stateData, isLoading: false, isError: false, isReady: true }',
+      "  if (stateData._loading) return { data: null, isLoading: true, isError: false, isReady: false, isFetching: true, refetch: async () => ({}) }",
+      "  if (stateData._error) return { data: null, isLoading: false, isError: true, isReady: false, error: stateData.message, isFetching: false, refetch: async () => ({}) }",
+      '  return { data: stateData.data ?? stateData, isLoading: false, isError: false, isReady: true, isFetching: false, refetch: async () => ({}) }',
       '}',
       '',
-      'const DEFAULT_STATE = { data: null, isLoading: true, isError: false, isReady: false }',
+      'function resolveFromInfiniteState(stateData: Record<string, any>) {',
+      '  const base = resolveFromState(stateData)',
+      '  return { ...base, fetchNextPage: async () => ({}), fetchPreviousPage: async () => ({}), hasNextPage: false, hasPreviousPage: false, isFetchingNextPage: false }',
+      '}',
+      '',
+      'const DEFAULT_STATE = { data: null, isLoading: true, isError: false, isReady: false, isFetching: true, refetch: async () => ({}) }',
+      'const DEFAULT_INFINITE_STATE = { data: null, isLoading: true, isError: false, isReady: false, isFetching: true, refetch: async () => ({}), fetchNextPage: async () => ({}), fetchPreviousPage: async () => ({}), hasNextPage: false, hasPreviousPage: false, isFetchingNextPage: false }',
+      'const DEFAULT_MUTATION_STATE = { mutate: () => {}, mutateAsync: async () => ({}), reset: () => {}, isPending: false, isError: false, isSuccess: false, data: undefined, error: null }',
     )
   }
 
@@ -150,7 +190,9 @@ function generateMockFile(
     const info = hookMap.get(hookName)
     const isStore = info?.mappingType === 'store'
     const isCustom = info?.mappingType === 'custom-hook'
-    const isDirectReturn = isStore || isCustom
+    // Query-style hooks (useMutation, useInfiniteQuery, useQuery, etc.) always use the query path
+    // even if inferHookMappingType classified them as 'custom-hook'
+    const isDirectReturn = (isStore || isCustom) && !isQueryStyleHook(hookName)
 
     if (regionKey) {
       if (isDirectReturn && info?.destructuredFields && info.destructuredFields.length > 0) {
@@ -228,23 +270,50 @@ function generateMockFile(
           '',
         )
       } else {
-        // Query hook (useQuery, useSWR) — use data/isLoading wrapper
+        // Query hook (useQuery, useSWR, useMutation, useInfiniteQuery) — use typed wrapper
+        const hookShape = classifyQueryHookShape(hookName)
+        let resolverCall: string
+        let defaultStateConst: string
+        if (hookShape === 'mutation') {
+          resolverCall = '  return DEFAULT_MUTATION_STATE'
+          defaultStateConst = 'DEFAULT_MUTATION_STATE'
+        } else if (hookShape === 'infinite') {
+          resolverCall = '  if (data) return resolveFromInfiniteState(data as Record<string, any>)'
+          defaultStateConst = 'DEFAULT_INFINITE_STATE'
+        } else {
+          resolverCall = '  if (data) return resolveFromState(data as Record<string, any>)'
+          defaultStateConst = 'DEFAULT_STATE'
+        }
         lines.push(
-          `// Mock replacement for ${hookName} — query, mapped to region '${regionKey}'`,
+          `// Mock replacement for ${hookName} — ${hookShape}, mapped to region '${regionKey}'`,
           '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
           `export function ${hookName}(..._args: any[]) {`,
           `  const data = useRegionDataForHook('${regionKey}')`,
           '  // eslint-disable-next-line @typescript-eslint/no-explicit-any',
-          '  if (data) return resolveFromState(data as Record<string, any>)',
-          '  return DEFAULT_STATE',
-          '}',
-          '',
         )
+        if (hookShape === 'mutation') {
+          lines.push(resolverCall)
+        } else {
+          lines.push(resolverCall, `  return ${defaultStateConst}`)
+        }
+        lines.push('}', '')
       }
     } else {
       // No region mapping — store/custom hooks return null (falsy, safe for !== null checks),
-      // query hooks return DEFAULT_STATE (has data: null)
-      const defaultReturn = isDirectReturn ? 'null' : 'DEFAULT_STATE'
+      // query hooks return appropriate DEFAULT state based on hook shape
+      let defaultReturn: string
+      if (isDirectReturn) {
+        defaultReturn = 'null'
+      } else {
+        const hookShape = classifyQueryHookShape(hookName)
+        if (hookShape === 'mutation') {
+          defaultReturn = 'DEFAULT_MUTATION_STATE'
+        } else if (hookShape === 'infinite') {
+          defaultReturn = 'DEFAULT_INFINITE_STATE'
+        } else {
+          defaultReturn = 'DEFAULT_STATE'
+        }
+      }
       lines.push(
         `// Mock replacement for ${hookName} — no region mapping`,
         '// eslint-disable-next-line @typescript-eslint/no-explicit-any',
