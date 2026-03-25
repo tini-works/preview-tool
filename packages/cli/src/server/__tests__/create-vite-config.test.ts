@@ -30,6 +30,13 @@ describe('loadHostEnvDefines', () => {
   it('handles missing .env files gracefully', () => {
     expect(() => loadHostEnvDefines('/nonexistent/path')).not.toThrow()
   })
+
+  it('strips surrounding quotes from .env values', () => {
+    writeFileSync(join(tmp, '.env'), 'VITE_API_URL="https://example.com"\nVITE_KEY=\'value\'\n')
+    const defines = loadHostEnvDefines(tmp)
+    expect(defines['import.meta.env.VITE_API_URL']).toBe('"https://example.com"')
+    expect(defines['import.meta.env.VITE_KEY']).toBe('"value"')
+  })
 })
 
 describe('findWorkspaceRoot', () => {

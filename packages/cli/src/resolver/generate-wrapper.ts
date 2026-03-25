@@ -83,7 +83,7 @@ const PROVIDER_DEFS: ProviderDef[] = [
     close: '</ThemeProvider>',
   },
   {
-    dependency: 'react-redux',
+    dependency: '@reduxjs/toolkit',
     imports: [
       "import { Provider } from 'react-redux'",
       "import { configureStore } from '@reduxjs/toolkit'",

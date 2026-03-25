@@ -159,11 +159,16 @@ describe('generateWrapperCode', () => {
   // Redux and Recoil provider support
   // -----------------------------------------------------------------------
 
-  it('generates redux Provider for react-redux', () => {
-    const code = generateWrapperCode(['react-redux'])
+  it('generates redux Provider when @reduxjs/toolkit is detected', () => {
+    const code = generateWrapperCode(['@reduxjs/toolkit'])
     expect(code).toContain("from 'react-redux'")
     expect(code).toContain('<Provider store={previewStore}>')
     expect(code).toContain('configureStore')
+  })
+
+  it('does not generate redux Provider for bare react-redux (no RTK)', () => {
+    const code = generateWrapperCode(['react-redux'])
+    expect(code).not.toContain('configureStore')
   })
 
   it('generates RecoilRoot for recoil', () => {

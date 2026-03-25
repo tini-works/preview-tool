@@ -284,7 +284,9 @@ export function loadHostEnvDefines(cwd: string): Record<string, string> {
       for (const line of lines) {
         const match = line.match(/^(VITE_\w+)\s*=\s*(.*)$/)
         if (match) {
-          defines[`import.meta.env.${match[1]}`] = JSON.stringify(match[2].trim())
+          const raw = match[2].trim()
+          const unquoted = raw.replace(/^(['"])(.*)\1$/, '$2')
+          defines[`import.meta.env.${match[1]}`] = JSON.stringify(unquoted)
         }
       }
     } catch {

@@ -37,7 +37,7 @@ const KNOWN_PROVIDERS = [
   'react-i18next',
   '@chakra-ui/react',
   '@mui/material',
-  'react-redux',
+  '@reduxjs/toolkit',
   'recoil',
 ] as const
 
