@@ -82,25 +82,33 @@ function buildScreenEntries(
   })
 }
 
+interface PluginState {
+  manifest: SpecManifest
+  enrichedScreens: EnrichedScreen[]
+}
+
 export function createSpecPreviewPlugin(options: SpecPreviewOptions): VitePlugin {
-  let manifest: SpecManifest = { screens: [], flows: [] }
-  let enrichedScreens: EnrichedScreen[] = []
+  // Single state object swapped atomically on each reload to avoid inconsistent
+  // reads where manifest and enrichedScreens belong to different load cycles.
+  let state: PluginState = { manifest: { screens: [], flows: [] }, enrichedScreens: [] }
 
   return {
     name: 'spec-preview',
     enforce: 'pre',
 
     async buildStart() {
-      manifest = await loadSpecs(options.specsDir, options.cwd)
+      let manifest = await loadSpecs(options.specsDir, options.cwd)
       manifest = { ...manifest, screens: normalizeSourceFiles(manifest.screens, options.specsDir, options.cwd) }
       // Run pipeline to get enriched regions (mock files already written by dev command)
+      let enrichedScreens: EnrichedScreen[] = []
       try {
         const result = await runSpecPipeline(manifest.screens, options.cwd, options.specsDir)
         enrichedScreens = result.enrichedScreens
       } catch (err) {
         console.warn('[preview-tool] Spec pipeline failed during build, falling back to basic mode:', err)
-        enrichedScreens = []
       }
+      // Atomic swap: both manifest and enrichedScreens are committed together
+      state = { manifest, enrichedScreens }
     },
 
     resolveId(id: string) {
@@ -114,6 +122,7 @@ export function createSpecPreviewPlugin(options: SpecPreviewOptions): VitePlugin
 
     load(id: string) {
       if (id === RESOLVED_PREFIX + VIRTUAL_MANIFEST) {
+        const { manifest, enrichedScreens } = state
         const screenEntries = buildScreenEntries(manifest, enrichedScreens)
         return `export const screens = ${JSON.stringify(manifest.screens, null, 2)};
 export const flows = ${JSON.stringify(manifest.flows, null, 2)};
@@ -127,15 +136,18 @@ export const screenEntries = ${JSON.stringify(screenEntries, null, 2)};`
       server.watcher.add(options.specsDir)
       server.watcher.on('change', async (file: string) => {
         if (file.startsWith(options.specsDir)) {
-          manifest = await loadSpecs(options.specsDir, options.cwd)
+          let manifest = await loadSpecs(options.specsDir, options.cwd)
           manifest = { ...manifest, screens: normalizeSourceFiles(manifest.screens, options.specsDir, options.cwd) }
+          let enrichedScreens: EnrichedScreen[] = []
           try {
             const result = await runSpecPipeline(manifest.screens, options.cwd, options.specsDir)
             enrichedScreens = result.enrichedScreens
           } catch (err) {
             console.warn('[preview-tool] Spec pipeline failed during reload, falling back to basic mode:', err)
-            enrichedScreens = []
           }
+          // Atomic swap: replace state in a single assignment so load() never
+          // sees a partially-updated combination of old manifest + new enrichedScreens.
+          state = { manifest, enrichedScreens }
           const mod = server.moduleGraph.getModuleById(
             RESOLVED_PREFIX + VIRTUAL_MANIFEST
           )
