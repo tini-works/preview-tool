@@ -109,4 +109,20 @@ describe('classifyHook', () => {
   it('classifies hook from next/navigation as provider', () => {
     expect(classifyHook('usePathname', 'next/navigation')).toBe('provider')
   })
+
+  // -----------------------------------------------------------------------
+  // GAP-20: Apollo useLazyQuery, useSubscription, useSuspenseQuery
+  // -----------------------------------------------------------------------
+
+  it('classifies useLazyQuery from @apollo/client as data', () => {
+    expect(classifyHook('useLazyQuery', '@apollo/client')).toBe('data')
+  })
+
+  it('classifies useSubscription from @apollo/client as data', () => {
+    expect(classifyHook('useSubscription', '@apollo/client')).toBe('data')
+  })
+
+  it('classifies useSuspenseQuery from @apollo/client as data', () => {
+    expect(classifyHook('useSuspenseQuery', '@apollo/client')).toBe('data')
+  })
 })

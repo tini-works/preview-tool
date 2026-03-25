@@ -53,6 +53,9 @@ export const DATA_HOOKS = new Set([
   'useFetch',          // various data-fetching libs
   'useLiveQuery',      // dexie-react-hooks
   'useAppLiveQuery',   // app-specific live queries
+  'useLazyQuery',      // @apollo/client
+  'useSubscription',   // @apollo/client
+  'useSuspenseQuery',  // @apollo/client
 ])
 
 // ---------------------------------------------------------------------------

@@ -101,7 +101,7 @@ function isQueryStyleHook(hookName: string): boolean {
     lower === 'usequery' ||
     lower === 'useswr' ||
     lower === 'usefetch' ||
-    lower === 'uselifequery' ||
+    lower === 'uselivequery' ||
     lower.includes('query') ||
     lower.includes('mutation') ||
     lower.includes('infinite')

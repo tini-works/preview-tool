@@ -130,6 +130,14 @@ describe('inferHookMappingType', () => {
   it('classifies useCartStore as store', () => {
     expect(inferHookMappingType('useCartStore')).toBe('store')
   })
+
+  it('useMutation is classified as query-hook', () => {
+    expect(inferHookMappingType('useMutation')).toBe('query-hook')
+  })
+
+  it('useSWRMutation is classified as query-hook', () => {
+    expect(inferHookMappingType('useSWRMutation')).toBe('query-hook')
+  })
 })
 
 describe('analysisToController', () => {
