@@ -82,6 +82,22 @@ const PROVIDER_DEFS: ProviderDef[] = [
     open: '<ThemeProvider theme={theme}>',
     close: '</ThemeProvider>',
   },
+  {
+    dependency: 'react-redux',
+    imports: [
+      "import { Provider } from 'react-redux'",
+      "import { configureStore } from '@reduxjs/toolkit'",
+    ].join('\n'),
+    setup: 'const previewStore = configureStore({ reducer: {} })',
+    open: '<Provider store={previewStore}>',
+    close: '</Provider>',
+  },
+  {
+    dependency: 'recoil',
+    imports: "import { RecoilRoot } from 'recoil'",
+    open: '<RecoilRoot>',
+    close: '</RecoilRoot>',
+  },
 ]
 
 export function generateWrapperCode(

@@ -154,6 +154,29 @@ describe('generateWrapperCode', () => {
     expect(code).toContain('MemoryRouter')
     expect(code).not.toContain('TanStackRouterWrapper')
   })
+
+  // -----------------------------------------------------------------------
+  // Redux and Recoil provider support
+  // -----------------------------------------------------------------------
+
+  it('generates redux Provider for react-redux', () => {
+    const code = generateWrapperCode(['react-redux'])
+    expect(code).toContain("from 'react-redux'")
+    expect(code).toContain('<Provider store={previewStore}>')
+    expect(code).toContain('configureStore')
+  })
+
+  it('generates RecoilRoot for recoil', () => {
+    const code = generateWrapperCode(['recoil'])
+    expect(code).toContain("from 'recoil'")
+    expect(code).toContain('<RecoilRoot>')
+  })
+
+  it('generates empty wrapper for unknown provider', () => {
+    const code = generateWrapperCode(['unknown-lib'])
+    expect(code).toContain('export function Wrapper')
+    expect(code).toContain('<>{children}</>')
+  })
 })
 
 // ---------------------------------------------------------------------------

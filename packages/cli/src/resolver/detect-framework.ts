@@ -37,6 +37,8 @@ const KNOWN_PROVIDERS = [
   'react-i18next',
   '@chakra-ui/react',
   '@mui/material',
+  'react-redux',
+  'recoil',
 ] as const
 
 const PAGE_PATTERNS = [

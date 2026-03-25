@@ -27,8 +27,6 @@ export const PROVIDER_HOOKS = new Set([
   'useFieldArray',
   // react-i18next
   'useTranslation',
-  // @tanstack/react-query (mutation-only — queries are data hooks)
-  'useMutation',
 ])
 
 // ---------------------------------------------------------------------------
@@ -49,7 +47,9 @@ export const PROVIDER_PACKAGES = new Set([
 
 export const DATA_HOOKS = new Set([
   'useQuery',          // @tanstack/react-query
+  'useMutation',       // @tanstack/react-query — returns { mutate, isPending, isError }
   'useSWR',            // swr
+  'useSWRMutation',    // swr/mutation
   'useFetch',          // various data-fetching libs
   'useLiveQuery',      // dexie-react-hooks
   'useAppLiveQuery',   // app-specific live queries

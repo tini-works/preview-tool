@@ -74,8 +74,12 @@ describe('classifyHook', () => {
     expect(classifyHook('useTranslation', 'react-i18next')).toBe('provider')
   })
 
-  it('classifies useMutation from @tanstack/react-query as provider', () => {
-    expect(classifyHook('useMutation', '@tanstack/react-query')).toBe('provider')
+  it('classifies useMutation from @tanstack/react-query as data (not provider)', () => {
+    expect(classifyHook('useMutation', '@tanstack/react-query')).toBe('data')
+  })
+
+  it('classifies useSWRMutation as data', () => {
+    expect(classifyHook('useSWRMutation', 'swr/mutation')).toBe('data')
   })
 
   it('classifies unknown npm hook as provider', () => {
