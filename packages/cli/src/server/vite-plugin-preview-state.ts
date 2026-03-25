@@ -18,11 +18,23 @@ export function transformUseState(code: string, fileName: string): string | null
   const project = new Project({ useInMemoryFileSystem: true })
   const sf = project.createSourceFile(fileName, code)
 
+  // Build set of names that resolve to React.useState (handles aliases)
+  const useStateNames = new Set(['useState', 'React.useState'])
+  for (const importDecl of sf.getImportDeclarations()) {
+    const mod = importDecl.getModuleSpecifierValue()
+    if (mod !== 'react' && mod !== 'React') continue
+    for (const named of importDecl.getNamedImports()) {
+      if (named.getName() === 'useState') {
+        useStateNames.add(named.getAliasNode()?.getText() ?? named.getName())
+      }
+    }
+  }
+
   // Find all useState call expressions
   const useStateCalls = sf.getDescendantsOfKind(SyntaxKind.CallExpression).filter((call) => {
     const expr = call.getExpression()
     const text = expr.getText()
-    return text === 'useState' || text === 'React.useState'
+    return useStateNames.has(text)
   })
 
   if (useStateCalls.length === 0) return null
@@ -50,8 +62,10 @@ export function transformUseState(code: string, fileName: string): string | null
     const initialValue = args.length > 0 ? args[0].getText() : 'undefined'
 
     // Replace: useState(init) → usePreviewState('varName', init)
-    // Strip any generic type params: useState<Type>(init) → usePreviewState('varName', init)
-    call.replaceWithText(`usePreviewState('${varName}', ${initialValue})`)
+    // Preserve any generic type params: useState<Type>(init) → usePreviewState<Type>('varName', init)
+    const typeArgs = call.getTypeArguments()
+    const typeParamText = typeArgs.length > 0 ? `<${typeArgs.map(t => t.getText()).join(', ')}>` : ''
+    call.replaceWithText(`usePreviewState${typeParamText}('${varName}', ${initialValue})`)
     hasReplacements = true
   }
 

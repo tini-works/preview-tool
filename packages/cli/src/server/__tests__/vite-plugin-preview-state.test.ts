@@ -27,7 +27,7 @@ function Page() {
 `
     const result = transformUseState(code, 'Page.tsx')
     expect(result).not.toBeNull()
-    expect(result).toContain("usePreviewState('items', [])")
+    expect(result).toContain("usePreviewState<string[]>('items', [])")
   })
 
   it('preserves other React imports (useCallback, useEffect, useRef)', () => {
@@ -64,7 +64,7 @@ function Page() {
     expect(result).not.toBeNull()
     expect(result).toContain("usePreviewState('name', '')")
     expect(result).toContain("usePreviewState('loading', true)")
-    expect(result).toContain("usePreviewState('error', null)")
+    expect(result).toContain("usePreviewState<string | null>('error', null)")
   })
 
   it('returns null when no useState calls', () => {
@@ -104,7 +104,33 @@ function Page() {
 `
     const result = transformUseState(code, 'Page.tsx')
     expect(result).not.toBeNull()
-    expect(result).toContain("usePreviewState('formData',")
+    expect(result).toContain("usePreviewState<LoginFormData>('formData',")
     expect(result).toContain("email: ''")
+  })
+
+  it('transforms aliased useState import', () => {
+    const code = `
+import { useState as useLocalState } from 'react'
+function Comp() {
+  const [count, setCount] = useLocalState(0)
+  return null
+}
+`
+    const result = transformUseState(code, 'comp.tsx')
+    expect(result).not.toBeNull()
+    expect(result).toContain("usePreviewState('count', 0)")
+  })
+
+  it('preserves generic type parameter from useState<T>', () => {
+    const code = `
+import { useState } from 'react'
+function Comp() {
+  const [open, setOpen] = useState<boolean>(false)
+  return null
+}
+`
+    const result = transformUseState(code, 'comp.tsx')
+    expect(result).not.toBeNull()
+    expect(result).toContain("usePreviewState<boolean>('open', false)")
   })
 })
