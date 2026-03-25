@@ -308,7 +308,7 @@ function resolveLocalImportPath(importPath: string, cwd: string): string {
  */
 export function loadHostEnvDefines(cwd: string): Record<string, string> {
   const defines: Record<string, string> = {}
-  const envFiles = ['.env', '.env.local', '.env.development', '.env.development.local']
+  const envFiles = ['.env', '.env.local', '.env.production', '.env.production.local', '.env.development', '.env.development.local']
   for (const file of envFiles) {
     const envPath = join(cwd, file)
     if (!existsSync(envPath)) continue

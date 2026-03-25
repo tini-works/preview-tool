@@ -37,6 +37,23 @@ describe('loadHostEnvDefines', () => {
     expect(defines['import.meta.env.VITE_API_URL']).toBe('"https://example.com"')
     expect(defines['import.meta.env.VITE_KEY']).toBe('"value"')
   })
+
+  it('reads VITE_* vars from .env.production', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'preview-env-'))
+    writeFileSync(join(dir, '.env.production'), 'VITE_API_URL=https://prod.example.com\n')
+    const defines = loadHostEnvDefines(dir)
+    expect(defines['import.meta.env.VITE_API_URL']).toBe('"https://prod.example.com"')
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it('.env.development overrides .env.production for same key', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'preview-env-'))
+    writeFileSync(join(dir, '.env.production'), 'VITE_API_URL=https://prod.example.com\n')
+    writeFileSync(join(dir, '.env.development'), 'VITE_API_URL=https://dev.example.com\n')
+    const defines = loadHostEnvDefines(dir)
+    expect(defines['import.meta.env.VITE_API_URL']).toBe('"https://dev.example.com"')
+    rmSync(dir, { recursive: true, force: true })
+  })
 })
 
 describe('findWorkspaceRoot', () => {
