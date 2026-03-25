@@ -15,21 +15,28 @@ import { createViteConfig } from '../server/create-vite-config.js'
 
 export const previewCommand = new Command('preview')
   .description('Preview an external app (init + generate + dev in one command)')
-  .argument('<source>', 'Local path or GitHub URL to the frontend project')
+  .argument('[source]', 'Local path or GitHub URL to the frontend project')
+  .option('-c, --cwd <path>', 'Working directory (alias for local source path)')
   .option('--path <subdir>', 'Subdirectory within the repo (for monorepos)')
   .option('--keep', 'Keep cloned temp directory on exit')
   .option('-p, --port <port>', 'Dev server port')
-  .action(async (source: string, options: {
+  .action(async (source: string | undefined, options: {
+    cwd?: string
     path?: string
     keep?: boolean
     port?: string
   }) => {
     try {
+    const effectiveSource = source ?? options.cwd
+    if (!effectiveSource) {
+      console.error(chalk.red('Error: source argument or --cwd option is required'))
+      process.exit(1)
+    }
     console.log(chalk.bold('\nPreview Tool\n'))
 
     // Step 1: Resolve source
-    console.log(chalk.dim(`Resolving source: ${source}`))
-    const resolved = await resolveSource(source, {
+    console.log(chalk.dim(`Resolving source: ${effectiveSource}`))
+    const resolved = await resolveSource(effectiveSource, {
       path: options.path,
       keep: options.keep,
     })

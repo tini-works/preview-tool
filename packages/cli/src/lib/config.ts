@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises'
 import { existsSync } from 'node:fs'
 import { join, resolve } from 'node:path'
+import { z } from 'zod'
 
 export interface PreviewConfig {
   screenGlob: string
@@ -9,6 +10,14 @@ export interface PreviewConfig {
   cssEntry?: string
   specsDir?: string
 }
+
+const PreviewConfigSchema = z.object({
+  screenGlob: z.string().optional(),
+  port: z.number().int().positive().optional(),
+  title: z.string().optional(),
+  cssEntry: z.string().optional(),
+  specsDir: z.string().optional(),
+})
 
 export const DEFAULT_CONFIG: PreviewConfig = {
   screenGlob: 'src/**/*.tsx',
@@ -41,8 +50,9 @@ export async function readConfig(cwd: string): Promise<PreviewConfig> {
   let config: PreviewConfig
   try {
     const raw = await readFile(configPath, 'utf-8')
-    const parsed = JSON.parse(raw) as Partial<PreviewConfig>
-    config = { ...DEFAULT_CONFIG, ...parsed }
+    const result = PreviewConfigSchema.safeParse(JSON.parse(raw))
+    const partial = result.success ? result.data : {}
+    config = { ...DEFAULT_CONFIG, ...partial }
   } catch {
     config = { ...DEFAULT_CONFIG }
   }
