@@ -182,6 +182,17 @@ describe('generateWrapperCode', () => {
     expect(code).toContain('export function Wrapper')
     expect(code).toContain('<>{children}</>')
   })
+
+  // -----------------------------------------------------------------------
+  // Jotai provider support
+  // -----------------------------------------------------------------------
+
+  it('generates JotaiProvider for jotai', () => {
+    const code = generateWrapperCode(['jotai'])
+    expect(code).toContain("from 'jotai'")
+    expect(code).toContain('<JotaiProvider>')
+    expect(code).toContain('</JotaiProvider>')
+  })
 })
 
 // ---------------------------------------------------------------------------

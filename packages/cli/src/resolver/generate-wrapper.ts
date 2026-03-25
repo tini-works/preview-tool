@@ -98,6 +98,12 @@ const PROVIDER_DEFS: ProviderDef[] = [
     open: '<RecoilRoot>',
     close: '</RecoilRoot>',
   },
+  {
+    dependency: 'jotai',
+    imports: "import { Provider as JotaiProvider } from 'jotai'",
+    open: '<JotaiProvider>',
+    close: '</JotaiProvider>',
+  },
 ]
 
 export function generateWrapperCode(

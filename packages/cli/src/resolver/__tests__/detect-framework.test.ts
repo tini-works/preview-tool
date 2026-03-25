@@ -208,6 +208,34 @@ export const devToolPages = {
     expect(result.providers).toContain('@reduxjs/toolkit')
   })
 
+  it('detects jotai as a provider', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'test-'))
+    await writeFile(join(dir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^19.0.0', jotai: '^2.0.0' },
+      devDependencies: { vite: '^6.0.0' },
+    }))
+    await mkdir(join(dir, 'src', 'pages'), { recursive: true })
+    await writeFile(join(dir, 'src', 'pages', 'home.tsx'), '')
+
+    const result = await detectFramework(dir)
+
+    expect(result.providers).toContain('jotai')
+  })
+
+  it('detects mobx-react-lite as a provider', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'test-'))
+    await writeFile(join(dir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^19.0.0', 'mobx-react-lite': '^4.0.0' },
+      devDependencies: { vite: '^6.0.0' },
+    }))
+    await mkdir(join(dir, 'src', 'pages'), { recursive: true })
+    await writeFile(join(dir, 'src', 'pages', 'home.tsx'), '')
+
+    const result = await detectFramework(dir)
+
+    expect(result.providers).toContain('mobx-react-lite')
+  })
+
   it('does not detect @reduxjs/toolkit as provider when it is absent', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'test-'))
     await writeFile(join(dir, 'package.json'), JSON.stringify({

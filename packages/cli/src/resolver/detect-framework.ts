@@ -39,6 +39,8 @@ const KNOWN_PROVIDERS = [
   '@mui/material',
   '@reduxjs/toolkit',
   'recoil',
+  'jotai',
+  'mobx-react-lite',
 ] as const
 
 const PAGE_PATTERNS = [
