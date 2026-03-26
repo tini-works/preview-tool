@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { extractHookFacts, extractComponentFacts, extractConditionalFacts, extractNavigationFacts, extractLocalStateFacts, extractDerivedVarFacts, extractFunctionFacts, extractPropertyChains, collectAllFacts, findTsConfig, aggregateSelectorHooks } from '../collect-facts.js'
 import { Project } from 'ts-morph'
-import { writeFileSync, mkdirSync, rmSync } from 'node:fs'
+import { writeFileSync, mkdirSync, rmSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -819,6 +819,118 @@ describe('Zustand selector aggregation', () => {
     expect(hooks).toHaveLength(1)
     expect(hooks[0].destructuredFields).toBeUndefined()
     expect(hooks[0].selectorPattern).toBeUndefined()
+  })
+})
+
+describe('GAP-05: collectAllFacts — workspace root tsconfig path merging', () => {
+  // Creates a minimal monorepo layout in a temp directory:
+  //   <root>/                          ← workspace root (has workspaces in package.json)
+  //     package.json
+  //     tsconfig.json                  ← has @myorg/* → packages/*/src paths
+  //     packages/
+  //       auth/src/index.ts            ← workspace package hook source
+  //       app/
+  //         package.json
+  //         tsconfig.json              ← no paths at all
+  //         src/Screen.tsx             ← imports from @myorg/auth
+
+  let rootDir: string
+
+  beforeAll(() => {
+    rootDir = join(tmpdir(), 'ws-path-test-' + Date.now())
+
+    // workspace root
+    mkdirSync(join(rootDir, 'packages', 'auth', 'src'), { recursive: true })
+    mkdirSync(join(rootDir, 'packages', 'app', 'src'), { recursive: true })
+
+    // workspace root package.json (declares workspaces)
+    writeFileSync(join(rootDir, 'package.json'), JSON.stringify({
+      name: 'monorepo-root',
+      workspaces: ['packages/*'],
+    }))
+
+    // workspace root tsconfig with @myorg/* paths
+    writeFileSync(join(rootDir, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: {
+        paths: {
+          '@myorg/auth': ['./packages/auth/src/index.ts'],
+          '@myorg/*': ['./packages/*/src/index.ts'],
+        },
+      },
+    }))
+
+    // workspace package: auth hook
+    writeFileSync(join(rootDir, 'packages', 'auth', 'src', 'index.ts'), `
+      export function useAuth() {
+        return { user: null as { id: string; name: string } | null, isLoggedIn: false }
+      }
+    `)
+
+    // app package.json
+    writeFileSync(join(rootDir, 'packages', 'app', 'package.json'), JSON.stringify({
+      name: 'app',
+      dependencies: { '@myorg/auth': '*' },
+    }))
+
+    // app tsconfig — no paths defined (the common monorepo case)
+    writeFileSync(join(rootDir, 'packages', 'app', 'tsconfig.json'), JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        jsx: 'react-jsx',
+      },
+    }))
+
+    // screen file that imports from the workspace package
+    writeFileSync(join(rootDir, 'packages', 'app', 'src', 'Screen.tsx'), `
+      import { useAuth } from '@myorg/auth'
+      export default function Screen() {
+        const { user, isLoggedIn } = useAuth()
+        return null
+      }
+    `)
+  })
+
+  afterAll(() => {
+    rmSync(rootDir, { recursive: true, force: true })
+  })
+
+  it('collects useAuth hook imported from a workspace package', async () => {
+    const screenPath = join(rootDir, 'packages', 'app', 'src', 'Screen.tsx')
+    const screens = [{ filePath: screenPath, route: '/screen' }]
+    const facts = await collectAllFacts(screens)
+
+    expect(facts).toHaveLength(1)
+    const hook = facts[0].hooks.find(h => h.name === 'useAuth')
+    expect(hook).toBeDefined()
+    expect(hook?.importPath).toBe('@myorg/auth')
+  })
+
+  it('merges workspace root paths while preserving app-specific paths', async () => {
+    // Write an app tsconfig that already has its own @/ path alias
+    const appTsConfigPath = join(rootDir, 'packages', 'app', 'tsconfig.json')
+    writeFileSync(appTsConfigPath, JSON.stringify({
+      compilerOptions: {
+        strict: true,
+        jsx: 'react-jsx',
+        paths: {
+          '@/*': ['./src/*'],
+        },
+      },
+    }))
+
+    const screenPath = join(rootDir, 'packages', 'app', 'src', 'Screen.tsx')
+    const screens = [{ filePath: screenPath, route: '/screen' }]
+    const facts = await collectAllFacts(screens)
+
+    // Hook should still be collected (import map is path-independent)
+    const hook = facts[0].hooks.find(h => h.name === 'useAuth')
+    expect(hook).toBeDefined()
+    expect(hook?.importPath).toBe('@myorg/auth')
+
+    // Restore no-paths tsconfig for other tests
+    writeFileSync(appTsConfigPath, JSON.stringify({
+      compilerOptions: { strict: true, jsx: 'react-jsx' },
+    }))
   })
 })
 

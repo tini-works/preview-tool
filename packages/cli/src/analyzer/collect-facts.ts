@@ -1,6 +1,6 @@
 import { type SourceFile, SyntaxKind, type CallExpression, type Node, Project } from 'ts-morph'
 import { readFile } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import type {
   HookFact,
@@ -15,6 +15,7 @@ import type {
   ScreenFacts,
 } from './types.js'
 import { extractHookReturnType, extractUseStateType, extractStoreSelectorType } from './extract-types.js'
+import { findWorkspaceRoot } from '../server/create-vite-config.js'
 
 /**
  * Extract all hook call facts from a source file using AST.
@@ -1107,11 +1108,61 @@ export interface ScreenInput {
 export async function collectAllFacts(screens: ScreenInput[]): Promise<ScreenFacts[]> {
   const tsConfigPath = screens.length > 0 ? findTsConfig(screens[0].filePath) : null
 
+  // GAP-05: Monorepo workspace path resolution.
+  // When the app's tsconfig has no paths for workspace packages (e.g. @myorg/*),
+  // walk up to the workspace root and merge its tsconfig paths into the project's
+  // compiler options so that ts-morph can resolve workspace package imports for
+  // type extraction (extractHookReturnType).
+  let mergedPaths: Record<string, string[]> | undefined
+  if (tsConfigPath) {
+    const appTsConfigDir = dirname(tsConfigPath)
+    const workspaceRoot = findWorkspaceRoot(appTsConfigDir)
+    if (workspaceRoot && workspaceRoot !== appTsConfigDir) {
+      const wsConfigPath = join(workspaceRoot, 'tsconfig.json')
+      if (existsSync(wsConfigPath)) {
+        try {
+          const wsConfig = JSON.parse(readFileSync(wsConfigPath, 'utf-8')) as Record<string, unknown>
+          const wsPaths = (wsConfig?.compilerOptions as Record<string, unknown> | undefined)?.paths as Record<string, string[]> | undefined
+          if (wsPaths && Object.keys(wsPaths).length > 0) {
+            // Read app tsconfig paths to avoid overriding app-specific path mappings
+            let appPaths: Record<string, string[]> = {}
+            try {
+              const appConfig = JSON.parse(readFileSync(tsConfigPath, 'utf-8')) as Record<string, unknown>
+              appPaths = ((appConfig?.compilerOptions as Record<string, unknown> | undefined)?.paths ?? {}) as Record<string, string[]>
+            } catch { /* ignore */ }
+
+            // Merge: workspace paths provide defaults, app paths take precedence
+            const merged: Record<string, string[]> = { ...wsPaths }
+            for (const [k, v] of Object.entries(appPaths)) {
+              merged[k] = v
+            }
+
+            // Only apply the merge if workspace added at least one new path prefix
+            const addedAny = Object.keys(wsPaths).some(k => !(k in appPaths))
+            if (addedAny) {
+              // Resolve workspace paths relative to the workspace root
+              const resolved: Record<string, string[]> = {}
+              for (const [pattern, targets] of Object.entries(merged)) {
+                resolved[pattern] = targets.map(t =>
+                  t.startsWith('.') ? join(workspaceRoot, t) : t
+                )
+              }
+              mergedPaths = resolved
+            }
+          }
+        } catch { /* ignore */ }
+      }
+    }
+  }
+
   const project = new Project({
     useInMemoryFileSystem: false,
     tsConfigFilePath: tsConfigPath ?? undefined,
     skipAddingFilesFromTsConfig: true,
-    ...(tsConfigPath ? {} : { compilerOptions: { strict: true, jsx: 4 } }),
+    ...(tsConfigPath
+      ? (mergedPaths ? { compilerOptions: { paths: mergedPaths } } : {})
+      : { compilerOptions: { strict: true, jsx: 4 } }
+    ),
   })
 
   // Add all screen files to the shared project
