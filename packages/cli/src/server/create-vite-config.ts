@@ -239,6 +239,9 @@ export async function createViteConfig(
   // Write browser-safe shims for Node.js built-ins (e.g. node:async_hooks)
   const nodeShimAliases = writeNodeShims(previewDir, cwd)
 
+  // Resolve workspace root early — needed for both alias resolution and server.fs.allow
+  const workspaceRoot = findWorkspaceRoot(cwd)
+
   // Use array format to guarantee ordering: shims first, then __real: aliases,
   // then mock aliases, then React deduplication, then general @/ alias last.
   const aliasArray = [
@@ -256,7 +259,8 @@ export async function createViteConfig(
     { find: '@host', replacement: join(cwd, 'src') },
     { find: '@preview', replacement: previewDir },
     // 4. Project path aliases from tsconfig.json (longest-find-first, falling back to src/)
-    ...buildProjectAliases(cwd),
+    //    Falls back to workspace root tsconfig when app tsconfig has no paths (monorepo).
+    ...buildProjectAliases(cwd, workspaceRoot),
   ]
 
   // Only include packages that the host project actually depends on
@@ -268,8 +272,6 @@ export async function createViteConfig(
   } catch {
     // package.json unreadable — stick with react/react-dom
   }
-
-  const workspaceRoot = findWorkspaceRoot(cwd)
 
   return {
     root: previewDir,
@@ -369,13 +371,29 @@ export function findWorkspaceRoot(cwd: string): string | null {
  * returned — we trust the project's own configuration and don't mix in
  * defaults. Projects that use ~/ must have it in their tsconfig.
  *
- * Falls back to the conventional @/ + ~/ → src/ mapping ONLY when tsconfig
- * has no paths at all (e.g. a plain CRA project). This preserves backwards
- * compatibility for projects that rely on the old hardcoded defaults.
+ * Monorepo fallback: when the app tsconfig has no paths but a workspace root
+ * tsconfig does, the workspace root aliases are used instead. This handles
+ * the common case where workspace-wide aliases (e.g. @myorg/*) live only in
+ * the root tsconfig and the app tsconfig does not extend it.
+ *
+ * Falls back to the conventional @/ + ~/ → src/ mapping ONLY when neither
+ * the app nor the workspace root tsconfig has any paths (e.g. a plain CRA
+ * project). This preserves backwards compatibility for projects that rely on
+ * the old hardcoded defaults.
  */
-function buildProjectAliases(cwd: string): Array<{ find: string; replacement: string }> {
+function buildProjectAliases(
+  cwd: string,
+  workspaceRoot: string | null,
+): Array<{ find: string; replacement: string }> {
   const fromTsconfig = readProjectAliases(cwd)
   if (fromTsconfig.length > 0) return fromTsconfig
+
+  // Monorepo fallback: check workspace root tsconfig
+  if (workspaceRoot && workspaceRoot !== cwd) {
+    const fromWorkspaceRoot = readProjectAliases(workspaceRoot)
+    if (fromWorkspaceRoot.length > 0) return fromWorkspaceRoot
+  }
+
   // Fallback: used only when tsconfig has no paths section
   return [
     { find: '~/', replacement: join(cwd, 'src') + '/' },

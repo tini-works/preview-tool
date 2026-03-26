@@ -4,6 +4,45 @@ import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { loadHostEnvDefines, findWorkspaceRoot, createViteConfig } from '../create-vite-config.js'
 
+describe('createViteConfig — monorepo workspace root alias fallback', () => {
+  it('picks up @myorg/* aliases from workspace root tsconfig when app tsconfig has no paths', async () => {
+    const wsRoot = mkdtempSync(join(tmpdir(), 'preview-ws-'))
+    const appDir = join(wsRoot, 'packages', 'app')
+    mkdirSync(join(appDir, '.preview'), { recursive: true })
+    mkdirSync(join(wsRoot, 'packages', 'auth', 'src'), { recursive: true })
+
+    // Workspace root package.json (declares workspaces)
+    writeFileSync(join(wsRoot, 'package.json'), JSON.stringify({
+      workspaces: ['packages/*'],
+      dependencies: { react: '^18.0.0' },
+    }))
+    // Root tsconfig with @myorg/* alias
+    writeFileSync(join(wsRoot, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: {
+        paths: { '@myorg/*': ['./packages/*/src'] }
+      }
+    }))
+    // App tsconfig — no paths, no extends
+    writeFileSync(join(appDir, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: { strict: true }
+    }))
+    writeFileSync(join(appDir, 'package.json'), JSON.stringify({
+      dependencies: { react: '^18.0.0' }
+    }))
+    writeFileSync(join(appDir, '.preview', 'screen-source-paths.json'), '[]')
+
+    const config = await createViteConfig(appDir, {
+      port: 3300, specsDir: undefined, screenGlob: 'src/**/*.tsx', title: 'Test'
+    })
+    const alias = (config as Record<string, unknown>)['resolve'] as Record<string, unknown>
+    const aliasArray = alias['alias'] as Array<{ find: string; replacement: string }>
+    const myorgAlias = aliasArray.find(a => String(a.find).includes('@myorg'))
+    expect(myorgAlias).toBeDefined()
+
+    rmSync(wsRoot, { recursive: true, force: true })
+  })
+})
+
 let tmp: string
 beforeEach(() => { tmp = mkdtempSync(join(tmpdir(), 'vite-test-')) })
 afterEach(() => { rmSync(tmp, { recursive: true, force: true }) })
